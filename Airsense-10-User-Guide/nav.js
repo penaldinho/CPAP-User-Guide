@@ -48,10 +48,11 @@ function injectNav(currentPageFile) {
     const persistedCollapsed = localStorage.getItem('nav-collapsed') === 'true';
     document.body.classList.toggle('nav-collapsed', persistedCollapsed);
     const isLocalHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    const hostedChatHref = 'https://chat.medtechguides.uk/chat.html';
     const landingHref = '../index.html';
     const chatHref = isLocalHost && window.location.port !== '3000'
       ? 'http://localhost:3000/chat.html'
-      : 'chat.html';
+      : hostedChatHref;
     const chatCurrent = currentPageFile === 'chat' ? ' aria-current="page"' : '';
     const searchCurrent = currentPageFile === 'search' ? ' aria-current="page"' : '';
 
@@ -257,9 +258,10 @@ function injectNav(currentPageFile) {
 
     if (!header.querySelector('.chat-button')) {
       const isLocalHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+      const hostedChatHref = 'https://chat.medtechguides.uk/chat.html';
       const chatHref = isLocalHost && window.location.port !== '3000'
         ? 'http://localhost:3000/chat.html'
-        : 'chat.html';
+        : hostedChatHref;
       const chatButton = document.createElement('a');
       chatButton.className = 'chat-button';
       chatButton.href = chatHref;

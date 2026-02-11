@@ -20,8 +20,16 @@
     <script>
       (function () {
         const isLocalHost = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+        const hostedChatHref = 'https://chat.medtechguides.uk/chat.html';
+        const isHostedChat = location.hostname === 'chat.medtechguides.uk';
+
         if (isLocalHost && location.port !== '3000') {
           location.replace('http://localhost:3000/chat.html');
+          return;
+        }
+
+        if (!isLocalHost && !isHostedChat) {
+          location.replace(hostedChatHref);
         }
       })();
     </script>
@@ -74,7 +82,7 @@
     </div>
 
     <div class="footer">
-      <a href="index.html">← Back to contents</a>
+      <a href="https://medtechguides.uk/Airsense-10-User-Guide/index.html">← Back to contents</a>
     </div>
   </div>
 
