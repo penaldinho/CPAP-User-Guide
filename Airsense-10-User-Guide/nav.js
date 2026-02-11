@@ -48,8 +48,11 @@ function injectNav(currentPageFile) {
     const persistedCollapsed = localStorage.getItem('nav-collapsed') === 'true';
     document.body.classList.toggle('nav-collapsed', persistedCollapsed);
     const isLocalHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    const isHostedChat = window.location.hostname === 'chat.medtechguides.uk';
     const hostedChatHref = 'https://chat.medtechguides.uk/chat.html';
-    const landingHref = '../index.html';
+    const guideBaseHref = isHostedChat ? 'https://medtechguides.uk/Airsense-10-User-Guide/' : '';
+    const guideHref = (path) => guideBaseHref ? `${guideBaseHref}${path}` : path;
+    const landingHref = isHostedChat ? 'https://medtechguides.uk/' : '../index.html';
     const chatHref = isLocalHost && window.location.port !== '3000'
       ? 'http://localhost:3000/chat.html'
       : hostedChatHref;
@@ -65,15 +68,15 @@ function injectNav(currentPageFile) {
       </div>
       <div class="nav-list">
         <a class="nav-link-primary nav-link-home" href="${landingHref}"><span class="nav-link-icon" aria-hidden="true">🏠</span>MedTech Guides</a>
-        <a class="nav-link-primary" href="index.html"><span class="nav-link-icon" aria-hidden="true">📚</span>Contents</a>
+        <a class="nav-link-primary" href="${guideHref('index.html')}"><span class="nav-link-icon" aria-hidden="true">📚</span>Contents</a>
         <a class="nav-link-primary" href="${chatHref}"${chatCurrent}><span class="nav-link-icon" aria-hidden="true">💬</span>Chat Assistant</a>
-        <a class="nav-link-primary" href="search.html"${searchCurrent}><span class="nav-link-icon" aria-hidden="true">🔍</span>Search</a>
+        <a class="nav-link-primary" href="${guideHref('search.html')}"${searchCurrent}><span class="nav-link-icon" aria-hidden="true">🔍</span>Search</a>
         ${navItems.map(item => {
           const isCurrent = item.href === currentPageFile + '.html';
           const ariaCurrent = isCurrent ? ' aria-current="page"' : '';
           const icon = item.icon ? `<span class="nav-link-icon" aria-hidden="true">${item.icon}</span>` : '';
           if (item.href === 'index.html') return '';
-          return `<a href="${item.href}"${ariaCurrent}>${icon}${item.label}</a>`;
+          return `<a href="${guideHref(item.href)}"${ariaCurrent}>${icon}${item.label}</a>`;
         }).filter(Boolean).join('\n        ')}
       </div>
       <div class="nav-actions" aria-label="Quick actions">
@@ -81,7 +84,7 @@ function injectNav(currentPageFile) {
           <span class="nav-action-icon" aria-hidden="true">🏠</span>
           <span class="tooltip" role="tooltip">MedTech Guides</span>
         </a>
-        <a class="nav-action-btn nav-action-contents" href="index.html" aria-label="Contents">
+        <a class="nav-action-btn nav-action-contents" href="${guideHref('index.html')}" aria-label="Contents">
           <span class="nav-action-icon" aria-hidden="true">📚</span>
           <span class="tooltip" role="tooltip">Contents</span>
         </a>
@@ -89,7 +92,7 @@ function injectNav(currentPageFile) {
           <span class="nav-action-icon" aria-hidden="true">💬</span>
           <span class="tooltip" role="tooltip">Chat assistant</span>
         </a>
-        <a class="nav-action-btn nav-action-search" href="search.html" aria-label="Search">
+        <a class="nav-action-btn nav-action-search" href="${guideHref('search.html')}" aria-label="Search">
           <span class="nav-action-icon" aria-hidden="true">🔍</span>
           <span class="tooltip" role="tooltip">Search</span>
         </a>
@@ -181,12 +184,20 @@ function injectNav(currentPageFile) {
       target.setAttribute('role', 'link');
       target.setAttribute('tabindex', '0');
       target.addEventListener('click', () => {
-        window.location.href = 'welcome.html';
+        const isHostedChat = window.location.hostname === 'chat.medtechguides.uk';
+        const guideHref = isHostedChat
+          ? 'https://medtechguides.uk/Airsense-10-User-Guide/welcome.html'
+          : 'welcome.html';
+        window.location.href = guideHref;
       });
       target.addEventListener('keydown', (event) => {
         if (event.key === 'Enter' || event.key === ' ') {
           event.preventDefault();
-          window.location.href = 'welcome.html';
+          const isHostedChat = window.location.hostname === 'chat.medtechguides.uk';
+          const guideHref = isHostedChat
+            ? 'https://medtechguides.uk/Airsense-10-User-Guide/welcome.html'
+            : 'welcome.html';
+          window.location.href = guideHref;
         }
       });
     });
@@ -319,7 +330,11 @@ function injectNav(currentPageFile) {
       e.preventDefault();
       const query = document.getElementById('header-search-input').value;
       if (query.trim()) {
-        window.location.href = `search.html?q=${encodeURIComponent(query)}`;
+        const isHostedChat = window.location.hostname === 'chat.medtechguides.uk';
+        const searchHref = isHostedChat
+          ? `https://medtechguides.uk/Airsense-10-User-Guide/search.html?q=${encodeURIComponent(query)}`
+          : `search.html?q=${encodeURIComponent(query)}`;
+        window.location.href = searchHref;
       }
     });
   }
