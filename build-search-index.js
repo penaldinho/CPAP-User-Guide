@@ -3,6 +3,8 @@
 const fs = require('fs');
 const path = require('path');
 
+const baseDir = path.join(__dirname, 'Airsense-10-User-Guide');
+
 // List of HTML files to index (in order of importance)
 const htmlFiles = [
   'welcome.html',
@@ -175,7 +177,7 @@ function buildSearchIndex() {
   const pages = [];
   
   htmlFiles.forEach(filename => {
-    const filepath = path.join(__dirname, filename);
+    const filepath = path.join(baseDir, filename);
     
     if (fs.existsSync(filepath)) {
       try {
@@ -193,7 +195,7 @@ function buildSearchIndex() {
   const searchIndex = { pages };
   
   // Write search index
-  const outputPath = path.join(__dirname, 'search-index.json');
+  const outputPath = path.join(baseDir, 'search-index.json');
   fs.writeFileSync(outputPath, JSON.stringify(searchIndex, null, 2), 'utf8');
   
   console.log(`\nSearch index built successfully!`);

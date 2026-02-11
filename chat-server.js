@@ -17,14 +17,16 @@ if (!API_KEY) {
   process.exit(1);
 }
 
+const baseDir = path.join(__dirname, 'Airsense-10-User-Guide');
+
 const app = express();
 app.use(express.json());
-app.use(express.static(__dirname));
+app.use(express.static(baseDir));
 
 // Load search index to get manual content
 let manualContent = '';
 try {
-  const searchIndexPath = path.join(__dirname, 'search-index.json');
+  const searchIndexPath = path.join(baseDir, 'search-index.json');
   const searchIndex = JSON.parse(fs.readFileSync(searchIndexPath, 'utf8'));
   
   // Combine all page content into one comprehensive manual
