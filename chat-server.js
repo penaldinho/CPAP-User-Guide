@@ -17,23 +17,51 @@ if (!API_KEY) {
   process.exit(1);
 }
 
-const baseDir = path.join(__dirname, 'Airsense-10-User-Guide');
+const guideConfigs = {
+  'airsense-10': {
+    name: 'AirSense 10',
+    dir: path.join(__dirname, 'Airsense-10-User-Guide')
+  }
+};
+
+const defaultGuide = 'airsense-10';
+const manualCache = new Map();
+
+const baseDir = guideConfigs[defaultGuide].dir;
 
 const app = express();
 app.use(express.json());
 app.use(express.static(baseDir));
 
-// Load search index to get manual content
-let manualContent = '';
-try {
-  const searchIndexPath = path.join(baseDir, 'search-index.json');
+const buildManualContent = (searchIndex) => searchIndex.pages
+  .map(page => `# ${page.title}\n\n${page.description}\n\n${page.content}`)
+  .join('\n\n---\n\n');
+
+const loadManualContent = (guideKey) => {
+  const guide = guideConfigs[guideKey] || guideConfigs[defaultGuide];
+  if (!guide) {
+    throw new Error(`Unknown guide: ${guideKey}`);
+  }
+
+  if (manualCache.has(guideKey)) {
+    return manualCache.get(guideKey);
+  }
+
+  const searchIndexPath = path.join(guide.dir, 'search-index.json');
   const searchIndex = JSON.parse(fs.readFileSync(searchIndexPath, 'utf8'));
-  
-  // Combine all page content into one comprehensive manual
-  manualContent = searchIndex.pages
-    .map(page => `# ${page.title}\n\n${page.description}\n\n${page.content}`)
-    .join('\n\n---\n\n');
-  
+  const manualContent = buildManualContent(searchIndex);
+
+  const cached = {
+    manualContent,
+    guideName: guide.name
+  };
+  manualCache.set(guideKey, cached);
+  return cached;
+};
+
+// Warm cache for the default guide
+try {
+  loadManualContent(defaultGuide);
   console.log('Loaded manual content from search-index.json');
 } catch (error) {
   console.error('Error loading search index:', error.message);
@@ -43,8 +71,8 @@ try {
 /**
  * Call Hugging Face Inference API
  */
-async function callHuggingFace(userMessage) {
-  const systemPrompt = `You are a helpful assistant for the AirSense 10 CPAP device user manual. 
+async function callHuggingFace(userMessage, manualContent, guideName) {
+  const systemPrompt = `You are a helpful assistant for the ${guideName} user manual. 
 Answer questions based on the following manual content. Be concise, helpful, and always cite which section of the manual you're referring to.
 If the manual doesn't contain information about the question, say so clearly.
 
@@ -220,8 +248,8 @@ async function callHuggingFaceCompletionFallback(prompt, model, hfBaseUrl) {
 /**
  * Call OpenAI API
  */
-async function callOpenAI(userMessage) {
-  const systemPrompt = `You are a helpful assistant for the AirSense 10 CPAP device user manual. 
+async function callOpenAI(userMessage, manualContent, guideName) {
+  const systemPrompt = `You are a helpful assistant for the ${guideName} user manual. 
 Answer questions based on the following manual content. Be concise, helpful, and always cite which section of the manual you're referring to.
 If the manual doesn't contain information about the question, say so clearly.
 
@@ -268,7 +296,7 @@ ${manualContent}`;
  * Main chat endpoint
  */
 app.post('/api/chat', async (req, res) => {
-  const { message } = req.body;
+  const { message, guide } = req.body;
 
   if (!message || message.trim().length === 0) {
     return res.status(400).json({ error: 'Message is required' });
@@ -277,11 +305,14 @@ app.post('/api/chat', async (req, res) => {
   try {
     console.log(`[${new Date().toISOString()}] User: ${message}`);
 
+    const guideKey = (guide || defaultGuide).toLowerCase();
+    const { manualContent, guideName } = loadManualContent(guideKey);
+
     let response;
     if (LLM_PROVIDER === 'openai') {
-      response = await callOpenAI(message);
+      response = await callOpenAI(message, manualContent, guideName);
     } else {
-      response = await callHuggingFace(message);
+      response = await callHuggingFace(message, manualContent, guideName);
     }
 
     console.log(`[${new Date().toISOString()}] Assistant: ${response.substring(0, 100)}...`);
@@ -315,6 +346,7 @@ const HOST = process.env.HOST || '0.0.0.0';
 app.listen(PORT, HOST, () => {
   console.log(`\n✓ Chat server running on http://localhost:${PORT}`);
   console.log(`✓ Provider: ${LLM_PROVIDER}`);
+  const { manualContent } = loadManualContent(defaultGuide);
   console.log(`✓ Manual content loaded: ${Math.round(manualContent.length / 1024)}KB`);
   console.log('\nOpen http://localhost:3000/chat.html in your browser to start chatting!');
   console.log('To access from a phone on the same Wi-Fi, use http://<your-pc-ip>:' + PORT + '/chat.html\n');

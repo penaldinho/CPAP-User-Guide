@@ -24,6 +24,9 @@ class ChatBot {
     const userMessage = this.inputField.value.trim();
     if (!userMessage || this.isLoading) return;
 
+    const urlParams = new URLSearchParams(window.location.search);
+    const guide = urlParams.get('guide') || 'airsense-10';
+
     // Add user message to chat
     this.addMessage(userMessage, 'user');
     this.inputField.value = '';
@@ -40,7 +43,7 @@ class ChatBot {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ message: userMessage })
+        body: JSON.stringify({ message: userMessage, guide })
       });
 
       if (!response.ok) {

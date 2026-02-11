@@ -49,7 +49,7 @@ function injectNav(currentPageFile) {
     document.body.classList.toggle('nav-collapsed', persistedCollapsed);
     const isLocalHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
     const isHostedChat = window.location.hostname === 'chat.medtechguides.uk';
-    const hostedChatHref = 'https://chat.medtechguides.uk/chat.html';
+    const hostedChatHref = 'https://chat.medtechguides.uk/chat.html?guide=airsense-10';
     const guideBaseHref = isHostedChat ? 'https://medtechguides.uk/Airsense-10-User-Guide/' : '';
     const guideHref = (path) => guideBaseHref ? `${guideBaseHref}${path}` : path;
     const landingHref = isHostedChat ? 'https://medtechguides.uk/' : '../index.html';
@@ -269,7 +269,7 @@ function injectNav(currentPageFile) {
 
     if (!header.querySelector('.chat-button')) {
       const isLocalHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-      const hostedChatHref = 'https://chat.medtechguides.uk/chat.html';
+      const hostedChatHref = 'https://chat.medtechguides.uk/chat.html?guide=airsense-10';
       const chatHref = isLocalHost && window.location.port !== '3000'
         ? 'http://localhost:3000/chat.html'
         : hostedChatHref;

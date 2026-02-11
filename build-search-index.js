@@ -3,7 +3,10 @@
 const fs = require('fs');
 const path = require('path');
 
-const baseDir = path.join(__dirname, 'Airsense-10-User-Guide');
+const targetDirArg = process.argv[2];
+const baseDir = targetDirArg
+  ? path.resolve(__dirname, targetDirArg)
+  : path.join(__dirname, 'Airsense-10-User-Guide');
 
 // List of HTML files to index (in order of importance)
 const htmlFiles = [
