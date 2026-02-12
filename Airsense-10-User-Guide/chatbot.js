@@ -6,39 +6,8 @@ class ChatBot {
     this.sendBtn = document.getElementById('chat-send-btn');
     this.loadingDiv = document.getElementById('chat-loading');
     this.isLoading = false;
-    this.chatDisabled = false;
 
-    this.checkChatAvailability();
     this.setupEventListeners();
-  }
-
-  async checkChatAvailability() {
-    const isLocalHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-    if (isLocalHost) return; // Always available on localhost
-
-    const apiUrl = 'https://chat.medtechguides.uk/api/health';
-    
-    try {
-      const response = await fetch(apiUrl, { method: 'GET', signal: AbortSignal.timeout(5000) });
-      if (!response.ok) throw new Error('Health check failed');
-    } catch (error) {
-      this.chatDisabled = true;
-      this.disableChatWithMessage();
-    }
-  }
-
-  disableChatWithMessage() {
-    this.messagesContainer.innerHTML = '';
-    this.addMessage(
-      '<strong>Chat Assistant Unavailable</strong><br><br>' +
-      'The chat assistant is currently unavailable on corporate networks with SSL inspection (such as Zscaler).<br><br>' +
-      'You can still access all manual content through the navigation menu. For chat functionality, please access this site from a personal device or contact your IT department to whitelist <code>chat.medtechguides.uk</code>.',
-      'assistant',
-      true
-    );
-    this.inputField.disabled = true;
-    this.sendBtn.disabled = true;
-    this.inputField.placeholder = 'Chat unavailable on this network';
   }
 
   setupEventListeners() {
@@ -53,7 +22,7 @@ class ChatBot {
 
   async sendMessage() {
     const userMessage = this.inputField.value.trim();
-    if (!userMessage || this.isLoading || this.chatDisabled) return;
+    if (!userMessage || this.isLoading) return;
 
     const urlParams = new URLSearchParams(window.location.search);
     const guide = urlParams.get('guide') || 'airsense-10';
@@ -88,20 +57,14 @@ class ChatBot {
       this.addMessage(data.response, 'assistant');
     } catch (error) {
       console.error('Chat error:', error);
-      
-      // Check if this is a network/SSL error
-      if (error.message.includes('Failed to fetch') || error.name === 'TypeError') {
-        this.chatDisabled = true;
-        this.disableChatWithMessage();
-      } else {
-        this.addMessage(
-          `Sorry, I encountered an error: ${error.message}. Please try again.`,
-          'assistant'
-        );
-      }
+      this.addMessage(
+        `<div class="chat-error">Sorry, I encountered an error: ${error.message}. Please make sure the chat server is running.</div>`,
+        'assistant',
+        true
+      );
     } finally {
       this.isLoading = false;
-      this.sendBtn.disabled = this.chatDisabled;
+      this.sendBtn.disabled = false;
       this.loadingDiv.style.display = 'none';
     }
   }
