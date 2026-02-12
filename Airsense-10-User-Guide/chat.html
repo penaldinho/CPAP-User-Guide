@@ -20,18 +20,10 @@
     <script>
       (function () {
         const isLocalHost = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
-        const urlParams = new URLSearchParams(location.search);
-        const guide = urlParams.get('guide') || 'airsense-10';
-        const hostedChatHref = `https://chat.medtechguides.uk/chat.html?guide=${encodeURIComponent(guide)}`;
-        const isHostedChat = location.hostname === 'chat.medtechguides.uk';
 
         if (isLocalHost && location.port !== '3000') {
           location.replace('http://localhost:3000/chat.html');
           return;
-        }
-
-        if (!isLocalHost && !isHostedChat) {
-          location.replace(hostedChatHref);
         }
       })();
     </script>
