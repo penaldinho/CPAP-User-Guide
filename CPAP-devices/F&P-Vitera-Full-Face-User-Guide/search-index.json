@@ -1,0 +1,81 @@
+{
+  "pages": [
+    {
+      "title": "F&P Vitera Full Face Mask User Guide",
+      "file": "index.html",
+      "description": "Contents and quick access for the F&P Vitera Full Face mask guide.",
+      "keywords": ["fp", "vitera", "mask", "contents", "guide"],
+      "content": "F&P Vitera Full Face Mask User Guide Contents Welcome Operating Instructions Mask Parts Fitting Your Mask Cleaning Your Mask at Home Mask Assembly Symbol Definitions Technical Information Further Information Warranty Statement"
+    },
+    {
+      "title": "Welcome",
+      "file": "welcome.html",
+      "description": "Welcome and intended use information for the F&P Vitera mask.",
+      "keywords": ["welcome", "intended use", "vitera", "mask"],
+      "content": "Welcome to the F&P Vitera Full Face Mask user guide with overview and usage information."
+    },
+    {
+      "title": "Operating Instructions",
+      "file": "operating-instructions.html",
+      "description": "Operating pressure, temperature range, and pre-use checks.",
+      "keywords": ["operating instructions", "pressure", "temperature", "pre-use checks"],
+      "content": "Operating Instructions include operating pressure and temperature ranges, and pre-use safety checks for seal and vents."
+    },
+    {
+      "title": "Mask Parts",
+      "file": "mask-parts.html",
+      "description": "Mask components, diagrams, and assembly references.",
+      "keywords": ["mask parts", "components", "diagram", "assembly"],
+      "content": "Mask Parts section lists the Vitera components and diagrams used for fitting and assembly."
+    },
+    {
+      "title": "Fitting Your Mask",
+      "file": "fitting-your-mask.html",
+      "description": "Step-by-step guidance to fit the mask correctly.",
+      "keywords": ["fitting", "mask fit", "seal", "headgear"],
+      "content": "Fitting Your Mask explains the steps to put on and adjust the mask for a proper seal."
+    },
+    {
+      "title": "Cleaning Your Mask at Home",
+      "file": "cleaning-your-mask-at-home.html",
+      "description": "Home cleaning and disassembly guidance for mask care.",
+      "keywords": ["cleaning", "disassembly", "home care", "maintenance"],
+      "content": "Cleaning Your Mask at Home covers disassembly, daily cleaning, and weekly cleaning cautions."
+    },
+    {
+      "title": "Mask Assembly",
+      "file": "mask-assembly.html",
+      "description": "Instructions for reassembling mask components.",
+      "keywords": ["assembly", "reassembly", "mask"],
+      "content": "Mask Assembly explains how to reconnect mask components after cleaning."
+    },
+    {
+      "title": "Symbol Definitions",
+      "file": "symbol-definitions.html",
+      "description": "Symbol reference used on product and packaging.",
+      "keywords": ["symbols", "definitions", "packaging"],
+      "content": "Symbol Definitions shows symbols that may appear on product and packaging."
+    },
+    {
+      "title": "Technical Information",
+      "file": "technical-information.html",
+      "description": "Technical specifications, flow information, and operating limits.",
+      "keywords": ["technical", "specifications", "flow", "limits"],
+      "content": "Technical Information includes oxygen use notes, specifications, and performance tables for the mask."
+    },
+    {
+      "title": "Further Information",
+      "file": "further-information.html",
+      "description": "Warnings, cautions, contraindications, disposal, and patents.",
+      "keywords": ["warnings", "cautions", "contraindication", "disposal"],
+      "content": "Further Information contains warnings and cautions for safe use and disposal guidance."
+    },
+    {
+      "title": "Warranty Statement",
+      "file": "warranty-statement.html",
+      "description": "Limited warranty and support details.",
+      "keywords": ["warranty", "support", "coverage"],
+      "content": "Warranty Statement provides the applicable limited warranty period and support contact path."
+    }
+  ]
+}

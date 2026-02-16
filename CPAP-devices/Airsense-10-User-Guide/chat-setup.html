@@ -1,0 +1,332 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Chat Setup — Assistant</title>
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    .setup-wrap { max-width: 860px; margin: 0 auto; }
+    .setup-grid { display: grid; grid-template-columns: repeat(2, minmax(220px, 1fr)); gap: 14px; margin-bottom: 14px; }
+    .setup-field label { display: block; font-size: 0.9rem; color: #475569; margin-bottom: 6px; }
+    .setup-field select { width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 10px; font-size: 0.95rem; }
+    .setup-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    .setup-btn { display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 10px; padding: 10px 14px; background: #0d6efd; color: #fff; text-decoration: none; cursor: pointer; font-weight: 600; }
+    .setup-hint { color: #475569; font-size: 0.92rem; }
+    .setup-help { color: #64748b; font-size: 0.9rem; margin-top: 6px; }
+    .setup-summary { margin-top: 8px; color: #334155; font-size: 0.94rem; }
+    @media (min-width: 900px) { .setup-wrap.container { padding-left: var(--pad) !important; } }
+    @media (max-width: 700px) { .setup-grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="container setup-wrap">
+    <div class="header">
+      <div class="brand">Device Chat Assistant</div>
+      <div class="subbrand">Setup Selection</div>
+    </div>
+
+    <h1>Choose your setup</h1>
+
+    <div class="card">
+      <p class="setup-hint">Choose which guides the assistant should use for your questions.</p>
+      <p class="setup-help">Pick one primary guide first, then optionally add masks or tubing so answers can include your full setup.</p>
+      <div class="setup-grid">
+        <div class="setup-field">
+          <label for="setup-device">Primary guide</label>
+          <select id="setup-device"></select>
+        </div>
+      </div>
+
+      <div class="setup-field" style="margin-bottom: 8px;">
+        <label for="additional-search">Search additional guides</label>
+        <input id="additional-search" type="text" placeholder="Search masks, tubing, and other guides..." style="width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 10px; font-size: 0.95rem;" />
+      </div>
+
+      <div class="setup-field" style="margin-bottom: 12px;">
+        <label>Additional guides (optional)</label>
+        <div id="additional-guide-groups"></div>
+      </div>
+      <div class="setup-actions">
+        <button id="continue-chat" class="setup-btn" type="button">Continue to Chat Assistant</button>
+        <a href="https://medtechguides.uk/CPAP-devices/index.html" class="setup-btn" style="background:#64748b;">Back to CPAP guides</a>
+      </div>
+      <p id="setup-summary" class="setup-summary"></p>
+    </div>
+  </div>
+
+  <script>
+    const FALLBACK_FAMILY = {
+      family: 'cpap',
+      label: 'CPAP',
+      backHref: 'https://medtechguides.uk/CPAP-devices/index.html',
+      defaultGuide: 'airsense-10',
+      devices: [
+        { value: 'airsense-10', label: 'ResMed AirSense 10' },
+        { value: 'fp-vitera', label: 'F&P Vitera Full Face Mask' },
+        { value: 'climatelineair', label: 'ResMed ClimateLineAir' }
+      ],
+      masks: [
+        { value: 'fp-vitera', label: 'F&P Vitera Full Face Mask' }
+      ],
+      accessories: [
+        { value: 'climatelineair', label: 'ResMed ClimateLineAir' }
+      ]
+    };
+
+    const setupDevice = document.getElementById('setup-device');
+    const additionalSearch = document.getElementById('additional-search');
+    const additionalGuideGroups = document.getElementById('additional-guide-groups');
+    const setupSummary = document.getElementById('setup-summary');
+    const continueBtn = document.getElementById('continue-chat');
+    const backToGuidesLink = document.querySelector('.setup-actions a');
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const incomingFamily = (urlParams.get('family') || 'cpap').toLowerCase();
+    const incomingGuide = (urlParams.get('guide') || '').toLowerCase();
+    const incomingGuides = (urlParams.get('guides') || '')
+      .split(',')
+      .map((item) => item.trim().toLowerCase())
+      .filter(Boolean);
+
+    const setOptions = (selectEl, options, includeNone = false) => {
+      selectEl.innerHTML = '';
+      if (includeNone) {
+        const noneOpt = document.createElement('option');
+        noneOpt.value = '';
+        noneOpt.textContent = 'None';
+        selectEl.appendChild(noneOpt);
+      }
+      options.forEach((item) => {
+        const opt = document.createElement('option');
+        opt.value = item.value;
+        opt.textContent = item.label;
+        selectEl.appendChild(opt);
+      });
+    };
+
+    const getOptionLabel = (selectEl, value) => {
+      const match = Array.from(selectEl.options).find((opt) => opt.value === value);
+      return match ? match.textContent : 'None';
+    };
+
+    const buildGuides = (setup) => [...new Set([setup.primaryGuide, ...(setup.additionalGuides || [])].filter(Boolean))];
+
+    const fetchFamilyConfig = async (familyKey) => {
+      try {
+        const response = await fetch(`/api/setup-config?family=${encodeURIComponent(familyKey)}`);
+        if (!response.ok) {
+          throw new Error('Failed to load setup config');
+        }
+        return await response.json();
+      } catch {
+        return FALLBACK_FAMILY;
+      }
+    };
+
+    const init = async () => {
+      const familyConfig = await fetchFamilyConfig(incomingFamily);
+      const resolvedFamily = (familyConfig.family || incomingFamily || 'cpap').toLowerCase();
+      const setupStorageKey = `setup-profile-${resolvedFamily}`;
+
+      const categoryMeta = [
+        { key: 'devices', label: 'Devices' },
+        { key: 'masks', label: 'Masks' },
+        { key: 'accessories', label: 'Tubing' }
+      ];
+
+      const allGuideOptions = [];
+      const guideCategoryMap = new Map();
+      categoryMeta.forEach((meta) => {
+        (familyConfig[meta.key] || []).forEach((item) => {
+          if (!allGuideOptions.some((existing) => existing.value === item.value)) {
+            allGuideOptions.push({ ...item, category: meta.key, categoryLabel: meta.label });
+          }
+          guideCategoryMap.set(item.value, meta.key);
+        });
+      });
+
+      setOptions(setupDevice, allGuideOptions.map((item) => ({
+        value: item.value,
+        label: `${item.label} (${item.categoryLabel})`
+      })), false);
+      if (backToGuidesLink) {
+        backToGuidesLink.href = familyConfig.backHref || FALLBACK_FAMILY.backHref;
+      }
+
+      const allowedGuideValues = new Set(allGuideOptions.map((item) => item.value));
+
+      const defaultGuide = familyConfig.defaultGuide || (allGuideOptions[0] ? allGuideOptions[0].value : FALLBACK_FAMILY.defaultGuide);
+
+      const renderAdditionalGuideGroups = (selectedPrimaryGuide, selectedAdditionalGuides, searchTerm = '') => {
+        const normalizedSearch = String(searchTerm || '').trim().toLowerCase();
+        additionalGuideGroups.innerHTML = '';
+
+        categoryMeta.forEach((meta) => {
+          const sectionItems = allGuideOptions
+            .filter((item) => item.category === meta.key)
+            .filter((item) => item.value !== selectedPrimaryGuide)
+            .filter((item) => {
+              if (!normalizedSearch) return true;
+              return `${item.label} ${item.categoryLabel}`.toLowerCase().includes(normalizedSearch);
+            });
+
+          if (!sectionItems.length) return;
+
+          const section = document.createElement('div');
+          section.style.border = '1px solid #e5e7eb';
+          section.style.borderRadius = '10px';
+          section.style.padding = '10px 12px';
+          section.style.marginBottom = '8px';
+
+          const heading = document.createElement('h3');
+          heading.textContent = meta.label;
+          heading.style.margin = '0 0 8px';
+          heading.style.fontSize = '1rem';
+          section.appendChild(heading);
+
+          sectionItems.forEach((item) => {
+            const row = document.createElement('label');
+            row.style.display = 'flex';
+            row.style.alignItems = 'center';
+            row.style.gap = '8px';
+            row.style.marginBottom = '6px';
+            row.style.cursor = 'pointer';
+
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.value = item.value;
+            checkbox.checked = selectedAdditionalGuides.has(item.value);
+            checkbox.addEventListener('change', () => {
+              if (checkbox.checked) {
+                selectedAdditionalGuides.add(item.value);
+              } else {
+                selectedAdditionalGuides.delete(item.value);
+              }
+              saveAndRefresh();
+            });
+
+            const text = document.createElement('span');
+            text.textContent = item.label;
+
+            row.appendChild(checkbox);
+            row.appendChild(text);
+            section.appendChild(row);
+          });
+
+          additionalGuideGroups.appendChild(section);
+        });
+
+        if (!additionalGuideGroups.children.length) {
+          const empty = document.createElement('p');
+          empty.textContent = 'No additional guides match your search.';
+          empty.style.margin = '0';
+          empty.style.color = '#64748b';
+          additionalGuideGroups.appendChild(empty);
+        }
+      };
+
+      const getStoredSetup = () => {
+        try {
+          const parsed = JSON.parse(localStorage.getItem(setupStorageKey) || '{}');
+          const parsedAdditional = Array.isArray(parsed.additionalGuides)
+            ? parsed.additionalGuides
+            : [];
+          const legacyAdditional = [parsed.mask, parsed.accessory].filter(Boolean);
+          const additionalGuides = [...new Set([...parsedAdditional, ...legacyAdditional].map((item) => String(item || '').toLowerCase()).filter((item) => allowedGuideValues.has(item)))];
+          return {
+            primaryGuide: (parsed.primaryGuide || parsed.device || defaultGuide).toLowerCase(),
+            additionalGuides
+          };
+        } catch {
+          return { primaryGuide: defaultGuide, additionalGuides: [] };
+        }
+      };
+
+      const updateSummary = (setup) => {
+        const additionalLabels = (setup.additionalGuides || []).map((guideKey) => {
+          const option = allGuideOptions.find((item) => item.value === guideKey);
+          return option ? option.label : guideKey;
+        });
+        const primaryLabel = getOptionLabel(setupDevice, setup.primaryGuide);
+        setupSummary.textContent = additionalLabels.length
+          ? `Selected setup: ${primaryLabel} as your primary guide, plus ${additionalLabels.join(', ')}. The assistant will use these guides when answering.`
+          : `Selected setup: ${primaryLabel} as your primary guide. No additional guides selected yet.`;
+      };
+
+      const hydrateInitialSetup = () => {
+        const stored = getStoredSetup();
+        const additionalSet = new Set(stored.additionalGuides || []);
+        const fromIncoming = {
+          primaryGuide: allowedGuideValues.has(incomingGuide) ? incomingGuide : (stored.primaryGuide || defaultGuide),
+          additionalGuides: [...additionalSet]
+        };
+
+        incomingGuides.forEach((guideKey) => {
+          if (!allowedGuideValues.has(guideKey)) return;
+          if (guideKey !== fromIncoming.primaryGuide && !fromIncoming.additionalGuides.includes(guideKey)) {
+            fromIncoming.additionalGuides.push(guideKey);
+          }
+        });
+
+        fromIncoming.additionalGuides = fromIncoming.additionalGuides.filter((item) => item !== fromIncoming.primaryGuide);
+
+        setupDevice.value = fromIncoming.primaryGuide;
+        renderAdditionalGuideGroups(fromIncoming.primaryGuide, new Set(fromIncoming.additionalGuides), additionalSearch.value);
+        updateSummary(fromIncoming);
+        return fromIncoming;
+      };
+
+      let currentSetup = hydrateInitialSetup();
+
+      const saveAndRefresh = () => {
+        const selectedAdditionalGuides = Array.from(
+          additionalGuideGroups.querySelectorAll('input[type="checkbox"]:checked')
+        )
+          .map((input) => input.value)
+          .filter((value) => value !== setupDevice.value);
+
+        currentSetup = {
+          primaryGuide: setupDevice.value,
+          additionalGuides: [...new Set(selectedAdditionalGuides)]
+        };
+
+        const scopedGuides = buildGuides(currentSetup);
+        const firstMask = scopedGuides.find((guideKey) => guideCategoryMap.get(guideKey) === 'masks') || '';
+        const firstAccessory = scopedGuides.find((guideKey) => guideCategoryMap.get(guideKey) === 'accessories') || '';
+
+        localStorage.setItem(setupStorageKey, JSON.stringify(currentSetup));
+        localStorage.setItem('cpap-my-setup-v1', JSON.stringify({
+          device: currentSetup.primaryGuide,
+          mask: firstMask,
+          accessory: firstAccessory,
+          guides: scopedGuides
+        }));
+
+        renderAdditionalGuideGroups(currentSetup.primaryGuide, new Set(currentSetup.additionalGuides), additionalSearch.value);
+        updateSummary(currentSetup);
+      };
+
+      setupDevice.addEventListener('change', saveAndRefresh);
+      additionalSearch.addEventListener('input', () => {
+        renderAdditionalGuideGroups(currentSetup.primaryGuide, new Set(currentSetup.additionalGuides), additionalSearch.value);
+      });
+
+      continueBtn.addEventListener('click', () => {
+        saveAndRefresh();
+        const guides = buildGuides(currentSetup);
+        const chatQuery = new URLSearchParams({
+          guide: currentSetup.primaryGuide || defaultGuide,
+          family: resolvedFamily
+        });
+        if (guides.length) {
+          chatQuery.set('guides', guides.join(','));
+        }
+        window.location.href = `chat.html?${chatQuery.toString()}`;
+      });
+    };
+
+    init();
+  </script>
+</body>
+</html>

@@ -17,14 +17,44 @@ if (!API_KEY) {
   process.exit(1);
 }
 
-const guideConfigs = {
-  'airsense-10': {
-    name: 'AirSense 10',
-    dir: path.join(__dirname, 'Airsense-10-User-Guide')
+const setupConfigPath = path.join(__dirname, 'chat-setup-config.json');
+let setupConfig;
+try {
+  setupConfig = JSON.parse(fs.readFileSync(setupConfigPath, 'utf8'));
+} catch (error) {
+  console.error(`Error loading shared setup config at ${setupConfigPath}:`, error.message);
+  process.exit(1);
+}
+
+const familyConfigs = setupConfig.families || {};
+const guideConfigs = Object.entries(setupConfig.guides || {}).reduce((acc, [guideKey, guide]) => {
+  const relativeDir = String(guide.relativeDir || '').replace(/\\/g, '/').split('/').filter(Boolean);
+  acc[guideKey] = {
+    name: guide.name,
+    family: guide.family,
+    dir: path.join(__dirname, ...relativeDir)
+  };
+  return acc;
+}, {});
+
+const resolveDefaultGuideForFamily = (familyKey) => {
+  const normalizedFamily = String(familyKey || '').trim().toLowerCase();
+  const familyConfig = familyConfigs[normalizedFamily];
+  const familyDefault = familyConfig && familyConfig.defaultGuide;
+  if (familyDefault && guideConfigs[familyDefault]) {
+    return familyDefault;
   }
+
+  const firstForFamily = Object.entries(guideConfigs)
+    .find(([, guide]) => guide.family === normalizedFamily)?.[0];
+  if (firstForFamily) {
+    return firstForFamily;
+  }
+
+  return Object.keys(guideConfigs)[0];
 };
 
-const defaultGuide = 'airsense-10';
+const defaultGuide = resolveDefaultGuideForFamily('cpap');
 const manualCache = new Map();
 
 const baseDir = guideConfigs[defaultGuide].dir;
@@ -57,6 +87,46 @@ const loadManualContent = (guideKey) => {
   };
   manualCache.set(guideKey, cached);
   return cached;
+};
+
+const normalizeGuideKeys = (primaryGuide, guideList, family) => {
+  const raw = Array.isArray(guideList)
+    ? guideList
+    : typeof guideList === 'string'
+      ? guideList.split(',')
+      : [];
+
+  const familyKey = String(family || '').trim().toLowerCase();
+  const familyGuideKeys = familyKey
+    ? Object.entries(guideConfigs)
+      .filter(([, config]) => config.family === familyKey)
+      .map(([guideKey]) => guideKey)
+    : Object.keys(guideConfigs);
+
+  const defaultForFamily = resolveDefaultGuideForFamily(familyKey) || defaultGuide;
+
+  const fallback = primaryGuide ? [primaryGuide] : [defaultForFamily];
+  const keys = (raw.length ? raw : fallback)
+    .map((item) => String(item || '').trim().toLowerCase())
+    .filter(Boolean)
+    .filter((item) => Boolean(guideConfigs[item]))
+    .filter((item) => familyGuideKeys.includes(item));
+
+  if (!keys.length) {
+    return [defaultForFamily];
+  }
+
+  return [...new Set(keys)];
+};
+
+const loadManualBundle = (guideKeys) => {
+  const docs = guideKeys.map(loadManualContent);
+  return {
+    guideName: docs.map((doc) => doc.guideName).join(' + '),
+    manualContent: docs
+      .map((doc) => `## Guide: ${doc.guideName}\n\n${doc.manualContent}`)
+      .join('\n\n====\n\n')
+  };
 };
 
 // Warm cache for the default guide
@@ -296,7 +366,7 @@ ${manualContent}`;
  * Main chat endpoint
  */
 app.post('/api/chat', async (req, res) => {
-  const { message, guide } = req.body;
+  const { message, guide, guides, family } = req.body;
 
   if (!message || message.trim().length === 0) {
     return res.status(400).json({ error: 'Message is required' });
@@ -305,8 +375,10 @@ app.post('/api/chat', async (req, res) => {
   try {
     console.log(`[${new Date().toISOString()}] User: ${message}`);
 
-    const guideKey = (guide || defaultGuide).toLowerCase();
-    const { manualContent, guideName } = loadManualContent(guideKey);
+    const primaryGuide = (guide || defaultGuide).toLowerCase();
+    const familyKey = String(family || '').trim().toLowerCase();
+    const guideKeys = normalizeGuideKeys(primaryGuide, guides, familyKey);
+    const { manualContent, guideName } = loadManualBundle(guideKeys);
 
     let response;
     if (LLM_PROVIDER === 'openai') {
@@ -315,6 +387,7 @@ app.post('/api/chat', async (req, res) => {
       response = await callHuggingFace(message, manualContent, guideName);
     }
 
+    console.log(`[${new Date().toISOString()}] Guides: ${guideKeys.join(', ')}`);
     console.log(`[${new Date().toISOString()}] Assistant: ${response.substring(0, 100)}...`);
 
     res.json({ response });
@@ -325,6 +398,36 @@ app.post('/api/chat', async (req, res) => {
       details: process.env.DEBUG ? error.toString() : undefined
     });
   }
+});
+
+app.get('/api/setup-config', (req, res) => {
+  const requestedFamily = String(req.query.family || '').trim().toLowerCase();
+  const resolvedFamily = requestedFamily && familyConfigs[requestedFamily]
+    ? requestedFamily
+    : (familyConfigs.cpap ? 'cpap' : Object.keys(familyConfigs)[0]);
+
+  if (!resolvedFamily || !familyConfigs[resolvedFamily]) {
+    return res.status(500).json({ error: 'No family configuration available' });
+  }
+
+  const familyConfig = familyConfigs[resolvedFamily];
+  const allowGuide = (value) => {
+    const key = String(value || '').trim().toLowerCase();
+    return Boolean(guideConfigs[key] && guideConfigs[key].family === resolvedFamily);
+  };
+  const filterOptions = (items) => (Array.isArray(items) ? items.filter((item) => allowGuide(item.value)) : []);
+
+  res.json({
+    family: resolvedFamily,
+    label: familyConfig.label || resolvedFamily.toUpperCase(),
+    backHref: familyConfig.backHref || '/index.html',
+    defaultGuide: allowGuide(familyConfig.defaultGuide)
+      ? familyConfig.defaultGuide
+      : resolveDefaultGuideForFamily(resolvedFamily),
+    devices: filterOptions(familyConfig.devices),
+    masks: filterOptions(familyConfig.masks),
+    accessories: filterOptions(familyConfig.accessories)
+  });
 });
 
 /**

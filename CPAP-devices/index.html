@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CPAP Devices — MedTech Guides</title>
+  <meta name="description" content="Browse CPAP device, mask, and tubing guides." />
+  <link rel="stylesheet" href="/style.css" />
+  <style>
+    :root {
+      --devices-accent: #1d4ed8;
+      --masks-accent: #b45309;
+      --tubing-accent: #0f766e;
+    }
+
+    .accordion--devices {
+      border-color: color-mix(in srgb, var(--devices-accent) 55%, var(--border));
+      background: color-mix(in srgb, var(--devices-accent) 14%, var(--card));
+    }
+
+    .accordion--devices .card {
+      border-color: color-mix(in srgb, var(--devices-accent) 40%, var(--border));
+      background: color-mix(in srgb, var(--devices-accent) 7%, var(--card));
+    }
+
+    .accordion--devices .card-icon {
+      background: color-mix(in srgb, var(--devices-accent) 22%, var(--card));
+    }
+
+    .accordion--masks {
+      border-color: color-mix(in srgb, var(--masks-accent) 55%, var(--border));
+      background: color-mix(in srgb, var(--masks-accent) 14%, var(--card));
+    }
+
+    .accordion--masks .card {
+      border-color: color-mix(in srgb, var(--masks-accent) 40%, var(--border));
+      background: color-mix(in srgb, var(--masks-accent) 7%, var(--card));
+    }
+
+    .accordion--masks .card-icon {
+      background: color-mix(in srgb, var(--masks-accent) 22%, var(--card));
+    }
+
+    .accordion--tubing {
+      border-color: color-mix(in srgb, var(--tubing-accent) 55%, var(--border));
+      background: color-mix(in srgb, var(--tubing-accent) 14%, var(--card));
+    }
+
+    .accordion--tubing .card {
+      border-color: color-mix(in srgb, var(--tubing-accent) 40%, var(--border));
+      background: color-mix(in srgb, var(--tubing-accent) 7%, var(--card));
+    }
+
+    .accordion--tubing .card-icon {
+      background: color-mix(in srgb, var(--tubing-accent) 22%, var(--card));
+    }
+  </style>
+</head>
+<body>
+  <button type="button" class="back-arrow" aria-label="Go back">
+    <span class="back-arrow-icon" aria-hidden="true">←</span>
+  </button>
+  <div class="page">
+    <header class="hero">
+      <div class="hero-content">
+        <span class="badge">MedTech Guides</span>
+        <h1>CPAP device guides</h1>
+        <p>
+          Explore CPAP devices, masks, and accessories. Expand each section to find the right guide.
+        </p>
+      </div>
+    </header>
+
+    <main class="content">
+      <section class="section">
+        <div class="device-type">
+          <div class="device-type-body">
+            <details class="accordion accordion--devices" open>
+              <summary>Devices</summary>
+              <div class="cards cards--accordion">
+                <a class="card" href="/CPAP-devices/Airsense-10-User-Guide/welcome.html?nav=expanded" aria-label="Open ResMed AirSense 10 User Guide">
+                  <div class="card-icon" aria-hidden="true">
+                    <img src="/CPAP-devices/images/resmed.png" alt="ResMed logo" />
+                  </div>
+                  <div class="card-body">
+                    <h3>ResMed AirSense 10</h3>
+                    <p>Interactive user guide for setup, therapy, and troubleshooting.</p>
+                    <span class="card-link">Open guide →</span>
+                  </div>
+                </a>
+              </div>
+            </details>
+
+            <details class="accordion accordion--masks" open>
+              <summary>Masks</summary>
+              <div class="cards cards--accordion">
+                <a class="card" href="/CPAP-devices/F&P-Vitera-Full-Face-User-Guide/welcome.html?nav=expanded" aria-label="Open F&P Vitera Full Face Mask User Guide">
+                  <div class="card-icon" aria-hidden="true">
+                    <img src="/CPAP-devices/images/FP.png" alt="Fisher &amp; Paykel logo" />
+                  </div>
+                  <div class="card-body">
+                    <h3>F&P Vitera Full Face Mask</h3>
+                    <p>Interactive user guide for setup, fitting, cleaning, and maintenance.</p>
+                    <span class="card-link">Open guide →</span>
+                  </div>
+                </a>
+              </div>
+            </details>
+
+            <details class="accordion accordion--tubing" open>
+              <summary>Tubing</summary>
+              <div class="cards cards--accordion">
+                <a class="card" href="/CPAP-devices/Resmed-ClimateLineAir-User-Guide/index.html?nav=expanded" aria-label="Open ResMed ClimateLineAir User Guide">
+                  <div class="card-icon" aria-hidden="true">
+                    <img src="/CPAP-devices/images/resmed.png" alt="ResMed logo" />
+                  </div>
+                  <div class="card-body">
+                    <h3>ResMed ClimateLineAir</h3>
+                    <p>Interactive user guide for setup, climate control, cleaning, and tubing maintenance.</p>
+                    <span class="card-link">Open guide →</span>
+                  </div>
+                </a>
+              </div>
+            </details>
+          </div>
+        </div>
+      </section>
+
+      <section class="section muted">
+        <h2>More CPAP guides</h2>
+        <p>Additional device families and tubing guides will be added here.</p>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <span>© 2026 MedTech Guides</span>
+      <span class="footer-disclaimer">All content is the property of its respective owners and is used here for informational purposes only.</span>
+    </footer>
+  </div>
+  <script>
+    const backArrow = document.querySelector('.back-arrow');
+    if (backArrow) {
+      backArrow.addEventListener('click', () => {
+        if (window.history.length > 1) {
+          window.history.back();
+        } else {
+          window.location.href = '/index.html';
+        }
+      });
+    }
+  </script>
+</body>
+</html>

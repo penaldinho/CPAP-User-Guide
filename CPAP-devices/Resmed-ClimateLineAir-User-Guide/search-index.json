@@ -1,0 +1,117 @@
+{
+  "pages": [
+    {
+      "title": "ResMed ClimateLineAir User Guide",
+      "file": "index.html",
+      "description": "Contents and quick access for the ClimateLineAir guide.",
+      "keywords": [
+        "climatelineair",
+        "resmed",
+        "contents",
+        "guide",
+        "tubing"
+      ],
+      "content": "ResMed ClimateLineAir User Guide Contents Welcome Setup Climate control Disconnecting Cleaning Checking Reconnecting the air tubing Troubleshooting Technical specifications Symbols Environmental information Limited warranty"
+    },
+    {
+      "title": "Welcome",
+      "file": "welcome.html",
+      "description": "Introduction to ClimateLineAir heated air tubing.",
+      "keywords": [
+        "welcome",
+        "climatelineair",
+        "heated tubing",
+        "climate control",
+        "humidification"
+      ],
+      "content": "Welcome About your ClimateLineAir The ClimateLineAir is heated air tubing that delivers the desired temperature at your mask. ClimateLineAir Oxy has a built-in oxygen connector. When used with HumidAir humidifier, ClimateLineAir allows you to use Climate Control. Climate Control is designed to make therapy more comfortable by enabling constant temperature and maintaining humidity. The ClimateLineAir is designed for use with AirSense 10, AirCurve 10 and Lumis devices."
+    },
+    {
+      "title": "Setup",
+      "file": "setup.html",
+      "description": "Prepare for use.",
+      "keywords": [
+        "setup",
+        "prepare",
+        "climatelineair"
+      ],
+      "content": "Setup Prepare for use"
+    },
+    {
+      "title": "Climate control",
+      "file": "climate-control.html",
+      "description": "Temperature and humidity settings.",
+      "keywords": [
+        "climate",
+        "control",
+        "humidity",
+        "temperature"
+      ],
+      "content": "Climate control Temperature and humidity settings"
+    },
+    {
+      "title": "Cleaning and maintenance",
+      "file": "cleaning.html",
+      "description": "Disconnecting, cleaning, checking, and reconnecting the air tubing.",
+      "keywords": [
+        "cleaning",
+        "disconnecting",
+        "checking",
+        "reconnecting",
+        "maintenance"
+      ],
+      "content": "Cleaning and maintenance Disconnecting Cleaning Checking Reconnecting the air tubing"
+    },
+    {
+      "title": "Troubleshooting",
+      "file": "troubleshooting.html",
+      "description": "Common issues and actions.",
+      "keywords": [
+        "troubleshooting",
+        "issues"
+      ],
+      "content": "Troubleshooting Common issues and actions"
+    },
+    {
+      "title": "Technical specifications",
+      "file": "technical-specifications.html",
+      "description": "Tubing specs and compatibility.",
+      "keywords": [
+        "technical",
+        "specifications",
+        "compatibility"
+      ],
+      "content": "Technical specifications Tubing specs and compatibility"
+    },
+    {
+      "title": "Symbols",
+      "file": "symbols.html",
+      "description": "Symbols and icons.",
+      "keywords": [
+        "symbols",
+        "icons"
+      ],
+      "content": "Symbols Symbols and icons"
+    },
+    {
+      "title": "Environmental information",
+      "file": "environmental-information.html",
+      "description": "Disposal and environmental details.",
+      "keywords": [
+        "environmental",
+        "disposal"
+      ],
+      "content": "Environmental information Disposal and environmental details"
+    },
+    {
+      "title": "Limited warranty",
+      "file": "limited-warranty.html",
+      "description": "Warranty coverage.",
+      "keywords": [
+        "warranty",
+        "limited"
+      ],
+      "content": "Limited warranty Warranty coverage"
+    }
+  ]
+}

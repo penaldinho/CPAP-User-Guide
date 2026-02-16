@@ -78,10 +78,93 @@ body {
   margin: 0 0 16px;
 }
 
+.section-lead {
+  margin: -6px 0 20px;
+  color: var(--muted);
+  max-width: 720px;
+  line-height: 1.6;
+}
+
+.device-type {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 20px;
+  box-shadow: var(--shadow);
+}
+
+.device-type-body {
+  display: grid;
+  gap: 12px;
+}
+
+.accordion {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 0 16px;
+  background: #fdfdff;
+}
+
+.accordion[open] {
+  border-color: #c7d7ff;
+}
+
+.accordion summary {
+  list-style: none;
+  cursor: pointer;
+  font-weight: 600;
+  padding: 14px 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.accordion summary::marker {
+  display: none;
+}
+
+.accordion summary::after {
+  content: "▾";
+  font-size: 0.9rem;
+  color: var(--muted);
+  transition: transform 0.2s ease;
+}
+
+.accordion[open] summary::after {
+  transform: rotate(180deg);
+}
+
+.guide-list {
+  margin: 0 0 14px;
+  padding-left: 18px;
+  color: var(--text);
+}
+
+.guide-list a {
+  color: var(--primary);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.guide-list a:hover,
+.guide-list a:focus-visible {
+  text-decoration: underline;
+}
+
+.coming-soon {
+  color: var(--muted);
+  font-style: italic;
+}
+
 .cards {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
   gap: 18px;
+}
+
+.cards--accordion {
+  margin: 10px 0 22px;
 }
 
 .card {
@@ -136,6 +219,48 @@ body {
 .card-link {
   color: var(--primary);
   font-weight: 600;
+}
+
+.back-arrow {
+  position: fixed;
+  top: 14px;
+  left: 14px;
+  z-index: 1100;
+  height: 32px;
+  width: 32px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: #ffffff;
+  color: var(--primary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 6px 14px rgba(15, 23, 42, 0.08);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.back-arrow:hover {
+  transform: translateY(-1px);
+  border-color: #c7d7ff;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.12);
+}
+
+.back-arrow:focus-visible {
+  outline: 3px solid rgba(47, 111, 237, 0.35);
+  outline-offset: 2px;
+}
+
+.back-arrow-icon {
+  font-size: 18px;
+  line-height: 1;
+}
+
+@media (max-width: 640px) {
+  .back-arrow {
+    top: auto;
+    bottom: 14px;
+  }
 }
 
 .muted {

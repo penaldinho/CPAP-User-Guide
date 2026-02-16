@@ -1,0 +1,37 @@
+{
+  "families": {
+    "cpap": {
+      "label": "CPAP",
+      "backHref": "https://medtechguides.uk/CPAP-devices/index.html",
+      "defaultGuide": "airsense-10",
+      "devices": [
+        { "value": "airsense-10", "label": "ResMed AirSense 10" },
+        { "value": "fp-vitera", "label": "F&P Vitera Full Face Mask" },
+        { "value": "climatelineair", "label": "ResMed ClimateLineAir" }
+      ],
+      "masks": [
+        { "value": "fp-vitera", "label": "F&P Vitera Full Face Mask" }
+      ],
+      "accessories": [
+        { "value": "climatelineair", "label": "ResMed ClimateLineAir" }
+      ]
+    }
+  },
+  "guides": {
+    "airsense-10": {
+      "name": "AirSense 10",
+      "family": "cpap",
+      "relativeDir": "CPAP-devices/Airsense-10-User-Guide"
+    },
+    "fp-vitera": {
+      "name": "F&P Vitera Full Face Mask",
+      "family": "cpap",
+      "relativeDir": "CPAP-devices/F&P-Vitera-Full-Face-User-Guide"
+    },
+    "climatelineair": {
+      "name": "ResMed ClimateLineAir",
+      "family": "cpap",
+      "relativeDir": "CPAP-devices/Resmed-ClimateLineAir-User-Guide"
+    }
+  }
+}
