@@ -22,7 +22,7 @@
         const isLocalHost = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
 
         if (isLocalHost && location.port !== '3000') {
-          const target = new URL('http://localhost:3000/chat.html');
+          const target = new URL(`http://localhost:3000${location.pathname}`);
           target.search = location.search;
           location.replace(target.toString());
           return;
@@ -74,7 +74,7 @@
     </div>
 
     <div class="footer">
-      <a href="https://medtechguides.uk/CPAP-devices/index.html" id="chat-back-link">← Back to contents</a>
+      <a href="index.html" id="chat-back-link">← Back to contents</a>
     </div>
   </div>
 
@@ -159,6 +159,6 @@
     }
   </style>
 
-  <script src="chatbot.js"></script>
+  <script src="../Airsense-10-User-Guide/chatbot.js"></script>
 </body>
 </html>

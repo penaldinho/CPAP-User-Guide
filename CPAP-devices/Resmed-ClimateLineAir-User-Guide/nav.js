@@ -179,17 +179,33 @@ function injectNav(currentPageFile) {
   // Inject search box into header
   const header = document.querySelector('.header');
   if (header) {
+    const isChatPage = currentPageFile === 'chat';
     const brand = header.querySelector('.brand');
     if (brand) {
-      brand.textContent = 'ResMed ClimateLineAir';
+      brand.textContent = isChatPage ? 'Chat Assistant' : 'ResMed ClimateLineAir';
     }
 
     const subbrand = header.querySelector('.subbrand');
     if (subbrand) {
-      subbrand.textContent = 'User Guide';
+      subbrand.textContent = isChatPage ? '' : 'User Guide';
+      subbrand.style.display = isChatPage ? 'none' : '';
     }
 
-    if (!header.querySelector('.header-logo')) {
+    const existingLogo = header.querySelector('.header-logo');
+    if (isChatPage) {
+      if (!existingLogo) {
+        const logo = document.createElement('img');
+        logo.className = 'header-logo';
+        logo.src = '/images/chat.PNG';
+        logo.alt = 'Chat Assistant logo';
+        header.insertBefore(logo, header.firstChild);
+      } else {
+        existingLogo.src = '/images/chat.PNG';
+        existingLogo.alt = 'Chat Assistant logo';
+      }
+    }
+
+    if (!isChatPage && !header.querySelector('.header-logo')) {
       const logo = document.createElement('img');
       logo.className = 'header-logo';
       logo.src = 'images/resmed.png';

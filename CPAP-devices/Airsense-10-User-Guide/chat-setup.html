@@ -29,8 +29,8 @@
     <h1>Choose your setup</h1>
 
     <div class="card">
-      <p class="setup-hint">Choose which guides the assistant should use for your questions.</p>
-      <p class="setup-help">Pick one primary guide first, then optionally add masks or tubing so answers can include your full setup.</p>
+      <p class="setup-hint">Choose one guide for this chat session.</p>
+      <p class="setup-help">Single-guide mode is enabled for better accuracy. You can switch guides any time from this page.</p>
       <div class="setup-grid">
         <div class="setup-field">
           <label for="setup-device">Primary guide</label>
@@ -80,6 +80,12 @@
     const setupSummary = document.getElementById('setup-summary');
     const continueBtn = document.getElementById('continue-chat');
     const backToGuidesLink = document.querySelector('.setup-actions a');
+    const SINGLE_GUIDE_MODE = true;
+    const guideChatPathMap = {
+      'airsense-10': '/CPAP-devices/Airsense-10-User-Guide/chat.html',
+      'fp-vitera': '/CPAP-devices/F&P-Vitera-Full-Face-User-Guide/chat.html',
+      'climatelineair': '/CPAP-devices/Resmed-ClimateLineAir-User-Guide/chat.html'
+    };
 
     const urlParams = new URLSearchParams(window.location.search);
     const incomingFamily = (urlParams.get('family') || 'cpap').toLowerCase();
@@ -158,7 +164,18 @@
 
       const defaultGuide = familyConfig.defaultGuide || (allGuideOptions[0] ? allGuideOptions[0].value : FALLBACK_FAMILY.defaultGuide);
 
+      if (SINGLE_GUIDE_MODE) {
+        const additionalSearchField = additionalSearch && additionalSearch.closest('.setup-field');
+        const additionalGuidesField = additionalGuideGroups && additionalGuideGroups.closest('.setup-field');
+        if (additionalSearchField) additionalSearchField.style.display = 'none';
+        if (additionalGuidesField) additionalGuidesField.style.display = 'none';
+      }
+
       const renderAdditionalGuideGroups = (selectedPrimaryGuide, selectedAdditionalGuides, searchTerm = '') => {
+        if (SINGLE_GUIDE_MODE) {
+          additionalGuideGroups.innerHTML = '';
+          return;
+        }
         const normalizedSearch = String(searchTerm || '').trim().toLowerCase();
         additionalGuideGroups.innerHTML = '';
 
@@ -229,6 +246,12 @@
       const getStoredSetup = () => {
         try {
           const parsed = JSON.parse(localStorage.getItem(setupStorageKey) || '{}');
+          if (SINGLE_GUIDE_MODE) {
+            return {
+              primaryGuide: (parsed.primaryGuide || parsed.device || defaultGuide).toLowerCase(),
+              additionalGuides: []
+            };
+          }
           const parsedAdditional = Array.isArray(parsed.additionalGuides)
             ? parsed.additionalGuides
             : [];
@@ -259,10 +282,10 @@
         const additionalSet = new Set(stored.additionalGuides || []);
         const fromIncoming = {
           primaryGuide: allowedGuideValues.has(incomingGuide) ? incomingGuide : (stored.primaryGuide || defaultGuide),
-          additionalGuides: [...additionalSet]
+          additionalGuides: SINGLE_GUIDE_MODE ? [] : [...additionalSet]
         };
 
-        incomingGuides.forEach((guideKey) => {
+        if (!SINGLE_GUIDE_MODE) incomingGuides.forEach((guideKey) => {
           if (!allowedGuideValues.has(guideKey)) return;
           if (guideKey !== fromIncoming.primaryGuide && !fromIncoming.additionalGuides.includes(guideKey)) {
             fromIncoming.additionalGuides.push(guideKey);
@@ -280,7 +303,7 @@
       let currentSetup = hydrateInitialSetup();
 
       const saveAndRefresh = () => {
-        const selectedAdditionalGuides = Array.from(
+        const selectedAdditionalGuides = SINGLE_GUIDE_MODE ? [] : Array.from(
           additionalGuideGroups.querySelectorAll('input[type="checkbox"]:checked')
         )
           .map((input) => input.value)
@@ -298,9 +321,9 @@
         localStorage.setItem(setupStorageKey, JSON.stringify(currentSetup));
         localStorage.setItem('cpap-my-setup-v1', JSON.stringify({
           device: currentSetup.primaryGuide,
-          mask: firstMask,
-          accessory: firstAccessory,
-          guides: scopedGuides
+          mask: SINGLE_GUIDE_MODE ? '' : firstMask,
+          accessory: SINGLE_GUIDE_MODE ? '' : firstAccessory,
+          guides: SINGLE_GUIDE_MODE ? [currentSetup.primaryGuide] : scopedGuides
         }));
 
         renderAdditionalGuideGroups(currentSetup.primaryGuide, new Set(currentSetup.additionalGuides), additionalSearch.value);
@@ -308,21 +331,22 @@
       };
 
       setupDevice.addEventListener('change', saveAndRefresh);
-      additionalSearch.addEventListener('input', () => {
-        renderAdditionalGuideGroups(currentSetup.primaryGuide, new Set(currentSetup.additionalGuides), additionalSearch.value);
-      });
+      if (!SINGLE_GUIDE_MODE) {
+        additionalSearch.addEventListener('input', () => {
+          renderAdditionalGuideGroups(currentSetup.primaryGuide, new Set(currentSetup.additionalGuides), additionalSearch.value);
+        });
+      }
 
       continueBtn.addEventListener('click', () => {
         saveAndRefresh();
-        const guides = buildGuides(currentSetup);
+        const selectedGuide = currentSetup.primaryGuide || defaultGuide;
         const chatQuery = new URLSearchParams({
-          guide: currentSetup.primaryGuide || defaultGuide,
+          guide: selectedGuide,
           family: resolvedFamily
         });
-        if (guides.length) {
-          chatQuery.set('guides', guides.join(','));
-        }
-        window.location.href = `chat.html?${chatQuery.toString()}`;
+        chatQuery.set('guides', String(selectedGuide));
+        const targetPath = guideChatPathMap[selectedGuide] || guideChatPathMap['airsense-10'];
+        window.location.href = `${targetPath}?${chatQuery.toString()}`;
       });
     };
 

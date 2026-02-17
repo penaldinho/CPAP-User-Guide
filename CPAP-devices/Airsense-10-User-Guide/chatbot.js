@@ -5,9 +5,26 @@ class ChatBot {
     this.inputField = document.getElementById('chat-input');
     this.sendBtn = document.getElementById('chat-send-btn');
     this.loadingDiv = document.getElementById('chat-loading');
+    this.initialMessage = document.getElementById('chat-initial-message');
     this.isLoading = false;
+    this.guideNames = {
+      'airsense-10': 'AirSense 10',
+      'fp-vitera': 'F&P Vitera Full Face Mask',
+      'climatelineair': 'ResMed ClimateLineAir'
+    };
+
+    this.applyGuideSpecificGreeting();
 
     this.setupEventListeners();
+  }
+
+  applyGuideSpecificGreeting() {
+    if (!this.initialMessage) return;
+    const urlParams = new URLSearchParams(window.location.search);
+    const guide = (urlParams.get('guide') || 'airsense-10').toLowerCase();
+    const guideName = this.guideNames[guide] || 'selected guide';
+
+    this.initialMessage.textContent = `Hi! I'm your ${guideName} assistant. Ask any questions about setup, therapy, maintenance, or troubleshooting and I'll answer using this user guide.`;
   }
 
   setupEventListeners() {

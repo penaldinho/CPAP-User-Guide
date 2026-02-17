@@ -188,17 +188,47 @@ function injectNav(currentPageFile) {
   // Inject search box into header
   const header = document.querySelector('.header');
   if (header) {
+    const isChatPage = currentPageFile === 'chat';
+    const chatLogoCandidates = [
+      'images/chat.PNG',
+      '/images/chat.PNG',
+      'https://medtechguides.uk/images/chat.PNG'
+    ];
+    const applyChatLogoSource = (logoEl) => {
+      let index = 0;
+      const tryNext = () => {
+        if (index >= chatLogoCandidates.length) return;
+        logoEl.src = chatLogoCandidates[index++];
+      };
+      logoEl.onerror = tryNext;
+      tryNext();
+    };
     const brand = header.querySelector('.brand');
     if (brand) {
-      brand.textContent = 'AirSense 10';
+      brand.textContent = isChatPage ? 'Chat Assistant' : 'AirSense 10';
     }
 
     const subbrand = header.querySelector('.subbrand');
     if (subbrand) {
-      subbrand.textContent = 'User Guide';
+      subbrand.textContent = isChatPage ? '' : 'User Guide';
+      subbrand.style.display = isChatPage ? 'none' : '';
     }
 
-    if (!header.querySelector('.header-logo')) {
+    const existingLogo = header.querySelector('.header-logo');
+    if (isChatPage) {
+      if (!existingLogo) {
+        const logo = document.createElement('img');
+        logo.className = 'header-logo';
+        logo.alt = 'Chat Assistant logo';
+        applyChatLogoSource(logo);
+        header.insertBefore(logo, header.firstChild);
+      } else {
+        existingLogo.alt = 'Chat Assistant logo';
+        applyChatLogoSource(existingLogo);
+      }
+    }
+
+    if (!isChatPage && !header.querySelector('.header-logo')) {
       const logo = document.createElement('img');
       logo.className = 'header-logo';
       logo.src = 'images/resmed.PNG';

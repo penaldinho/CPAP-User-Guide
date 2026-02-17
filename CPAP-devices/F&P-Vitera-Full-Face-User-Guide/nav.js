@@ -189,17 +189,33 @@ function injectNav(currentPageFile) {
 
   const header = document.querySelector('.header');
   if (header) {
+    const isChatPage = currentPageFile === 'chat';
     const brand = header.querySelector('.brand');
     if (brand) {
-      brand.textContent = 'F&P Vitera Full Face';
+      brand.textContent = isChatPage ? 'Chat Assistant' : 'F&P Vitera Full Face';
     }
 
     const subbrand = header.querySelector('.subbrand');
     if (subbrand) {
-      subbrand.textContent = 'Mask User Guide';
+      subbrand.textContent = isChatPage ? '' : 'Mask User Guide';
+      subbrand.style.display = isChatPage ? 'none' : '';
     }
 
-    if (!header.querySelector('.header-logo')) {
+    const existingLogo = header.querySelector('.header-logo');
+    if (isChatPage) {
+      if (!existingLogo) {
+        const logo = document.createElement('img');
+        logo.className = 'header-logo';
+        logo.src = '/images/chat.PNG';
+        logo.alt = 'Chat Assistant logo';
+        header.insertBefore(logo, header.firstChild);
+      } else {
+        existingLogo.src = '/images/chat.PNG';
+        existingLogo.alt = 'Chat Assistant logo';
+      }
+    }
+
+    if (!isChatPage && !header.querySelector('.header-logo')) {
       const logo = document.createElement('img');
       logo.className = 'header-logo';
       logo.src = '/CPAP-devices/images/FP.PNG';

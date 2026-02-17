@@ -62,6 +62,8 @@ const baseDir = guideConfigs[defaultGuide].dir;
 const app = express();
 app.use(express.json());
 app.use(express.static(baseDir));
+app.use('/CPAP-devices', express.static(path.join(__dirname, 'CPAP-devices')));
+app.use('/images', express.static(path.join(__dirname, 'images')));
 
 const buildManualContent = (searchIndex) => searchIndex.pages
   .map(page => `# ${page.title}\n\n${page.description}\n\n${page.content}`)
