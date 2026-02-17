@@ -201,7 +201,7 @@ function injectNav(currentPageFile) {
     if (!header.querySelector('.header-logo')) {
       const logo = document.createElement('img');
       logo.className = 'header-logo';
-      logo.src = 'images/resmed.png';
+      logo.src = 'images/resmed.PNG';
       logo.alt = 'ResMed logo';
       header.insertBefore(logo, header.firstChild);
     }
