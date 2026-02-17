@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Search — F&P Vitera Full Face User Guide</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="brand">F&P Vitera Full Face</div>
+      <div class="subbrand">Search</div>
+    </div>
+
+    <div class="nav"></div>
+
+    <script src="nav.js"></script>
+    <script>injectNav('search');</script>
+
+    <h1>Search Results</h1>
+
+    <div class="card">
+      <form id="search-form" style="display: flex; gap: 8px;">
+        <input 
+          type="text" 
+          id="search-input" 
+          placeholder="Search the guide..." 
+          style="flex: 1; padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;"
+          autocomplete="off"
+        />
+        <button type="submit" style="padding: 8px 16px; background-color: #0066cc; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: 500;">Search</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <p><span id="results-count">0 results</span> for <span id="search-query"></span></p>
+    </div>
+
+    <div id="search-results">
+      <p class="muted">Enter a search term above to find relevant pages in the guide.</p>
+    </div>
+
+    <div class="footer">
+      <a href="index.html">← Back to contents</a>
+    </div>
+  </div>
+
+  <style>
+    .search-result {
+      margin-bottom: 12px;
+      border-left: 3px solid #0066cc;
+    }
+
+    .search-result-title {
+      display: block;
+      font-size: 18px;
+      font-weight: 600;
+      color: #0066cc;
+      text-decoration: none;
+      margin-bottom: 4px;
+    }
+
+    .search-result-title:hover {
+      text-decoration: underline;
+    }
+
+    .search-result-description {
+      font-size: 14px;
+      color: #555;
+      margin: 0 0 8px 0;
+    }
+
+    .search-result-keywords {
+      font-size: 12px;
+      color: #999;
+      margin: 0;
+    }
+  </style>
+
+  <script src="search.js"></script>
+</body>
+</html>

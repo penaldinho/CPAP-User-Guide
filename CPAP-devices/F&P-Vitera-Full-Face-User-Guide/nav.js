@@ -4,12 +4,27 @@ function injectNav(currentPageFile) {
     return text.replace(/\bCPAP\b/g, 'see pap');
   };
 
-  // Load text size preference
-  const textSize = localStorage.getItem('text-size') || 'medium';
+  const safeGetItem = (key) => {
+    try {
+      return localStorage.getItem(key);
+    } catch {
+      return null;
+    }
+  };
+
+  const safeSetItem = (key, value) => {
+    try {
+      localStorage.setItem(key, value);
+    } catch {
+      // Ignore storage errors
+    }
+  };
+
+  const textSize = safeGetItem('text-size') || 'medium';
   document.body.classList.add(`text-size-${textSize}`);
 
   const navItems = [
-    { href: 'index.html', label: 'Contents', icon: '📚' },
+    { href: 'index.html', label: 'Contents', icon: '&#x1F4DA;' },
     { href: 'welcome.html', label: 'Welcome', number: 1 },
     { href: 'operating-instructions.html', label: 'Operating Instructions', number: 2 },
     { href: 'mask-parts.html', label: 'Mask Parts', number: 3 },
@@ -22,7 +37,6 @@ function injectNav(currentPageFile) {
     { href: 'warranty-statement.html', label: 'Warranty Statement', number: 10 }
   ];
 
-  // Load highlight script if not already loaded
   if (!window.highlightScriptLoaded) {
     const highlightScript = document.createElement('script');
     highlightScript.src = 'highlight.js';
@@ -35,26 +49,30 @@ function injectNav(currentPageFile) {
     const urlParams = new URLSearchParams(window.location.search);
     const forceExpanded = urlParams.get('nav') === 'expanded';
     if (forceExpanded) {
-      localStorage.setItem('nav-collapsed', 'false');
+      safeSetItem('nav-collapsed', 'false');
     }
-    const persistedCollapsed = localStorage.getItem('nav-collapsed') === 'true';
+    const persistedCollapsed = safeGetItem('nav-collapsed') === 'true';
     document.body.classList.toggle('nav-collapsed', persistedCollapsed);
     const isLocalHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
     const isHostedChat = window.location.hostname === 'chat.medtechguides.uk';
     const hostedChatSetupHref = 'https://chat.medtechguides.uk/chat-setup.html?guide=fp-vitera&family=cpap';
-    const hostedChatHref = hostedChatSetupHref;
-    const guideBaseHref = isHostedChat ? 'https://medtechguides.uk/CPAP-devices/F&P-Vitera-Full-Face-User-Guide/' : '';
+    const guideBaseHref = isHostedChat ? 'https://medtechguides.uk/CPAP-devices/F%26P-Vitera-Full-Face-User-Guide/' : '';
     const guideHref = (path) => guideBaseHref ? `${guideBaseHref}${path}` : path;
-    // Always link home button to the main landing page at the root
     const getLandingHref = () => {
       if (isHostedChat) return 'https://medtechguides.uk/';
-      // Always use absolute path to root index.html
       return '/index.html';
     };
     const getSetupGuides = () => {
       try {
-        const setup = JSON.parse(localStorage.getItem('cpap-my-setup-v1') || '{}');
-        return [setup.device, setup.mask, setup.accessory].filter(Boolean);
+        const familyProfile = JSON.parse(safeGetItem('setup-profile-cpap') || '{}');
+        if (Array.isArray(familyProfile.guides) && familyProfile.guides.length) {
+          return familyProfile.guides.filter(Boolean);
+        }
+        const setup = JSON.parse(safeGetItem('cpap-my-setup-v1') || '{}');
+        const legacyGuides = Array.isArray(setup.guides) && setup.guides.length
+          ? setup.guides
+          : [setup.device, setup.mask, setup.accessory];
+        return legacyGuides.filter(Boolean);
       } catch {
         return [];
       }
@@ -64,8 +82,8 @@ function injectNav(currentPageFile) {
     const setupGuidesQuery = setupGuides.length
       ? `&guides=${encodeURIComponent(setupGuides.join(','))}`
       : '';
-    const localChatHref = `http://localhost:3000/chat.html?guide=fp-vitera${setupGuidesQuery}`;
-    const hostedChatHrefWithSetup = `${hostedChatHref}${setupGuidesQuery}`;
+    const localChatHref = `http://localhost:3000/chat-setup.html?guide=fp-vitera&family=cpap${setupGuidesQuery}`;
+    const hostedChatHrefWithSetup = `${hostedChatSetupHref}${setupGuidesQuery}`;
     const chatHref = isLocalHost && window.location.port !== '3000'
       ? localChatHref
       : hostedChatHrefWithSetup;
@@ -80,10 +98,10 @@ function injectNav(currentPageFile) {
         <button class="nav-text-size-btn" data-size="large" aria-label="Large text">A</button>
       </div>
       <div class="nav-list">
-        <a class="nav-link-primary nav-link-home" href="${landingHref}"><span class="nav-link-icon" aria-hidden="true">🏠</span>MedTech Guides</a>
-        <a class="nav-link-primary" href="${guideHref('index.html')}"><span class="nav-link-icon" aria-hidden="true">📚</span>Contents</a>
-        <a class="nav-link-primary" href="${chatHref}"${chatCurrent}><span class="nav-link-icon" aria-hidden="true">💬</span>Chat Assistant</a>
-        <a class="nav-link-primary" href="${guideHref('search.html')}"${searchCurrent}><span class="nav-link-icon" aria-hidden="true">🔍</span>Search</a>
+        <a class="nav-link-primary nav-link-home" href="${landingHref}"><span class="nav-link-icon" aria-hidden="true">&#x1F3E0;</span>MedTech Guides</a>
+        <a class="nav-link-primary" href="${guideHref('index.html')}"><span class="nav-link-icon" aria-hidden="true">&#x1F4DA;</span>Contents</a>
+        <a class="nav-link-primary" href="${chatHref}"${chatCurrent}><span class="nav-link-icon" aria-hidden="true">&#x1F4AC;</span>Chat Assistant</a>
+        <a class="nav-link-primary" href="${guideHref('search.html')}"${searchCurrent}><span class="nav-link-icon" aria-hidden="true">&#x1F50D;</span>Search</a>
         ${navItems.map(item => {
           const isCurrent = item.href === currentPageFile + '.html';
           const ariaCurrent = isCurrent ? ' aria-current="page"' : '';
@@ -95,25 +113,24 @@ function injectNav(currentPageFile) {
       </div>
       <div class="nav-actions" aria-label="Quick actions">
         <a class="nav-action-btn nav-action-home" href="${landingHref}" aria-label="MedTech Guides">
-          <span class="nav-action-icon" aria-hidden="true">🏠</span>
+          <span class="nav-action-icon" aria-hidden="true">&#x1F3E0;</span>
           <span class="tooltip" role="tooltip">MedTech Guides</span>
         </a>
         <a class="nav-action-btn nav-action-contents" href="${guideHref('index.html')}" aria-label="Contents">
-          <span class="nav-action-icon" aria-hidden="true">📚</span>
+          <span class="nav-action-icon" aria-hidden="true">&#x1F4DA;</span>
           <span class="tooltip" role="tooltip">Contents</span>
         </a>
         <a class="nav-action-btn nav-action-chat" href="${chatHref}" aria-label="Chat assistant">
-          <span class="nav-action-icon" aria-hidden="true">💬</span>
+          <span class="nav-action-icon" aria-hidden="true">&#x1F4AC;</span>
           <span class="tooltip" role="tooltip">Chat assistant</span>
         </a>
         <a class="nav-action-btn nav-action-search" href="${guideHref('search.html')}" aria-label="Search">
-          <span class="nav-action-icon" aria-hidden="true">🔍</span>
+          <span class="nav-action-icon" aria-hidden="true">&#x1F50D;</span>
           <span class="tooltip" role="tooltip">Search</span>
         </a>
       </div>
     `;
-    
-    // Initialize nav text size controls
+
     const navTextSizeBtns = navContainer.querySelectorAll('.nav-text-size-btn');
     navTextSizeBtns.forEach((btn) => {
       const size = btn.getAttribute('data-size');
@@ -123,10 +140,9 @@ function injectNav(currentPageFile) {
       btn.addEventListener('click', () => {
         document.body.className = document.body.className.replace(/text-size-\w+/g, '');
         document.body.classList.add(`text-size-${size}`);
-        localStorage.setItem('text-size', size);
+        safeSetItem('text-size', size);
         document.querySelectorAll('.nav-text-size-btn, .text-size-btn').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
-        // Sync header controls if they exist
         const headerBtn = document.querySelector(`.text-size-btn[data-size="${size}"]`);
         if (headerBtn) headerBtn.classList.add('active');
       });
@@ -140,11 +156,11 @@ function injectNav(currentPageFile) {
       desktopToggle.innerHTML = '<span class="nav-toggle-icon" aria-hidden="true"></span><span class="nav-toggle-label">Menu</span><span class="tooltip" role="tooltip">Menu</span>';
       desktopToggle.addEventListener('click', () => {
         const isCollapsed = document.body.classList.toggle('nav-collapsed');
-        localStorage.setItem('nav-collapsed', String(isCollapsed));
+        safeSetItem('nav-collapsed', String(isCollapsed));
         desktopToggle.setAttribute('aria-expanded', String(!isCollapsed));
         const handleIcon = document.querySelector('.nav-handle-icon');
         if (handleIcon) {
-          handleIcon.textContent = isCollapsed ? '❯' : '❮';
+          handleIcon.textContent = isCollapsed ? '\u276F' : '\u276E';
         }
       });
       navContainer.prepend(desktopToggle);
@@ -155,11 +171,11 @@ function injectNav(currentPageFile) {
       handle.className = 'nav-handle';
       handle.type = 'button';
       handle.setAttribute('aria-label', 'Toggle navigation');
-      handle.innerHTML = '<span class="nav-handle-icon" aria-hidden="true">❮</span>';
+      handle.innerHTML = '<span class="nav-handle-icon" aria-hidden="true">&#x276E;</span>';
       handle.addEventListener('click', () => {
         const isCollapsed = document.body.classList.toggle('nav-collapsed');
-        localStorage.setItem('nav-collapsed', String(isCollapsed));
-        handle.querySelector('.nav-handle-icon').textContent = isCollapsed ? '❯' : '❮';
+        safeSetItem('nav-collapsed', String(isCollapsed));
+        handle.querySelector('.nav-handle-icon').textContent = isCollapsed ? '\u276F' : '\u276E';
       });
       navContainer.appendChild(handle);
     }
@@ -167,11 +183,10 @@ function injectNav(currentPageFile) {
     const handleIcon = document.querySelector('.nav-handle-icon');
     if (handleIcon) {
       const isCollapsed = document.body.classList.contains('nav-collapsed');
-      handleIcon.textContent = isCollapsed ? '❯' : '❮';
+      handleIcon.textContent = isCollapsed ? '\u276F' : '\u276E';
     }
   }
 
-  // Inject search box into header
   const header = document.querySelector('.header');
   if (header) {
     const brand = header.querySelector('.brand');
@@ -187,7 +202,7 @@ function injectNav(currentPageFile) {
     if (!header.querySelector('.header-logo')) {
       const logo = document.createElement('img');
       logo.className = 'header-logo';
-        logo.src = 'images/FP.png';
+      logo.src = '/CPAP-devices/images/FP.PNG';
       logo.alt = 'Fisher & Paykel logo';
       header.insertBefore(logo, header.firstChild);
     }
@@ -197,7 +212,7 @@ function injectNav(currentPageFile) {
       backArrow.type = 'button';
       backArrow.className = 'back-arrow';
       backArrow.setAttribute('aria-label', 'Go back');
-      backArrow.innerHTML = '<span class="back-arrow-icon" aria-hidden="true">←</span>';
+      backArrow.innerHTML = '<span class="back-arrow-icon" aria-hidden="true">&#x2190;</span>';
       backArrow.addEventListener('click', () => {
         if (window.history.length > 1) {
           window.history.back();
@@ -208,28 +223,34 @@ function injectNav(currentPageFile) {
       document.body.appendChild(backArrow);
     }
 
+    const isHostedChat = window.location.hostname === 'chat.medtechguides.uk';
+    const getLandingHref = () => {
+      if (isHostedChat) return 'https://medtechguides.uk/';
+      return '/index.html';
+    };
+
     const headerLogo = header.querySelector('.header-logo');
     const headerLinkTargets = [headerLogo, brand, subbrand].filter(Boolean);
     headerLinkTargets.forEach((target) => {
       target.setAttribute('role', 'link');
       target.setAttribute('tabindex', '0');
       target.addEventListener('click', () => {
-        const isHostedChat = window.location.hostname === 'chat.medtechguides.uk';
         window.location.href = getLandingHref();
       });
       target.addEventListener('keydown', (event) => {
         if (event.key === 'Enter' || event.key === ' ') {
           event.preventDefault();
-          const isHostedChat = window.location.hostname === 'chat.medtechguides.uk';
           window.location.href = getLandingHref();
         }
       });
     });
-    // Add mobile nav toggle
-    const searchForm = document.createElement('form');
-    searchForm.id = 'header-search-form';
-    searchForm.className = 'header-search';
-    searchForm.innerHTML = `
+
+    let searchForm = header.querySelector('#header-search-form');
+    if (!searchForm) {
+      searchForm = document.createElement('form');
+      searchForm.id = 'header-search-form';
+      searchForm.className = 'header-search';
+      searchForm.innerHTML = `
       <button type="button" class="search-toggle" aria-label="Open search">
         <span class="search-icon" aria-hidden="true">&#128269;</span>
         <span class="visually-hidden">Open search</span>
@@ -248,9 +269,6 @@ function injectNav(currentPageFile) {
         <button type="button" class="search-close" aria-label="Close search">&times;</button>
       </div>
     `;
-
-    // Only add if not already present
-    if (!header.querySelector('#header-search-form')) {
       header.appendChild(searchForm);
     }
 
@@ -272,10 +290,9 @@ function injectNav(currentPageFile) {
         btn.addEventListener('click', () => {
           document.body.className = document.body.className.replace(/text-size-\w+/g, '');
           document.body.classList.add(`text-size-${size}`);
-          localStorage.setItem('text-size', size);
+          safeSetItem('text-size', size);
           document.querySelectorAll('.text-size-btn, .nav-text-size-btn').forEach(b => b.classList.remove('active'));
           btn.classList.add('active');
-          // Sync nav controls if they exist
           const navBtn = document.querySelector(`.nav-text-size-btn[data-size="${size}"]`);
           if (navBtn) navBtn.classList.add('active');
         });
@@ -287,7 +304,7 @@ function injectNav(currentPageFile) {
       homeButton.className = 'home-button';
       homeButton.href = '/index.html';
       homeButton.setAttribute('aria-label', 'Back to MedTech Guides');
-      homeButton.innerHTML = '<span class="home-icon" aria-hidden="true">🏠</span><span class="visually-hidden">Back to MedTech Guides</span><span class="tooltip" role="tooltip">Back to MedTech Guides</span>';
+      homeButton.innerHTML = '<span class="home-icon" aria-hidden="true">&#x1F3E0;</span><span class="visually-hidden">Back to MedTech Guides</span><span class="tooltip" role="tooltip">Back to MedTech Guides</span>';
       header.appendChild(homeButton);
     }
 
@@ -296,13 +313,19 @@ function injectNav(currentPageFile) {
       const hostedChatSetupHref = 'https://chat.medtechguides.uk/chat-setup.html?guide=fp-vitera&family=cpap';
       const getSetupGuides = () => {
         try {
-          const setup = JSON.parse(localStorage.getItem('cpap-my-setup-v1') || '{}');
-          return [setup.device, setup.mask, setup.accessory].filter(Boolean);
+          const familyProfile = JSON.parse(safeGetItem('setup-profile-cpap') || '{}');
+          if (Array.isArray(familyProfile.guides) && familyProfile.guides.length) {
+            return familyProfile.guides.filter(Boolean);
+          }
+          const setup = JSON.parse(safeGetItem('cpap-my-setup-v1') || '{}');
+          const legacyGuides = Array.isArray(setup.guides) && setup.guides.length
+            ? setup.guides
+            : [setup.device, setup.mask, setup.accessory];
+          return legacyGuides.filter(Boolean);
         } catch {
           return [];
         }
       };
-      const landingHref = getLandingHref();
       const setupGuides = [...new Set(getSetupGuides())];
       const setupGuidesQuery = setupGuides.length
         ? `&guides=${encodeURIComponent(setupGuides.join(','))}`
@@ -316,7 +339,7 @@ function injectNav(currentPageFile) {
       chatButton.className = 'chat-button';
       chatButton.href = chatHref;
       chatButton.setAttribute('aria-label', 'Chat Assistant');
-      chatButton.innerHTML = '<span class="chat-icon" aria-hidden="true">💬</span><span class="visually-hidden">Chat Assistant</span><span class="tooltip" role="tooltip">Chat assistant</span>';
+      chatButton.innerHTML = '<span class="chat-icon" aria-hidden="true">&#x1F4AC;</span><span class="visually-hidden">Chat Assistant</span><span class="tooltip" role="tooltip">Chat assistant</span>';
       header.appendChild(chatButton);
     }
 
@@ -333,7 +356,7 @@ function injectNav(currentPageFile) {
           toggle.setAttribute('aria-expanded', String(!isCollapsed));
           const handleIcon = document.querySelector('.nav-handle-icon');
           if (handleIcon) {
-            handleIcon.textContent = isCollapsed ? '❯' : '❮';
+            handleIcon.textContent = isCollapsed ? '\u276F' : '\u276E';
           }
         } else {
           const isOpen = document.body.classList.toggle('nav-open');
@@ -346,7 +369,6 @@ function injectNav(currentPageFile) {
       header.appendChild(toggle);
     }
 
-    // Add search form handler
     const toggleButton = searchForm.querySelector('.search-toggle');
     if (toggleButton) {
       toggleButton.addEventListener('click', () => {
@@ -371,7 +393,7 @@ function injectNav(currentPageFile) {
       if (query.trim()) {
         const isHostedChat = window.location.hostname === 'chat.medtechguides.uk';
         const searchHref = isHostedChat
-          ? `https://medtechguides.uk/CPAP-devices/F&P-Vitera-Full-Face-User-Guide/search.html?q=${encodeURIComponent(query)}`
+          ? `https://medtechguides.uk/CPAP-devices/F%26P-Vitera-Full-Face-User-Guide/search.html?q=${encodeURIComponent(query)}`
           : `search.html?q=${encodeURIComponent(query)}`;
         window.location.href = searchHref;
       }
@@ -393,8 +415,9 @@ function injectNav(currentPageFile) {
     };
 
     const splitIntoSentences = (text) => {
-      return text
-        .split(/(?<=[.!?])\s+/)
+      if (!text) return [];
+      const matches = text.match(/[^.!?]+[.!?]*\s*/g) || [];
+      return matches
         .map(sentence => sentence.trim())
         .filter(Boolean);
     };
@@ -410,7 +433,7 @@ function injectNav(currentPageFile) {
       if (!button) return;
       button.classList.remove('active');
       const icon = button.querySelector('.card-tts-icon');
-      if (icon) icon.textContent = '🔊';
+      if (icon) icon.textContent = '\uD83D\uDD0A';
       button.dataset.speaking = 'false';
     };
 
@@ -434,7 +457,7 @@ function injectNav(currentPageFile) {
 
       button.classList.add('active');
       const icon = button.querySelector('.card-tts-icon');
-      if (icon) icon.textContent = '⏸';
+      if (icon) icon.textContent = '\u23F8';
       button.dataset.speaking = 'true';
       activeButton = button;
 
@@ -494,7 +517,7 @@ function injectNav(currentPageFile) {
       ttsBtn.type = 'button';
       ttsBtn.className = 'card-tts-btn';
       ttsBtn.setAttribute('aria-label', 'Read this section');
-      ttsBtn.innerHTML = '<span class="card-tts-icon" aria-hidden="true">🔊</span>';
+      ttsBtn.innerHTML = '<span class="card-tts-icon" aria-hidden="true">&#x1F50A;</span>';
       summary.appendChild(ttsBtn);
 
       ttsBtn.addEventListener('click', (event) => {
@@ -508,22 +531,6 @@ function injectNav(currentPageFile) {
 
         const title = summary.querySelector('h1, h2, h3, h4, h5, h6');
         const body = card.querySelector('.card-body');
-        const textParts = [];
-
-        if (title) {
-          const titleText = getCleanText(title);
-          if (titleText) textParts.push(titleText);
-        }
-
-        if (body) {
-          const bodyText = Array.from(body.querySelectorAll('p, li, h3, h4, h5, h6'))
-            .map(el => getCleanText(el))
-            .filter(Boolean)
-            .join('. ');
-          if (bodyText) {
-            textParts.push(bodyText);
-          }
-        }
 
         const segments = [];
         if (title) {
@@ -559,7 +566,7 @@ function injectNav(currentPageFile) {
         ttsBtn.type = 'button';
         ttsBtn.className = 'card-tts-btn card-tts-btn-inline';
         ttsBtn.setAttribute('aria-label', 'Read this section');
-        ttsBtn.innerHTML = '<span class="card-tts-icon" aria-hidden="true">🔊</span>';
+        ttsBtn.innerHTML = '<span class="card-tts-icon" aria-hidden="true">&#x1F50A;</span>';
 
         const heading = card.querySelector('h2, h3, h4, h5, h6');
         if (heading) {
