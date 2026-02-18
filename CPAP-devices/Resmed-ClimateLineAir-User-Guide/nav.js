@@ -216,6 +216,11 @@ function injectNav(currentPageFile) {
       backArrow.setAttribute('aria-label', 'Go back');
       backArrow.innerHTML = '<span class="back-arrow-icon" aria-hidden="true">←</span>';
       backArrow.addEventListener('click', () => {
+        const isHostedChatBack = /(^|\.)chat\.medtechguides\.uk$/i.test(window.location.hostname);
+        if (isHostedChatBack) {
+          window.location.href = 'https://medtechguides.uk/index.html';
+          return;
+        }
         if (window.history.length > 1) {
           window.history.back();
         } else {
@@ -302,7 +307,7 @@ function injectNav(currentPageFile) {
     if (!header.querySelector('.home-button')) {
       const homeButton = document.createElement('a');
       homeButton.className = 'home-button';
-      homeButton.href = '/index.html';
+      homeButton.href = 'https://medtechguides.uk/index.html';
       homeButton.setAttribute('aria-label', 'Back to MedTech Guides');
       homeButton.innerHTML = '<span class="home-icon" aria-hidden="true">🏠</span><span class="visually-hidden">Back to MedTech Guides</span><span class="tooltip" role="tooltip">Back to MedTech Guides</span>';
       header.appendChild(homeButton);
