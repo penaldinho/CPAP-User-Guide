@@ -58,10 +58,7 @@ function injectNav(currentPageFile) {
     const hostedChatSetupHref = 'https://chat.medtechguides.uk/chat-setup.html?guide=fp-vitera&family=cpap';
     const guideBaseHref = isHostedChat ? 'https://medtechguides.uk/CPAP-devices/F%26P-Vitera-Full-Face-User-Guide/' : '';
     const guideHref = (path) => guideBaseHref ? `${guideBaseHref}${path}` : path;
-    const getLandingHref = () => {
-      if (isHostedChat) return 'https://medtechguides.uk/index.html';
-      return '/index.html';
-    };
+    const getLandingHref = () => 'https://medtechguides.uk/index.html';
     const getSetupGuides = () => {
       try {
         const familyProfile = JSON.parse(safeGetItem('setup-profile-cpap') || '{}');
@@ -240,10 +237,7 @@ function injectNav(currentPageFile) {
     }
 
     const isHostedChat = /(^|\.)chat\.medtechguides\.uk$/i.test(window.location.hostname);
-    const getLandingHref = () => {
-      if (isHostedChat) return 'https://medtechguides.uk/index.html';
-      return '/index.html';
-    };
+    const getLandingHref = () => 'https://medtechguides.uk/index.html';
 
     const headerLogo = header.querySelector('.header-logo');
     const headerLinkTargets = [headerLogo, brand, subbrand].filter(Boolean);

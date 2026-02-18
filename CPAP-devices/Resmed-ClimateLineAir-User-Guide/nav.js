@@ -44,11 +44,7 @@ function injectNav(currentPageFile) {
     const guideBaseHref = isHostedChat ? 'https://medtechguides.uk/CPAP-devices/Resmed-ClimateLineAir-User-Guide/' : '';
     const guideHref = (path) => guideBaseHref ? `${guideBaseHref}${path}` : path;
     // Always link home button to the main landing page at the root
-    const getLandingHref = () => {
-      if (isHostedChat) return 'https://medtechguides.uk/index.html';
-      // Always use absolute path to root index.html
-      return '/index.html';
-    };
+    const getLandingHref = () => 'https://medtechguides.uk/index.html';
     const getSetupGuides = () => {
       try {
         const familyProfile = JSON.parse(localStorage.getItem('setup-profile-cpap') || '{}');
