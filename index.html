@@ -24,8 +24,13 @@
       <section class="section">
         <h2>Device types</h2>
         <p class="section-lead">Choose a device family to browse devices, masks, and accessories.</p>
+        <div class="search-wrap" role="search" aria-label="Search guides">
+          <label for="main-search" class="search-label">Search device types and guides</label>
+          <input id="main-search" class="search-input" type="search" placeholder="Try: cpap, airsense, vitera, climateline" autocomplete="off" />
+          <p id="main-search-status" class="search-status" aria-live="polite"></p>
+        </div>
         <div class="cards">
-          <a class="card" href="/CPAP-devices/" aria-label="Open CPAP device guides">
+          <a class="card" href="/CPAP-devices/" aria-label="Open CPAP device guides" data-search="cpap device devices masks tubing airsense 10 resmed f&p vitera full face climatelineair climateline air">
             <div class="card-icon" aria-hidden="true">
               <img src="/images/cpap.PNG" alt="CPAP devices" />
             </div>
@@ -36,6 +41,46 @@
             </div>
           </a>
         </div>
+
+        <div id="main-guide-results-wrap" style="display:none; margin-top:16px;">
+          <p class="section-lead" style="margin:0 0 12px;">Matching guides</p>
+          <div class="cards" id="main-guide-results">
+            <a class="card" href="/CPAP-devices/Airsense-10-User-Guide/welcome.html?nav=expanded" aria-label="Open ResMed AirSense 10 User Guide" data-search="resmed airsense 10 cpap device machine setup therapy troubleshooting">
+              <div class="card-icon" aria-hidden="true">
+                <img src="/CPAP-devices/images/resmed.PNG" alt="ResMed logo" />
+              </div>
+              <div class="card-body">
+                <h3>ResMed AirSense 10</h3>
+                <p>Interactive user guide for setup, therapy, and troubleshooting.</p>
+                <span class="card-link">Open guide →</span>
+              </div>
+            </a>
+
+            <a class="card" href="/CPAP-devices/F&P-Vitera-Full-Face-User-Guide/welcome.html?nav=expanded" aria-label="Open F&P Vitera Full Face Mask User Guide" data-search="f&p vitera full face mask fitting cleaning assembly maintenance">
+              <div class="card-icon" aria-hidden="true">
+                <img src="/CPAP-devices/images/FP.PNG" alt="Fisher &amp; Paykel logo" />
+              </div>
+              <div class="card-body">
+                <h3>F&P Vitera Full Face Mask</h3>
+                <p>Interactive user guide for setup, fitting, cleaning, and maintenance.</p>
+                <span class="card-link">Open guide →</span>
+              </div>
+            </a>
+
+            <a class="card" href="/CPAP-devices/Resmed-ClimateLineAir-User-Guide/index.html?nav=expanded" aria-label="Open ResMed ClimateLineAir User Guide" data-search="resmed climatelineair climateline air tubing tube climate control humidification cleaning">
+              <div class="card-icon" aria-hidden="true">
+                <img src="/CPAP-devices/images/resmed.PNG" alt="ResMed logo" />
+              </div>
+              <div class="card-body">
+                <h3>ResMed ClimateLineAir</h3>
+                <p>Interactive user guide for setup, climate control, and cleaning.</p>
+                <span class="card-link">Open guide →</span>
+              </div>
+            </a>
+          </div>
+        </div>
+
+        <p id="main-no-results" class="section-lead" style="display:none; margin-top:16px;">No matching device types or guides found.</p>
       </section>
 
       <section class="section muted">
@@ -49,5 +94,86 @@
       <span class="footer-disclaimer">All content is the property of its respective owners and is used here for informational purposes only.</span>
     </footer>
   </div>
+
+  <style>
+    .search-wrap {
+      margin: 0 0 18px;
+    }
+
+    .search-label {
+      display: block;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .search-input {
+      width: 100%;
+      max-width: 520px;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      font: inherit;
+      background: #fff;
+    }
+
+    .search-input:focus {
+      outline: 2px solid #c7d7ff;
+      border-color: #9eb8ff;
+    }
+
+    .search-status {
+      margin: 8px 0 0;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+  </style>
+
+  <script>
+    (function () {
+      const input = document.getElementById('main-search');
+      const categoryCards = Array.from(document.querySelectorAll('.section .cards .card[data-search]')).filter((card) => card.closest('#main-guide-results') === null);
+      const guideCards = Array.from(document.querySelectorAll('#main-guide-results .card[data-search]'));
+      const guideWrap = document.getElementById('main-guide-results-wrap');
+      const noResults = document.getElementById('main-no-results');
+      const status = document.getElementById('main-search-status');
+      if (!input || !categoryCards.length || !guideCards.length || !guideWrap || !noResults || !status) return;
+
+      const normalize = (value) => String(value || '').toLowerCase().trim();
+
+      const filterCards = () => {
+        const query = normalize(input.value);
+        let visibleCategoryCount = 0;
+        let visibleGuideCount = 0;
+
+        categoryCards.forEach((card) => {
+          const haystack = normalize(card.getAttribute('data-search'));
+          const match = !query || haystack.includes(query);
+          card.style.display = match ? '' : 'none';
+          if (match) visibleCategoryCount += 1;
+        });
+
+        guideCards.forEach((card) => {
+          const haystack = normalize(card.getAttribute('data-search'));
+          const match = Boolean(query) && haystack.includes(query);
+          card.style.display = match ? '' : 'none';
+          if (match) visibleGuideCount += 1;
+        });
+
+        guideWrap.style.display = visibleGuideCount ? '' : 'none';
+
+        const visibleCount = visibleCategoryCount + visibleGuideCount;
+
+        noResults.style.display = visibleCount ? 'none' : '';
+
+        if (!query) {
+          status.textContent = '';
+        } else {
+          status.textContent = `${visibleCount} result${visibleCount === 1 ? '' : 's'} found`;
+        }
+      };
+
+      input.addEventListener('input', filterCards);
+    })();
+  </script>
 </body>
 </html>

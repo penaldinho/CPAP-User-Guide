@@ -54,6 +54,37 @@
     .accordion--tubing .card-icon {
       background: color-mix(in srgb, var(--tubing-accent) 22%, var(--card));
     }
+
+    .search-wrap {
+      margin: 0 0 18px;
+    }
+
+    .search-label {
+      display: block;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .search-input {
+      width: 100%;
+      max-width: 560px;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      font: inherit;
+      background: #fff;
+    }
+
+    .search-input:focus {
+      outline: 2px solid #c7d7ff;
+      border-color: #9eb8ff;
+    }
+
+    .search-status {
+      margin: 8px 0 0;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
   </style>
 </head>
 <body>
@@ -73,12 +104,17 @@
 
     <main class="content">
       <section class="section">
+        <div class="search-wrap" role="search" aria-label="Search CPAP guides">
+          <label for="cpap-search" class="search-label">Search CPAP guides</label>
+          <input id="cpap-search" class="search-input" type="search" placeholder="Try: airsense, vitera, climateline, mask, tubing" autocomplete="off" />
+          <p id="cpap-search-status" class="search-status" aria-live="polite"></p>
+        </div>
         <div class="device-type">
           <div class="device-type-body">
             <details class="accordion accordion--devices" open>
               <summary>Devices</summary>
               <div class="cards cards--accordion">
-                <a class="card" href="/CPAP-devices/Airsense-10-User-Guide/welcome.html?nav=expanded" aria-label="Open ResMed AirSense 10 User Guide">
+                <a class="card" href="/CPAP-devices/Airsense-10-User-Guide/welcome.html?nav=expanded" aria-label="Open ResMed AirSense 10 User Guide" data-search="resmed airsense 10 cpap device machine therapy setup troubleshooting">
                   <div class="card-icon" aria-hidden="true">
                     <img src="/CPAP-devices/images/resmed.PNG" alt="ResMed logo" />
                   </div>
@@ -94,7 +130,7 @@
             <details class="accordion accordion--masks" open>
               <summary>Masks</summary>
               <div class="cards cards--accordion">
-                <a class="card" href="/CPAP-devices/F&P-Vitera-Full-Face-User-Guide/welcome.html?nav=expanded" aria-label="Open F&P Vitera Full Face Mask User Guide">
+                <a class="card" href="/CPAP-devices/F&P-Vitera-Full-Face-User-Guide/welcome.html?nav=expanded" aria-label="Open F&P Vitera Full Face Mask User Guide" data-search="f&p vitera full face mask fitting cleaning assembly maintenance">
                   <div class="card-icon" aria-hidden="true">
                     <img src="/CPAP-devices/images/FP.PNG" alt="Fisher &amp; Paykel logo" />
                   </div>
@@ -110,7 +146,7 @@
             <details class="accordion accordion--tubing" open>
               <summary>Tubing</summary>
               <div class="cards cards--accordion">
-                <a class="card" href="/CPAP-devices/Resmed-ClimateLineAir-User-Guide/index.html?nav=expanded" aria-label="Open ResMed ClimateLineAir User Guide">
+                <a class="card" href="/CPAP-devices/Resmed-ClimateLineAir-User-Guide/index.html?nav=expanded" aria-label="Open ResMed ClimateLineAir User Guide" data-search="resmed climatelineair climateline air tubing tube climate control humidification cleaning">
                   <div class="card-icon" aria-hidden="true">
                     <img src="/CPAP-devices/images/resmed.PNG" alt="ResMed logo" />
                   </div>
@@ -124,6 +160,7 @@
             </details>
           </div>
         </div>
+        <p id="cpap-no-results" class="section-lead" style="display:none; margin-top:16px;">No matching guides found in this device type.</p>
       </section>
 
       <section class="section muted">
@@ -148,6 +185,45 @@
         }
       });
     }
+
+    (function () {
+      const input = document.getElementById('cpap-search');
+      const cards = Array.from(document.querySelectorAll('.cards .card[data-search]'));
+      const accordions = Array.from(document.querySelectorAll('.accordion'));
+      const noResults = document.getElementById('cpap-no-results');
+      const status = document.getElementById('cpap-search-status');
+      if (!input || !cards.length || !noResults || !status) return;
+
+      const normalize = (value) => String(value || '').toLowerCase().trim();
+
+      const filterCards = () => {
+        const query = normalize(input.value);
+        let visibleCount = 0;
+
+        cards.forEach((card) => {
+          const haystack = normalize(card.getAttribute('data-search'));
+          const match = !query || haystack.includes(query);
+          card.style.display = match ? '' : 'none';
+          if (match) visibleCount += 1;
+        });
+
+        accordions.forEach((accordion) => {
+          const visibleInAccordion = Array.from(accordion.querySelectorAll('.card[data-search]'))
+            .some((card) => card.style.display !== 'none');
+          accordion.style.display = visibleInAccordion ? '' : 'none';
+        });
+
+        noResults.style.display = visibleCount ? 'none' : '';
+
+        if (!query) {
+          status.textContent = '';
+        } else {
+          status.textContent = `${visibleCount} result${visibleCount === 1 ? '' : 's'} found`;
+        }
+      };
+
+      input.addEventListener('input', filterCards);
+    })();
   </script>
 </body>
 </html>

@@ -48,13 +48,13 @@ function injectNav(currentPageFile) {
     const persistedCollapsed = localStorage.getItem('nav-collapsed') === 'true';
     document.body.classList.toggle('nav-collapsed', persistedCollapsed);
     const isLocalHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-    const isHostedChat = window.location.hostname === 'chat.medtechguides.uk';
+    const isHostedChat = /(^|\.)chat\.medtechguides\.uk$/i.test(window.location.hostname);
     const hostedChatSetupHref = 'https://chat.medtechguides.uk/chat-setup.html?guide=airsense-10&family=cpap';
     const guideBaseHref = isHostedChat ? 'https://medtechguides.uk/CPAP-devices/Airsense-10-User-Guide/' : '';
     const guideHref = (path) => guideBaseHref ? `${guideBaseHref}${path}` : path;
     // Always link home button to the main landing page at the root
     const getLandingHref = () => {
-      if (isHostedChat) return 'https://medtechguides.uk/';
+      if (isHostedChat) return 'https://medtechguides.uk/index.html';
       // Always use absolute path to root index.html
       return '/index.html';
     };

@@ -54,12 +54,12 @@ function injectNav(currentPageFile) {
     const persistedCollapsed = safeGetItem('nav-collapsed') === 'true';
     document.body.classList.toggle('nav-collapsed', persistedCollapsed);
     const isLocalHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-    const isHostedChat = window.location.hostname === 'chat.medtechguides.uk';
+    const isHostedChat = /(^|\.)chat\.medtechguides\.uk$/i.test(window.location.hostname);
     const hostedChatSetupHref = 'https://chat.medtechguides.uk/chat-setup.html?guide=fp-vitera&family=cpap';
     const guideBaseHref = isHostedChat ? 'https://medtechguides.uk/CPAP-devices/F%26P-Vitera-Full-Face-User-Guide/' : '';
     const guideHref = (path) => guideBaseHref ? `${guideBaseHref}${path}` : path;
     const getLandingHref = () => {
-      if (isHostedChat) return 'https://medtechguides.uk/';
+      if (isHostedChat) return 'https://medtechguides.uk/index.html';
       return '/index.html';
     };
     const getSetupGuides = () => {
@@ -239,9 +239,9 @@ function injectNav(currentPageFile) {
       document.body.appendChild(backArrow);
     }
 
-    const isHostedChat = window.location.hostname === 'chat.medtechguides.uk';
+    const isHostedChat = /(^|\.)chat\.medtechguides\.uk$/i.test(window.location.hostname);
     const getLandingHref = () => {
-      if (isHostedChat) return 'https://medtechguides.uk/';
+      if (isHostedChat) return 'https://medtechguides.uk/index.html';
       return '/index.html';
     };
 
