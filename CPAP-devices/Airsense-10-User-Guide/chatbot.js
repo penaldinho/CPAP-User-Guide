@@ -27,6 +27,74 @@ class ChatBot {
     this.initialMessage.textContent = `Hi! I'm your ${guideName} assistant. Ask any questions about setup, therapy, maintenance, or troubleshooting and I'll answer using this user guide.`;
   }
 
+  escapeHtml(text) {
+    return String(text || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  formatAssistantText(text) {
+    let content = String(text || '').replace(/\r\n/g, '\n').trim();
+
+    if (!content.includes('\n') && /\s\d+\.\s/.test(content)) {
+      content = content.replace(/\s(\d+\.\s)/g, '\n$1');
+    }
+
+    const escaped = this.escapeHtml(content);
+    const withBold = escaped.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+
+    const lines = withBold.split('\n').map((line) => line.trimEnd());
+    const parts = [];
+    let i = 0;
+
+    while (i < lines.length) {
+      const line = lines[i].trim();
+      if (!line) {
+        i += 1;
+        continue;
+      }
+
+      const headingMatch = line.match(/^#{1,3}\s+(.+)$/);
+      if (headingMatch) {
+        parts.push(`<h3 style="margin:8px 0 6px; font-size:14px;">${headingMatch[1]}</h3>`);
+        i += 1;
+        continue;
+      }
+
+      if (/^\d+\.\s+/.test(line)) {
+        const items = [];
+        while (i < lines.length && /^\d+\.\s+/.test(lines[i].trim())) {
+          items.push(lines[i].trim().replace(/^\d+\.\s+/, ''));
+          i += 1;
+        }
+        parts.push(`<ol style="margin:6px 0 8px 18px; padding:0;">${items.map((item) => `<li style="margin:4px 0;">${item}</li>`).join('')}</ol>`);
+        continue;
+      }
+
+      if (/^[-*]\s+/.test(line)) {
+        const items = [];
+        while (i < lines.length && /^[-*]\s+/.test(lines[i].trim())) {
+          items.push(lines[i].trim().replace(/^[-*]\s+/, ''));
+          i += 1;
+        }
+        parts.push(`<ul style="margin:6px 0 8px 18px; padding:0;">${items.map((item) => `<li style="margin:4px 0;">${item}</li>`).join('')}</ul>`);
+        continue;
+      }
+
+      const paragraphLines = [];
+      while (i < lines.length && lines[i].trim() && !/^#{1,3}\s+/.test(lines[i].trim()) && !/^\d+\.\s+/.test(lines[i].trim()) && !/^[-*]\s+/.test(lines[i].trim())) {
+        paragraphLines.push(lines[i].trim());
+        i += 1;
+      }
+      parts.push(`<p style="margin:6px 0;">${paragraphLines.join(' ')}</p>`);
+    }
+
+    return parts.join('');
+  }
+
   setupEventListeners() {
     this.sendBtn.addEventListener('click', () => this.sendMessage());
     this.inputField.addEventListener('keypress', (e) => {
@@ -120,6 +188,8 @@ class ChatBot {
     
     if (isHtml) {
       bubble.innerHTML = text;
+    } else if (sender === 'assistant') {
+      bubble.innerHTML = this.formatAssistantText(text);
     } else {
       bubble.textContent = text;
     }
