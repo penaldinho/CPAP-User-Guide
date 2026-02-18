@@ -3,115 +3,229 @@
     {
       "title": "ResMed ClimateLineAir User Guide",
       "file": "index.html",
-      "description": "Contents and quick access for the ClimateLineAir guide.",
+      "description": "ResMed ClimateLineAir User Guide — Quick Access ResMed ClimateLineAir User Guide Contents Contents Welcome Introduction to ClimateLineAir Setup Prepar...",
       "keywords": [
         "climatelineair",
         "resmed",
-        "contents",
+        "user",
         "guide",
-        "tubing"
+        "contents",
+        "welcome",
+        "cleaning",
+        "symbols",
+        "environmental",
+        "warranty",
+        "quick",
+        "access",
+        "introduction",
+        "setup",
+        "prepare"
       ],
-      "content": "ResMed ClimateLineAir User Guide Contents Welcome Setup Climate control Disconnecting Cleaning Checking Reconnecting the air tubing Troubleshooting Technical specifications Symbols Environmental information Limited warranty"
+      "content": "ResMed ClimateLineAir User Guide — Quick Access ResMed ClimateLineAir User Guide Contents Contents Welcome Introduction to ClimateLineAir Setup Prepare for use Climate control Temperature and humidity settings Cleaning and maintenance Disconnecting, cleaning, checking, and reconnecting Troubleshooting Common issues and actions Technical specifications Tubing specs and compatibility Symbols Symbols and icons Environmental information Disposal and environmental details Limited warranty Warranty coverage Start: 1. Welcome →"
     },
     {
       "title": "Welcome",
       "file": "welcome.html",
-      "description": "Introduction to ClimateLineAir heated air tubing.",
+      "description": "Welcome — ResMed ClimateLineAir User Guide ResMed ClimateLineAir User Guide 1",
       "keywords": [
-        "welcome",
         "climatelineair",
-        "heated tubing",
-        "climate control",
-        "humidification"
+        "tubing",
+        "user",
+        "guide",
+        "heated",
+        "temperature",
+        "climate",
+        "control",
+        "lumis",
+        "contents",
+        "sections",
+        "welcome",
+        "resmed",
+        "oxygen",
+        "designed"
       ],
-      "content": "Welcome About your ClimateLineAir The ClimateLineAir is heated air tubing that delivers the desired temperature at your mask. ClimateLineAir Oxy has a built-in oxygen connector. When used with HumidAir humidifier, ClimateLineAir allows you to use Climate Control. Climate Control is designed to make therapy more comfortable by enabling constant temperature and maintaining humidity. The ClimateLineAir is designed for use with AirSense 10, AirCurve 10 and Lumis devices."
+      "content": "Welcome — ResMed ClimateLineAir User Guide ResMed ClimateLineAir User Guide 1. Welcome About your ClimateLineAir The ClimateLineAir™ is heated air tubing that delivers the desired temperature at your mask. ClimateLineAir Oxy is a variant of the ClimateLineAir that has a built-in oxygen connector to attach a supplemental oxygen supply. When used with the HumidAir™ humidifier, ClimateLineAir heated air tubing allows you to use Climate Control. Climate Control is designed to make therapy more comfortable by enabling constant temperature and maintaining humidity. The ClimateLineAir heated air tubing is designed for use with AirSense™ 10 / AirCurve™ 10 and Lumis™ devices. Please read this entire user guide together with your device user guide before using your ClimateLineAir heated air tubing. Note Not all types of air tubing are available in all regions. Lumis does not include S9 Lumis Tx. Getting started If this is your first time using your ClimateLineAir heated air tubing, we recommend starting with: Contents — to review sections of this user guide Setup — to prepare your tubing for use Climate control — to learn about temperature and humidity settings Quick navigation Use the navigation menu to access different sections, or visit the Contents page for a complete overview of all available sections. Go to Contents Next: 2. Setup →"
     },
     {
       "title": "Setup",
       "file": "setup.html",
-      "description": "Prepare for use.",
+      "description": "Setup — ResMed ClimateLineAir User Guide ResMed ClimateLineAir User Guide 2",
       "keywords": [
+        "oxygen",
+        "connector",
         "setup",
-        "prepare",
-        "climatelineair"
+        "climatelineair",
+        "tubing",
+        "supplemental",
+        "user",
+        "guide",
+        "make",
+        "sure",
+        "device",
+        "resmed",
+        "connected",
+        "cuff",
+        "connect"
       ],
-      "content": "Setup Prepare for use"
+      "content": "Setup — ResMed ClimateLineAir User Guide ResMed ClimateLineAir User Guide 2. Setup Setup Make sure the device is connected and turned on. Hold the cuff of the air tubing and line up the air tubing connector with the connector port. Push the cuff until the connector clicks into place. ClimateLineAir connected will briefly display on the device screen. Connect the assembled mask to the free end of the air tubing. Setup with supplemental oxygen To set up the ClimateLineAir Oxy with supplemental oxygen, perform the steps outlined in the setup section and the following additional steps. Remove the cap from the oxygen connector. Connect the oxygen supply tubing to the oxygen connector. Make sure it is firmly attached. Notes Before adding oxygen, familiarize yourself with the specific warnings relating to the use of supplemental oxygen. These can be found at the end of your device User Guide. If you use the ClimateLineAir Oxy without supplemental oxygen, make sure the cap of the oxygen connector is firmly attached. ← Back: 1. Welcome Next: 3. Climate control →"
     },
     {
-      "title": "Climate control",
+      "title": "Cleaning",
+      "file": "cleaning.html",
+      "description": "Cleaning — ResMed ClimateLineAir User Guide ResMed ClimateLineAir User Guide 4",
+      "keywords": [
+        "tubing",
+        "cleaning",
+        "hold",
+        "pull",
+        "cuff",
+        "device",
+        "resmed",
+        "climatelineair",
+        "user",
+        "guide",
+        "regularly",
+        "clean",
+        "disconnecting",
+        "checking",
+        "reconnecting"
+      ],
+      "content": "Cleaning — ResMed ClimateLineAir User Guide ResMed ClimateLineAir User Guide 4. Cleaning and maintenance It is important that you regularly clean your air tubing to make sure you receive optimal therapy. The following sections will help you with disconnecting, cleaning, checking and reconnecting your air tubing. Disconnecting Hold the cuff of the air tubing, apply gentle pressure to the release buttons and pull it away from the device. Hold both the cuff of the air tubing and the swivel of the mask, then gently pull apart. Note: Only hold and pull the cuff of the air tubing. Do not hold or pull the tubing itself as it may cause damage. Cleaning You should clean the air tubing weekly as described. Wash the air tubing in warm water using mild detergent. Do not wash in a dishwasher or washing machine. Rinse the air tubing thoroughly and allow to dry, out of direct sunlight and/or heat. Checking You should regularly check the air tubing for any damage. If there are any holes, tears or cracks you should replace it. Reconnecting the air tubing When the air tubing is dry, you can reconnect it to the device. Connect the air tubing firmly to the air outlet located on the rear of the device. Connect the free end of the air tubing firmly onto the assembled mask. ← Back: 3. Climate control Next: 5. Troubleshooting →"
+    },
+    {
+      "title": "Climate Control",
       "file": "climate-control.html",
-      "description": "Temperature and humidity settings.",
+      "description": "Climate Control — ResMed ClimateLineAir User Guide ResMed ClimateLineAir User Guide 3",
       "keywords": [
         "climate",
         "control",
         "humidity",
-        "temperature"
+        "dial",
+        "temperature",
+        "turn",
+        "auto",
+        "change",
+        "tube",
+        "press",
+        "manual",
+        "level",
+        "adjust",
+        "comfortable",
+        "climatelineair"
       ],
-      "content": "Climate control Temperature and humidity settings"
-    },
-    {
-      "title": "Cleaning and maintenance",
-      "file": "cleaning.html",
-      "description": "Disconnecting, cleaning, checking, and reconnecting the air tubing.",
-      "keywords": [
-        "cleaning",
-        "disconnecting",
-        "checking",
-        "reconnecting",
-        "maintenance"
-      ],
-      "content": "Cleaning and maintenance Disconnecting Cleaning Checking Reconnecting the air tubing"
+      "content": "Climate Control — ResMed ClimateLineAir User Guide ResMed ClimateLineAir User Guide 3. Climate Control Climate Control Climate Control is an intelligent system that controls the humidifier and the ClimateLineAir heated air tubing to deliver constant, comfortable temperature and humidity levels during therapy. Designed to prevent dryness of the nose and mouth, it maintains the set temperature and relative humidity while you sleep. Climate Control can be set to either Auto or Manual and is only available when both the ClimateLineAir and the HumidAir humidifier are attached. Climate Control Auto Climate Control Auto is the recommended and default setting. Climate Control Auto is designed to make therapy as easy as possible, so there is no need to change the temperature or humidity settings. The Tube Temperature is set to Auto (80°F [27°C]) and Climate Control adjusts the humidifier output to maintain a constant, comfortable humidity level of 85% relative humidity while protecting against rainout (water droplets in the air tubing and mask). Tube Temperature In Climate Control Auto there is no need to change any settings, but if the air in the mask feels too warm or cold you can adjust the tube temperature to find what is most comfortable for you. You can set the Tube Temperature to anywhere between 60–86°F (16–30°C), or turn it off completely. To adjust the Tube Temperature: In My Options, turn the dial to highlight Tube Temperature and then press the dial. Turn the dial to adjust the temperature and press the dial to save the change. Climate Control Manual Designed to offer you more flexibility and control over your settings, Climate Control Manual lets you adjust the temperature and humidity to the setting which is most comfortable for you. In Climate Control Manual, the tube temperature and the humidity level can be set independently however, rainout protection is not guaranteed. If rainout does occur, first try increasing the tube temperature. If the air temperature becomes too warm and rainout continues, try decreasing the humidity. To change to Climate Control Manual: In My Options, turn the dial to highlight Climate Ctrl and then press the dial. Turn the dial to select Manual and press the dial to save the change. Humidity Level The humidifier moistens the air and is designed to make therapy more comfortable. If you are getting a dry nose or mouth, turn up the humidity. If you are getting any moisture in your mask, turn down the humidity. You can set the Humidity Level to Off or between 1 and 8, where 1 is the lowest humidity setting and 8 is the highest humidity setting. To adjust the Humidity Level: In My Options, turn the dial to highlight Humidity Level and then press the dial. Turn the dial to adjust the humidity level and press the dial to save the change. Return to Climate Control Auto If you have been using Climate Control Manual and want to return to Climate Control Auto, follow the instructions below. To change to Climate Control Auto: In My Options, turn the dial to highlight Climate Ctrl and then press the dial. Turn the dial to select Auto and then press the dial to save the change. ← Back: 2. Setup Next: 4. Cleaning and maintenance →"
     },
     {
       "title": "Troubleshooting",
       "file": "troubleshooting.html",
-      "description": "Common issues and actions.",
+      "description": "Troubleshooting — ResMed ClimateLineAir User Guide ResMed ClimateLineAir User Guide 5",
       "keywords": [
         "troubleshooting",
-        "issues"
+        "resmed",
+        "user",
+        "guide",
+        "climatelineair",
+        "device",
+        "problems",
+        "refer",
+        "section",
+        "note",
+        "serious",
+        "incidents",
+        "occur",
+        "relation",
+        "reported"
       ],
-      "content": "Troubleshooting Common issues and actions"
+      "content": "Troubleshooting — ResMed ClimateLineAir User Guide ResMed ClimateLineAir User Guide 5. Troubleshooting Troubleshooting If you have any problems, refer to the troubleshooting section of your device user guide or www.resmed.com. Note: For any serious incidents that occur in relation to this device, these should be reported to ResMed and the competent authority in your country. ← Back: 4. Cleaning and maintenance Next: 6. Technical specifications →"
     },
     {
-      "title": "Technical specifications",
+      "title": "Technical Specifications",
       "file": "technical-specifications.html",
-      "description": "Tubing specs and compatibility.",
+      "description": "Technical Specifications — ResMed ClimateLineAir User Guide ResMed ClimateLineAir User Guide 6",
       "keywords": [
-        "technical",
+        "climatelineair",
+        "temperature",
+        "operating",
+        "humidity",
         "specifications",
-        "compatibility"
+        "user",
+        "guide",
+        "pressure",
+        "device",
+        "technical",
+        "resmed",
+        "conditions",
+        "relative",
+        "noncondensing",
+        "range"
       ],
-      "content": "Technical specifications Tubing specs and compatibility"
+      "content": "Technical Specifications — ResMed ClimateLineAir User Guide ResMed ClimateLineAir User Guide 6. Technical Specifications Environmental conditions Condition Specification Operating temperature +41°F to +95°F (+5°C to +35°C) Operating humidity 10 to 95% relative humidity, noncondensing Operating altitude Sea level to 8,500' (2,591 m); air pressure range 1013 hPa to 738 hPa Storage and transport temperature -4°F to +140°F (-20°C to +60°C) Storage and transport humidity 5 to 95% relative humidity, noncondensing Note: The air flow for breathing produced by this therapy device can be higher than the temperature of the room. Under extreme ambient temperature conditions (104°F/40°C) the device remains safe. Temperature Temperature range: +60 to +86°F (+16 to +30°C) Cut-out: +106°F (+41°C) Operating pressure Maximum recommended pressure: 30 cm H₂O (30 hPa) Physical specifications Material ClimateLineAir: Flexible plastic and electrical components ClimateLineAir Oxy: Flexible plastic and electrical components Length ClimateLineAir: 6'6\" (2 m) ClimateLineAir Oxy: 6'4\" (1.9 m) Inner diameter Standard/SlimLine: 0.6\" (15 mm) ClimateLineAir/ClimateLineAir Oxy: 0.75\" (19 mm) Design life Air tubing (Standard, SlimLine, ClimateLineAir, ClimateLineAir Oxy): 6 months Electromagnetic compatibility Refer to the device User Guide for air tubing resistance to flow and compliance values. ← Back: 5. Troubleshooting Next: 7. Symbols →"
+    },
+    {
+      "title": "Limited Warranty",
+      "file": "limited-warranty.html",
+      "description": "Limited Warranty — ResMed ClimateLineAir User Guide ResMed ClimateLineAir User Guide 9",
+      "keywords": [
+        "limited",
+        "warranty",
+        "user",
+        "guide",
+        "resmed",
+        "climatelineair",
+        "back",
+        "refer",
+        "device",
+        "environmental",
+        "information",
+        "contents"
+      ],
+      "content": "Limited Warranty — ResMed ClimateLineAir User Guide ResMed ClimateLineAir User Guide 9. Limited Warranty Limited Warranty Refer to your device user guide. ← Back: 8. Environmental information Back to contents →"
+    },
+    {
+      "title": "Environmental Information",
+      "file": "environmental-information.html",
+      "description": "Environmental Information — ResMed ClimateLineAir User Guide ResMed ClimateLineAir User Guide 8",
+      "keywords": [
+        "information",
+        "resmed",
+        "systems",
+        "environmental",
+        "device",
+        "collection",
+        "disposal",
+        "climatelineair",
+        "user",
+        "guide",
+        "waste",
+        "reuse",
+        "recycling",
+        "environment",
+        "please"
+      ],
+      "content": "Environmental Information — ResMed ClimateLineAir User Guide ResMed ClimateLineAir User Guide 8. Environmental Information Environmental Information This device should be disposed of separately, not as unsorted municipal waste. To dispose of your device, you should use appropriate collection, reuse and recycling systems available in your region. The use of these collection, reuse and recycling systems is designed to reduce pressure on natural resources and prevent hazardous substances from damaging the environment. If you need information on these disposal systems, please contact your local waste administration. The crossed-bin symbol invites you to use these disposal systems. If you require information on collection and disposal of your ResMed device please contact your ResMed office, local distributor or go to www.resmed.com/environment . ← Back: 7. Symbols Next: 9. Limited warranty →"
     },
     {
       "title": "Symbols",
       "file": "symbols.html",
-      "description": "Symbols and icons.",
+      "description": "Symbols — ResMed ClimateLineAir User Guide ResMed ClimateLineAir User Guide 7",
       "keywords": [
         "symbols",
-        "icons"
+        "resmed",
+        "climatelineair",
+        "user",
+        "guide",
+        "following",
+        "appear",
+        "product",
+        "packaging",
+        "glossary",
+        "back",
+        "technical",
+        "specifications",
+        "next",
+        "environmental"
       ],
-      "content": "Symbols Symbols and icons"
-    },
-    {
-      "title": "Environmental information",
-      "file": "environmental-information.html",
-      "description": "Disposal and environmental details.",
-      "keywords": [
-        "environmental",
-        "disposal"
-      ],
-      "content": "Environmental information Disposal and environmental details"
-    },
-    {
-      "title": "Limited warranty",
-      "file": "limited-warranty.html",
-      "description": "Warranty coverage.",
-      "keywords": [
-        "warranty",
-        "limited"
-      ],
-      "content": "Limited warranty Warranty coverage"
+      "content": "Symbols — ResMed ClimateLineAir User Guide ResMed ClimateLineAir User Guide 7. Symbols Symbols The following symbols may appear on the product or packaging. See symbols glossary at ResMed.com/symbols . ← Back: 6. Technical specifications Next: 8. Environmental information →"
     }
   ]
 }

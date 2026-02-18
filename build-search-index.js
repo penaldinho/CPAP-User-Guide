@@ -8,28 +8,46 @@ const baseDir = targetDirArg
   ? path.resolve(__dirname, targetDirArg)
   : path.join(__dirname, 'CPAP-devices', 'Airsense-10-User-Guide');
 
-// List of HTML files to index (in order of importance)
-const htmlFiles = [
-  'welcome.html',
+const excludedHtmlFiles = new Set([
+  'chat.html',
+  'chat-setup.html',
+  'search.html'
+]);
+
+const priorityOrder = [
   'index.html',
-  'about-device.html',
+  'welcome.html',
   'setup.html',
+  'operating-instructions.html',
+  'fitting-your-mask.html',
+  'mask-assembly.html',
+  'cleaning-your-mask-at-home.html',
+  'cleaning.html',
+  'climate-control.html',
   'starting-therapy.html',
   'stopping-therapy.html',
-  'power-save-mode.html',
-  'my-options.html',
-  'caring-for-your-device.html',
-  'therapy-data.html',
-  'travelling.html',
   'troubleshooting.html',
-  'reassembling-parts.html',
+  'technical-information.html',
   'technical-specifications.html',
-  'symbols.html',
-  'environmental-information.html',
-  'servicing.html',
+  'further-information.html',
   'limited-warranty.html',
-  'further-information.html'
+  'warranty-statement.html'
 ];
+
+function getHtmlFilesToIndex(directory) {
+  const allHtmlFiles = fs.readdirSync(directory)
+    .filter((name) => name.toLowerCase().endsWith('.html'))
+    .filter((name) => !excludedHtmlFiles.has(name.toLowerCase()));
+
+  const priorityRank = new Map(priorityOrder.map((name, index) => [name, index]));
+
+  return allHtmlFiles.sort((a, b) => {
+    const aRank = priorityRank.has(a) ? priorityRank.get(a) : Number.MAX_SAFE_INTEGER;
+    const bRank = priorityRank.has(b) ? priorityRank.get(b) : Number.MAX_SAFE_INTEGER;
+    if (aRank !== bRank) return aRank - bRank;
+    return a.localeCompare(b);
+  });
+}
 
 /**
  * Extract text content from HTML
@@ -176,7 +194,8 @@ function processHtmlFile(filepath) {
  */
 function buildSearchIndex() {
   console.log('Building search index...');
-  
+  const htmlFiles = getHtmlFilesToIndex(baseDir);
+
   const pages = [];
   
   htmlFiles.forEach(filename => {

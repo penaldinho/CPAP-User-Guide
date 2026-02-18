@@ -1,81 +1,255 @@
 {
   "pages": [
     {
-      "title": "F&P Vitera Full Face Mask User Guide",
+      "title": "F&P Vitera Full Face",
       "file": "index.html",
-      "description": "Contents and quick access for the F&P Vitera Full Face mask guide.",
-      "keywords": ["fp", "vitera", "mask", "contents", "guide"],
-      "content": "F&P Vitera Full Face Mask User Guide Contents Welcome Operating Instructions Mask Parts Fitting Your Mask Cleaning Your Mask at Home Mask Assembly Symbol Definitions Technical Information Further Information Warranty Statement"
+      "description": "F&P Vitera Full Face — Quick Access F&P Vitera Full Face Contents Contents Welcome Introduction to your mask Operating Instructions How to use your ma...",
+      "keywords": [
+        "mask",
+        "vitera",
+        "full",
+        "face",
+        "contents",
+        "welcome",
+        "fitting",
+        "cleaning",
+        "information",
+        "warranty",
+        "quick",
+        "access",
+        "introduction",
+        "operating",
+        "instructions"
+      ],
+      "content": "F&P Vitera Full Face — Quick Access F&P Vitera Full Face Contents Contents Welcome Introduction to your mask Operating Instructions How to use your mask Mask Parts Component identification Fitting Your Mask Proper fitting and adjustment Cleaning Your Mask at Home Cleaning procedures and care Mask Assembly Reassembling your mask Symbol Definitions Understanding mask symbols Technical Information Specifications and data Further Information Additional support and resources Warranty Statement Warranty coverage details ← Back to 1. Welcome"
     },
     {
       "title": "Welcome",
       "file": "welcome.html",
-      "description": "Welcome and intended use information for the F&P Vitera mask.",
-      "keywords": ["welcome", "intended use", "vitera", "mask"],
-      "content": "Welcome to the F&P Vitera Full Face Mask user guide with overview and usage information."
+      "description": "Welcome — F&P Vitera Full Face User Guide F&P Vitera Full Face Mask User Guide 1",
+      "keywords": [
+        "mask",
+        "full",
+        "face",
+        "vitera",
+        "guide",
+        "intended",
+        "welcome",
+        "user",
+        "cpap",
+        "therapy",
+        "fitting",
+        "thank",
+        "choosing",
+        "fisher",
+        "paykel"
+      ],
+      "content": "Welcome — F&P Vitera Full Face User Guide F&P Vitera Full Face Mask User Guide 1. Welcome Thank you for choosing the Fisher & Paykel Healthcare Vitera Full Face Mask This Full Face mask has been designed to make it easier for you to fit CPAP therapy into your life. This is your mask Use and Care Guide. Please read this entire guide before you first use your mask. Following the steps in this guide, and referring to the images and diagrams will assist you with assembly, fitting and daily use of your F&P Vitera Full Face mask. Intended Use/ Indications For Use The F&P Vitera Full Face mask is intended to be used by adults weighing ≥ 66lbs (30kgs) who have been diagnosed by a physician as requiring CPAP or Bi-Level therapy. The F&P Vitera Full Face mask is intended for single patient use in the home. Fitting Your Mask Go to Contents Next: 2. Operating Instructions →"
     },
     {
       "title": "Operating Instructions",
       "file": "operating-instructions.html",
-      "description": "Operating pressure, temperature range, and pre-use checks.",
-      "keywords": ["operating instructions", "pressure", "temperature", "pre-use checks"],
-      "content": "Operating Instructions include operating pressure and temperature ranges, and pre-use safety checks for seal and vents."
-    },
-    {
-      "title": "Mask Parts",
-      "file": "mask-parts.html",
-      "description": "Mask components, diagrams, and assembly references.",
-      "keywords": ["mask parts", "components", "diagram", "assembly"],
-      "content": "Mask Parts section lists the Vitera components and diagrams used for fitting and assembly."
+      "description": "Operating Instructions — F&P Vitera Full Face User Guide F&P Vitera Full Face Mask User Guide 2",
+      "keywords": [
+        "mask",
+        "operating",
+        "instructions",
+        "guide",
+        "vitera",
+        "full",
+        "face",
+        "user",
+        "range",
+        "inspect",
+        "deterioration",
+        "holes",
+        "ensure",
+        "blocked",
+        "pressure"
+      ],
+      "content": "Operating Instructions — F&P Vitera Full Face User Guide F&P Vitera Full Face Mask User Guide 2. Operating Instructions Operating Instructions The operating pressure range of your mask is 4 to 30 cmH 2 O. The operating temperature range of your mask is 5 to 40 °C (41 to 104 °F). Before using your mask each time, you should: Inspect it for damage or deterioration. If there is any visible deterioration (cracking, tears, etc.), do not use your mask, and seek replacement part(s) from your healthcare provider. Inspect the exhaust holes on the Seal . Ensure air is flowing through these holes and do not use if blocked. Make sure path of air in mask is free from objects that may prevent breathing. Ensure Elbow Side Vents are not blocked. ⚠️ Note Please refer to the Warnings and Cautions within this guide. Failure to follow the operating instructions above may compromise the performance and safety of the mask. ← Back to contents Next: 3. Mask Parts →"
     },
     {
       "title": "Fitting Your Mask",
       "file": "fitting-your-mask.html",
-      "description": "Step-by-step guidance to fit the mask correctly.",
-      "keywords": ["fitting", "mask fit", "seal", "headgear"],
-      "content": "Fitting Your Mask explains the steps to put on and adjust the mask for a proper seal."
-    },
-    {
-      "title": "Cleaning Your Mask at Home",
-      "file": "cleaning-your-mask-at-home.html",
-      "description": "Home cleaning and disassembly guidance for mask care.",
-      "keywords": ["cleaning", "disassembly", "home care", "maintenance"],
-      "content": "Cleaning Your Mask at Home covers disassembly, daily cleaning, and weekly cleaning cautions."
+      "description": "Fitting Your Mask — F&P Vitera Full Face User Guide F&P Vitera Full Face Mask User Guide 4",
+      "keywords": [
+        "mask",
+        "headgear",
+        "straps",
+        "fitting",
+        "face",
+        "guide",
+        "ensure",
+        "clip",
+        "vitera",
+        "full",
+        "user",
+        "frame",
+        "seal",
+        "onto",
+        "blue"
+      ],
+      "content": "Fitting Your Mask — F&P Vitera Full Face User Guide F&P Vitera Full Face Mask User Guide 4. Fitting Your Mask Mask Diagram Getting Started Remove all packaging before using your mask. Refer to the fitting images in the Welcome section . Hold the front of the mask with one hand and the Headgear with the other. Ensure that one Headgear Clip is unhooked from the Frame . Place the Seal onto your face and guide the Headgear over your head. Hook the unattached Headgear Clip onto the Frame . Gently tighten the Headgear straps starting with the bottom straps, followed by loosely fitting the blue forehead straps. ⚠️ Caution To avoid the risk of suffocation, ensure the headgear is not overtightened. The mask, when fitted correctly, should be able to be pulled away from the mouth without adjusting the headgear straps or disconnecting the Headgear Clips . 💡 Useful Tips If you are experiencing mask leaks, you may need to lift the Seal off your face and reposition it. Ensure the Headgear straps are not fastened too tightly. The blue forehead straps should rest horizontally just above the ears. If required, the crown strap can be adjusted to achieve this. For easy mask removal, rotate Headgear Clip downward to unhook. ← Back to contents Next: 5. Cleaning Your Mask at Home →"
     },
     {
       "title": "Mask Assembly",
       "file": "mask-assembly.html",
-      "description": "Instructions for reassembling mask components.",
-      "keywords": ["assembly", "reassembly", "mask"],
-      "content": "Mask Assembly explains how to reconnect mask components after cleaning."
+      "description": "Mask Assembly — F&P Vitera Full Face User Guide F&P Vitera Full Face Mask User Guide 6",
+      "keywords": [
+        "mask",
+        "assembly",
+        "frame",
+        "onto",
+        "vitera",
+        "full",
+        "face",
+        "user",
+        "guide",
+        "push",
+        "swivel",
+        "reassembling",
+        "seal",
+        "firmly",
+        "place"
+      ],
+      "content": "Mask Assembly — F&P Vitera Full Face User Guide F&P Vitera Full Face Mask User Guide 6. Mask Assembly Reassembling Your Mask Push the Seal firmly into place on the Frame . Push the Swivel onto the Elbow . Slide the Forehead Clip onto the top of the Frame . Hook the Headgear Clips onto the Frame . 💡 Mask Assembly Tip Check the Swivel is not stuck in the CPAP tube. Assembly Diagram ← Back to contents Next: 7. Symbol Definitions →"
     },
     {
-      "title": "Symbol Definitions",
-      "file": "symbol-definitions.html",
-      "description": "Symbol reference used on product and packaging.",
-      "keywords": ["symbols", "definitions", "packaging"],
-      "content": "Symbol Definitions shows symbols that may appear on product and packaging."
+      "title": "Cleaning Your Mask at Home",
+      "file": "cleaning-your-mask-at-home.html",
+      "description": "Cleaning Your Mask at Home — F&P Vitera Full Face User Guide F&P Vitera Full Face Mask User Guide 5",
+      "keywords": [
+        "mask",
+        "cleaning",
+        "headgear",
+        "parts",
+        "clean",
+        "remove",
+        "home",
+        "elbow",
+        "soap",
+        "water",
+        "visually",
+        "user",
+        "frame",
+        "necessary",
+        "direct"
+      ],
+      "content": "Cleaning Your Mask at Home — F&P Vitera Full Face User Guide F&P Vitera Full Face Mask User Guide 5. Cleaning Your Mask at Home Disassembly for Cleaning Unhook the Headgear Clips from the Frame . Slide the Forehead Clip downwards towards the Seal . Remove the Seal from the Frame . Remove the Swivel from the Elbow . Cleaning Your Mask at Home Wash your mask (excluding the Headgear ) after each use: Hand-wash your mask in soap dissolved in lukewarm water. Do not soak for more than 10 minutes. Rinse thoroughly in fresh water, ensuring that all soap residue has been removed. Inspect all parts to ensure they are visually clean. If necessary, repeat the cleaning steps until all parts are visually clean. Leave all parts to dry out of direct sunlight before reassembling. Wash your Headgear after 7 days use: Hand-wash your Headgear in soap dissolved in lukewarm water. Do not soak for more than 10 minutes. Rinse thoroughly in fresh water, ensuring that all soap residue has been removed. Inspect all parts to ensure they are visually clean. If necessary, repeat the cleaning steps until all parts are visually clean. Leave all parts to dry out of direct sunlight before reassembling. ⚠️ Cleaning Cautions It is not necessary to remove the Headgear Clips or the Forehead Clip when cleaning the Headgear . Do not remove the Elbow from the Frame . It is not intended to be detached by the home user. Do not pull on or attempt to remove the Silicone Flap from the Elbow , or attempt to disassemble the Elbow. It is not intended to be disassembled. Do not clean your mask in a dishwasher. Do not clean your mask with products containing alcohol, antibacterial agents, antiseptic, bleach, chlorine or moisturizer. Do not store your mask in direct sunlight. Do not iron the Headgear . The above actions may deteriorate or damage the mask and shorten its life. If there is any visible deterioration do not use your mask and seek replacement part(s). ← Back to contents Next: 6. Mask Assembly →"
     },
     {
       "title": "Technical Information",
       "file": "technical-information.html",
-      "description": "Technical specifications, flow information, and operating limits.",
-      "keywords": ["technical", "specifications", "flow", "limits"],
-      "content": "Technical Information includes oxygen use notes, specifications, and performance tables for the mask."
+      "description": "Technical Information — F&P Vitera Full Face User Guide F&P Vitera Full Face Mask User Guide 8",
+      "keywords": [
+        "mask",
+        "pressure",
+        "information",
+        "vitera",
+        "full",
+        "face",
+        "exhaust",
+        "flow",
+        "resistance",
+        "non-rebreathing",
+        "valve",
+        "technical",
+        "oxygen",
+        "sound",
+        "user"
+      ],
+      "content": "Technical Information — F&P Vitera Full Face User Guide F&P Vitera Full Face Mask User Guide 8. Technical Information Oxygen/Pressure Port Connector If pressure readings and/or additional oxygen are required, an Oxygen/Pressure Port Connector is available (REF 900HC452). Please contact your healthcare provider. Technical Specifications The F&P Vitera Full Face mask has exhaust holes to expel the air that you exhale from the mask. It is important that these exhaust holes are not blocked by any object. This controlled leak ensures all exhaled CO2 is expelled from the mask. F&P Vitera Exhaust Flow Information Pressure (cmH 2 O) 4 6 8 10 12 14 16 18 20 22 24 26 28 30 Flow (L/min) 24 28 32 36 40 43 47 50 53 55 58 60 62 64 Due to manufacturing variations, the exhaust flow rates may vary from the nominal values shown above. Resistance to Flow Pressure drop through mask at 50 L/min: 0.24±0.15 cmH 2 O Pressure drop through mask at 100 L/min: 0.47±0.15 cmH 2 O Inspiratory and Expiratory Resistance Inspiratory resistance of the mask (in combination with the Non-Rebreathing Valve) is 1.05±0.15 cmH 2 O Expiratory resistance of the mask (in combination with the Non-Rebreathing Valve) is 0.80±0.15 cmH 2 O The opening to atmosphere pressure of the Non-Rebreathing Valve is <0.56 cmH 2 O The closing to atmosphere pressure of the Non-Rebreathing Valve is <2.16 cmH 2 O Mask Dead Space Small = 246 cc Medium = 271 cc Large = 322 cc Sound The sound power level of mask is 29.8 dBA, with uncertainty 2.5 dBA The sound pressure level of the mask is 21.8 dBA, with uncertainty 2.5 dBA Additional Information The F&P Vitera Full Face mask and accessories are not made with natural rubber latex or DEHP. The mask should be replaced no later than 12 months after the date of first use. Storage Store dry mask in clean conditions out of direct sunlight. Storage temperature: -20 to 50°C (-4 to 122°F). ← Back to contents Next: 9. Further Information →"
     },
     {
       "title": "Further Information",
       "file": "further-information.html",
-      "description": "Warnings, cautions, contraindications, disposal, and patents.",
-      "keywords": ["warnings", "cautions", "contraindication", "disposal"],
-      "content": "Further Information contains warnings and cautions for safe use and disposal guidance."
+      "description": "Further Information — F&P Vitera Full Face User Guide F&P Vitera Full Face Mask User Guide 9",
+      "keywords": [
+        "mask",
+        "cpap",
+        "bi-level",
+        "machine",
+        "information",
+        "exhaled",
+        "turned",
+        "oxygen",
+        "face",
+        "guide",
+        "used",
+        "exhaust",
+        "holes",
+        "some",
+        "discomfort"
+      ],
+      "content": "Further Information — F&P Vitera Full Face User Guide F&P Vitera Full Face Mask User Guide 9. Further Information ⚠️ Warnings This mask is not suitable for life support ventilation. This mask must be used under qualified supervision for users whom are unable to remove the mask themselves. Your mask should only be used with approved CPAP or Bi-Level equipment recommended by your physician or respiratory therapist. Your mask should not be used unless the CPAP or Bi-Level machine is turned on and operating properly. To avoid having an adverse effect on the safety and quality of the therapy, the exhaust holes on the mask should never be blocked. Explanation of Warning: Device switched on (with mask connected): When the CPAP or Bi-Level machine is turned on and functioning properly, new air from the CPAP or Bi-Level machine flushes the exhaled air out through the mask's exhaust holes. Device switched off (with mask connected): When the CPAP or Bi-Level machine is turned off, not enough fresh air will be provided through the mask, and exhaled air may be re-breathed. Re-breathing of exhaled air for longer than several minutes can lead to suffocation in some circumstances. At low CPAP or Bi-Level pressures the flow through the exhaust holes may be inadequate to clear all exhaled gas from the tubing. Some re-breathing of exhaled air may occur. Discontinue use and consult your healthcare provider or physician if the following occurs: Discomfort or irritation in or near the eyes. Excessive leaks between mask Seal and face. Gum, jaw or mouth soreness/ discomfort or an aggravation of an existing dental condition occurs. Allergic reaction. Mask discomfort or irritation. Do not use if vomiting or feeling nauseous. Do not block Elbow side vents. Mask use with oxygen: With your CPAP or Bi-Level machine, the oxygen flow must be turned off when the CPAP or Bi-Level machine is not operating. Oxygen accumulated in your CPAP or Bi-Level machine enclosure will create a risk of fire. You should not smoke or be in the vicinity of someone smoking while using oxygen with your mask. As part of good hygiene, always follow cleaning instructions and use mild soap. Some cleaning products may damage the mask, its parts and their function, or leave harmful residual vapours that could be inhaled if not rinsed thoroughly. California residents please be advised of the following, pursuant to Proposition 65: This product contains chemicals known to the State of California to cause cancer, birth defects and other reproductive harm. For more information, please visit: www.fphcare.com/prop65 ⚠️ Cautions Use your mask for its intended use as directed in this guide. If any visible deterioration of a system component is apparent (cracking, discolouration, tears etc), the component should be discarded and replaced. Contraindication None known. Disposal Your mask does not contain any hazardous material and may be disposed of with general waste. Patent Information For patent information, see www.fphcare.com/ip . ← Back to contents Next: 10. Warranty Statement →"
     },
     {
       "title": "Warranty Statement",
       "file": "warranty-statement.html",
-      "description": "Limited warranty and support details.",
-      "keywords": ["warranty", "support", "coverage"],
-      "content": "Warranty Statement provides the applicable limited warranty period and support contact path."
+      "description": "Warranty Statement — F&P Vitera Full Face User Guide F&P Vitera Full Face Mask User Guide 10",
+      "keywords": [
+        "warranty",
+        "statement",
+        "user",
+        "vitera",
+        "full",
+        "face",
+        "guide",
+        "mask",
+        "fisher",
+        "paykel",
+        "healthcare",
+        "accordance",
+        "warrants",
+        "excluding",
+        "foams"
+      ],
+      "content": "Warranty Statement — F&P Vitera Full Face User Guide F&P Vitera Full Face Mask User Guide 10. Warranty Statement Warranty Statement Fisher & Paykel Healthcare warrants that the mask (excluding foams and material diffusers), when used in accordance with its instructions for use, shall be free from defects in workmanship and materials and will perform in accordance with Fisher & Paykel Healthcare's official published product specifications for a period of 90 days from the date of purchase by the end user. This warranty is subject to the limitations and exceptions set out in detail in www.fphcare.com/sleep-apnea/masks/warranty-mask/ . ← Back to contents"
+    },
+    {
+      "title": "Mask Parts",
+      "file": "mask-parts.html",
+      "description": "Mask Parts — F&P Vitera Full Face User Guide F&P Vitera Full Face Mask User Guide 3",
+      "keywords": [
+        "mask",
+        "elbow",
+        "frame",
+        "user",
+        "parts",
+        "vitera",
+        "full",
+        "face",
+        "guide",
+        "refer",
+        "diagram",
+        "headgear",
+        "removed",
+        "back",
+        "understanding"
+      ],
+      "content": "Mask Parts — F&P Vitera Full Face User Guide F&P Vitera Full Face Mask User Guide 3. Mask Parts Understanding Your Mask Components Refer to the mask diagram below. Seal Forehead Clip Frame Elbow Headgear Elbow Swivel Headgear Clips Elbow Side Vents Mask Diagram ⚠️ Note The Elbow is permanently attached to the Frame . It is not intended to be removed from the mask by the home user. If removed unintentionally, refer to the image below. Advanced Assembly To assemble Elbow back into Frame: Position the Elbow so it is facing upward. Push the Elbow at an angle and rotate into the Frame until the Elbow pops in. ← Back to contents Next: 4. Fitting Your Mask →"
+    },
+    {
+      "title": "Symbol Definitions",
+      "file": "symbol-definitions.html",
+      "description": "Symbol Definitions — F&P Vitera Full Face User Guide F&P Vitera Full Face Mask User Guide 7",
+      "keywords": [
+        "symbol",
+        "definitions",
+        "vitera",
+        "full",
+        "face",
+        "user",
+        "guide",
+        "mask",
+        "back",
+        "contents",
+        "next",
+        "technical",
+        "information"
+      ],
+      "content": "Symbol Definitions — F&P Vitera Full Face User Guide F&P Vitera Full Face Mask User Guide 7. Symbol Definitions ← Back to contents Next: 8. Technical Information →"
     }
   ]
 }
