@@ -86,6 +86,7 @@ function injectNav(currentPageFile) {
       : hostedChatHrefWithSetup;
     const chatCurrent = currentPageFile === 'chat' ? ' aria-current="page"' : '';
     const searchCurrent = currentPageFile === 'search' ? ' aria-current="page"' : '';
+    const videoLibraryCurrent = currentPageFile === 'video-library' ? ' aria-current="page"' : '';
 
     navContainer.innerHTML = `
       <div class="nav-text-size-controls">
@@ -99,6 +100,7 @@ function injectNav(currentPageFile) {
         <a class="nav-link-primary" href="${guideHref('index.html')}"><span class="nav-link-icon" aria-hidden="true">&#x1F4DA;</span>Contents</a>
         <a class="nav-link-primary" href="${chatHref}"${chatCurrent}><span class="nav-link-icon" aria-hidden="true">&#x1F4AC;</span>Chat Assistant</a>
         <a class="nav-link-primary" href="${guideHref('search.html')}"${searchCurrent}><span class="nav-link-icon" aria-hidden="true">&#x1F50D;</span>Search</a>
+        <a class="nav-link-primary" href="${guideHref('video-library.html')}"${videoLibraryCurrent}><span class="nav-link-icon" aria-hidden="true">&#x1F3AC;</span>Video Library</a>
         ${navItems.map(item => {
           const isCurrent = item.href === currentPageFile + '.html';
           const ariaCurrent = isCurrent ? ' aria-current="page"' : '';
