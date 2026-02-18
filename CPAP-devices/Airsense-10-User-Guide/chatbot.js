@@ -12,16 +12,109 @@ class ChatBot {
       'fp-vitera': 'F&P Vitera Full Face Mask',
       'climatelineair': 'ResMed ClimateLineAir'
     };
+    this.chatPaths = {
+      'airsense-10': '/CPAP-devices/Airsense-10-User-Guide/chat.html',
+      'fp-vitera': '/CPAP-devices/F&P-Vitera-Full-Face-User-Guide/chat.html',
+      'climatelineair': '/CPAP-devices/Resmed-ClimateLineAir-User-Guide/chat.html'
+    };
 
     this.applyGuideSpecificGreeting();
+    this.renderDisclaimerCard();
+    this.renderChatbotSwitcher();
 
     this.setupEventListeners();
   }
 
+  getCurrentGuide() {
+    const urlParams = new URLSearchParams(window.location.search);
+    return (urlParams.get('guide') || 'airsense-10').toLowerCase();
+  }
+
+  buildChatUrl(guideKey) {
+    const targetPath = this.chatPaths[guideKey] || this.chatPaths['airsense-10'];
+    const url = new URL(targetPath, window.location.origin);
+
+    const currentParams = new URLSearchParams(window.location.search);
+    const family = (currentParams.get('family') || 'cpap').toLowerCase();
+
+    url.searchParams.set('family', family);
+    url.searchParams.set('guide', guideKey);
+    url.searchParams.set('guides', guideKey);
+
+    return `${url.pathname}${url.search}`;
+  }
+
+  renderChatbotSwitcher() {
+    const container = document.querySelector('.container');
+    const footer = container ? container.querySelector('.footer') : null;
+    if (!container || !footer) return;
+
+    const currentGuide = this.getCurrentGuide();
+    const currentGuideName = this.guideNames[currentGuide] || 'selected device';
+
+    const switcherCard = document.createElement('div');
+    switcherCard.className = 'card';
+    switcherCard.id = 'chatbot-switcher';
+    switcherCard.style.backgroundColor = '#e8f5e9';
+    switcherCard.style.border = '1px solid #a5d6a7';
+
+    switcherCard.innerHTML = `
+      <p style="margin: 0 0 10px;">
+        This is the <strong>${currentGuideName}</strong> chatbot. Not the device you are looking for?
+      </p>
+      <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+        <select id="chatbot-switch-select" style="padding: 8px 10px; border: 1px solid #ddd; border-radius: 6px; min-width: 240px; font-size: calc(14px * var(--text-scale));"></select>
+        <a id="chatbot-switch-link" href="#" style="display:inline-block; padding: 9px 12px; background:#0066cc; color:#fff; text-decoration:none; border-radius:6px; font-size: calc(14px * var(--text-scale));">Open chatbot</a>
+      </div>
+    `;
+
+    container.insertBefore(switcherCard, footer);
+
+    const select = document.getElementById('chatbot-switch-select');
+    const link = document.getElementById('chatbot-switch-link');
+    if (!select || !link) return;
+
+    Object.entries(this.guideNames).forEach(([guideKey, label]) => {
+      const option = document.createElement('option');
+      option.value = guideKey;
+      option.textContent = label;
+      if (guideKey === currentGuide) {
+        option.selected = true;
+      }
+      select.appendChild(option);
+    });
+
+    const updateLink = () => {
+      link.href = this.buildChatUrl(select.value);
+    };
+
+    updateLink();
+    select.addEventListener('change', updateLink);
+  }
+
+  renderDisclaimerCard() {
+    const container = document.querySelector('.container');
+    const heading = container ? container.querySelector('h1') : null;
+    if (!container || !heading || document.getElementById('chatbot-disclaimer')) return;
+
+    const disclaimerCard = document.createElement('div');
+    disclaimerCard.className = 'card';
+    disclaimerCard.id = 'chatbot-disclaimer';
+    disclaimerCard.style.backgroundColor = '#fff8e1';
+    disclaimerCard.style.border = '1px solid #ffecb3';
+
+    disclaimerCard.innerHTML = `
+      <p style="margin:0;">
+        <strong>Disclaimer:</strong> This is a chatbot and the information provided may not always be accurate. Please consult the user guide or speak with a health professional for accurate advice.
+      </p>
+    `;
+
+    heading.insertAdjacentElement('afterend', disclaimerCard);
+  }
+
   applyGuideSpecificGreeting() {
     if (!this.initialMessage) return;
-    const urlParams = new URLSearchParams(window.location.search);
-    const guide = (urlParams.get('guide') || 'airsense-10').toLowerCase();
+    const guide = this.getCurrentGuide();
     const guideName = this.guideNames[guide] || 'selected guide';
 
     this.initialMessage.textContent = `Hi! I'm your ${guideName} assistant. Ask any questions about setup, therapy, maintenance, or troubleshooting and I'll answer using this user guide.`;
