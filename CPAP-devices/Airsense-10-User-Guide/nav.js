@@ -194,72 +194,66 @@ function injectNav(currentPageFile) {
       styleEl.id = 'mobile-chat-fab-style';
       styleEl.textContent = `
         .mobile-chat-dock {
-          display: none;
+          position: fixed;
+          right: 14px;
+          bottom: 10px;
+          transform: none;
+          z-index: 1600;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 88px;
+          height: 88px;
+          border-radius: 999px;
+          background: rgba(18, 24, 38, 0.92);
+          box-shadow: 0 12px 28px rgba(18, 24, 38, 0.35);
         }
 
-        @media (max-width: 768px) {
-          .mobile-chat-dock {
-            position: fixed;
-            right: 14px;
-            bottom: 10px;
-            transform: none;
-            z-index: 1600;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            width: 88px;
-            height: 88px;
-            border-radius: 999px;
-            background: rgba(18, 24, 38, 0.92);
-            box-shadow: 0 12px 28px rgba(18, 24, 38, 0.35);
-          }
+        .mobile-chat-fab {
+          width: 72px;
+          height: 72px;
+          border-radius: 999px;
+          border: 2px solid #ffffff;
+          overflow: hidden;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          background: #ffffff;
+        }
 
-          .mobile-chat-fab {
-            width: 72px;
-            height: 72px;
-            border-radius: 999px;
-            border: 2px solid #ffffff;
-            overflow: hidden;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            background: #ffffff;
-          }
+        .mobile-chat-fab img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+        }
 
-          .mobile-chat-fab img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-          }
+        .mobile-chat-callout {
+          position: absolute;
+          right: 84px;
+          bottom: 48px;
+          width: 280px;
+          max-width: 280px;
+          padding: 6px 12px;
+          border-radius: 12px;
+          background: #ffffff;
+          color: #121826;
+          border: 1px solid #d9e1f2;
+          box-shadow: 0 10px 24px rgba(18, 24, 38, 0.2);
+          font-size: 12px;
+          line-height: 1.2;
+          padding-right: 28px;
+        }
 
-          .mobile-chat-callout {
-            position: absolute;
-            right: 84px;
-            bottom: 48px;
-            width: 280px;
-            max-width: 280px;
-            padding: 6px 12px;
-            border-radius: 12px;
-            background: #ffffff;
-            color: #121826;
-            border: 1px solid #d9e1f2;
-            box-shadow: 0 10px 24px rgba(18, 24, 38, 0.2);
-            font-size: 12px;
-            line-height: 1.2;
-            padding-right: 28px;
-          }
-
-          .mobile-chat-callout-close {
-            position: absolute;
-            top: 4px;
-            right: 6px;
-            border: 0;
-            background: transparent;
-            color: #4a5568;
-            font-size: 14px;
-            line-height: 1;
-            cursor: pointer;
-          }
+        .mobile-chat-callout-close {
+          position: absolute;
+          top: 4px;
+          right: 6px;
+          border: 0;
+          background: transparent;
+          color: #4a5568;
+          font-size: 14px;
+          line-height: 1;
+          cursor: pointer;
         }
       `;
       document.head.appendChild(styleEl);
