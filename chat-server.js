@@ -3,6 +3,7 @@
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
+const { execFileSync } = require('child_process');
 
 // Configuration - Choose your LLM provider
 const LLM_PROVIDER = process.env.LLM_PROVIDER || 'huggingface'; // 'openai' or 'huggingface'
@@ -57,6 +58,8 @@ const resolveDefaultGuideForFamily = (familyKey) => {
 const defaultGuide = resolveDefaultGuideForFamily('cpap');
 const manualCache = new Map();
 
+const excludedHtmlFiles = new Set(['chat.html', 'chat-setup.html', 'search.html']);
+
 const baseDir = guideConfigs[defaultGuide].dir;
 
 const app = express();
@@ -69,23 +72,62 @@ const buildManualContent = (searchIndex) => searchIndex.pages
   .map(page => `# ${page.title}\n\n${page.description}\n\n${page.content}`)
   .join('\n\n---\n\n');
 
+const listGuideHtmlFiles = (guideDir) => fs.readdirSync(guideDir)
+  .filter((name) => name.toLowerCase().endsWith('.html'))
+  .filter((name) => !excludedHtmlFiles.has(name.toLowerCase()))
+  .map((name) => path.join(guideDir, name));
+
+const getLatestHtmlMtimeMs = (guideDir) => {
+  const htmlFiles = listGuideHtmlFiles(guideDir);
+  return htmlFiles.reduce((latest, filePath) => {
+    const mtimeMs = fs.statSync(filePath).mtimeMs;
+    return mtimeMs > latest ? mtimeMs : latest;
+  }, 0);
+};
+
+const ensureFreshSearchIndex = (guideKey, guide) => {
+  const searchIndexPath = path.join(guide.dir, 'search-index.json');
+  const latestHtmlMtimeMs = getLatestHtmlMtimeMs(guide.dir);
+
+  let indexMtimeMs = 0;
+  if (fs.existsSync(searchIndexPath)) {
+    indexMtimeMs = fs.statSync(searchIndexPath).mtimeMs;
+  }
+
+  if (!fs.existsSync(searchIndexPath) || latestHtmlMtimeMs > indexMtimeMs) {
+    const buildScriptPath = path.join(__dirname, 'build-search-index.js');
+    const relativeGuideDir = path.relative(__dirname, guide.dir);
+    execFileSync(process.execPath, [buildScriptPath, relativeGuideDir], {
+      stdio: 'ignore'
+    });
+    console.log(`Rebuilt search index for ${guideKey} because source pages changed.`);
+  }
+
+  return {
+    searchIndexPath,
+    indexMtimeMs: fs.statSync(searchIndexPath).mtimeMs
+  };
+};
+
 const loadManualContent = (guideKey) => {
   const guide = guideConfigs[guideKey] || guideConfigs[defaultGuide];
   if (!guide) {
     throw new Error(`Unknown guide: ${guideKey}`);
   }
 
-  if (manualCache.has(guideKey)) {
-    return manualCache.get(guideKey);
+  const { searchIndexPath, indexMtimeMs } = ensureFreshSearchIndex(guideKey, guide);
+  const cachedEntry = manualCache.get(guideKey);
+  if (cachedEntry && cachedEntry.indexMtimeMs === indexMtimeMs) {
+    return cachedEntry;
   }
 
-  const searchIndexPath = path.join(guide.dir, 'search-index.json');
   const searchIndex = JSON.parse(fs.readFileSync(searchIndexPath, 'utf8'));
   const manualContent = buildManualContent(searchIndex);
 
   const cached = {
     manualContent,
-    guideName: guide.name
+    guideName: guide.name,
+    indexMtimeMs
   };
   manualCache.set(guideKey, cached);
   return cached;

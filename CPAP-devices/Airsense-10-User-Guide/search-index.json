@@ -1,9 +1,32 @@
 {
   "pages": [
     {
+      "title": "AirSense 10 User Guide",
+      "file": "index.html",
+      "description": "AirSense 10 User Guide — Quick Access AirSense 10 User Guide Contents Contents Welcome Introduction and device overview About your device Device parts...",
+      "keywords": [
+        "device",
+        "therapy",
+        "overview",
+        "parts",
+        "information",
+        "airsense",
+        "user",
+        "guide",
+        "contents",
+        "welcome",
+        "power",
+        "save",
+        "data",
+        "back",
+        "symbols"
+      ],
+      "content": "AirSense 10 User Guide — Quick Access AirSense 10 User Guide Contents Contents Welcome Introduction and device overview About your device Device parts, overview and control panel Setup Prepare the device for use Starting therapy Begin therapy / what you should see Stopping therapy End therapy / summary screen Power save mode Entering and exiting power save My Options Comfort settings (where applicable) Caring for your device Cleaning and checks Therapy data Recorded data overview Travelling General travel guidance Troubleshooting Common issues and actions Reassembling parts Putting parts back together Technical specifications Device and component details Symbols Symbols and icons Environmental information Disposal instructions Servicing Servicing information Limited warranty Warranty periods Further information Additional help ← Back to 1. Welcome"
+    },
+    {
       "title": "Welcome",
       "file": "welcome.html",
-      "description": "Welcome — AirSense 10 User Guide AirSense 10 User Guide — Quick Access Welcome Welcome The AirSense™ 10 AutoSet™ and AirSense 10 Elite are ResMed's pr...",
+      "description": "Welcome — AirSense 10 User Guide AirSense 10 User Guide Welcome 1",
       "keywords": [
         "device",
         "airsense",
@@ -17,57 +40,11 @@
         "environment",
         "available",
         "welcome",
+        "user",
         "autoset",
-        "elite",
-        "positive"
+        "elite"
       ],
-      "content": "Welcome — AirSense 10 User Guide AirSense 10 User Guide — Quick Access Welcome Welcome The AirSense™ 10 AutoSet™ and AirSense 10 Elite are ResMed's premium auto-adjusting pressure and Continuous Positive Airway Pressure (CPAP) devices. WARNING Read this entire guide before using the device. Use the device according to the intended use provided in this guide. The advice provided by your prescribing doctor should be followed ahead of the information provided in this guide. Indications for use AirSense 10 AutoSet The AirSense 10 AutoSet self-adjusting device is indicated for the treatment of obstructive sleep apnoea (OSA) in patients weighing more than 30 kg. It is intended for home and hospital use. The humidifier is intended for single patient use in the home environment and re-use in a hospital/institutional environment. AirSense 10 Elite The AirSense 10 Elite device is indicated for the treatment of obstructive sleep apnoea (OSA) in patients weighing more than 30 kg. It is intended for home and hospital use. The humidifier is intended for single patient use in the home environment and re-use in a hospital/institutional environment. Clinical benefits The clinical benefit of CPAP therapy is a reduction in apnoeas, hypopnoeas and sleepiness, as well as improved quality of life. The clinical benefit of humidification is the reduction of positive airway pressure related side effects. Contraindications Positive airway pressure therapy may be contraindicated in some patients with the following pre-existing conditions: Severe bullous lung disease Pneumothorax Pathologically low blood pressure Dehydration Cerebrospinal fluid leak, recent cranial surgery, or trauma Adverse effects You should report unusual chest pain, severe headache, or increased breathlessness to your prescribing physician. An acute upper respiratory tract infection may require temporary discontinuation of treatment. The following side effects may arise during the course of therapy with the device: Drying of the nose, mouth, or throat Nosebleed Bloating Ear or sinus discomfort Eye irritation Skin rashes At a glance The AirSense 10 includes the following: Device HumidAir™ humidifier (if supplied) Air tubing Power supply unit Travel bag SD card (not available in all devices) Available accessories Contact your care provider for a range of accessories available for use with the device including: Air tubing (heated and non-heated): ClimateLineAir™, SlimLine™, ClimateLineAir Oxy, Standard Side cover for use without the humidifier Filter: Hypoallergenic filter, standard filter Air10™ DC/DC converter SD card reader Air10 oximeter adapter Air10 USB adapter Power Station II Air10 tubing elbow Getting started If this is your first time using your AirSense 10 device, we recommend starting with: About your device — to familiarize yourself with the device Setup — to prepare your device for use Starting therapy — to begin your first therapy session Quick navigation Use the navigation menu at the top of the page to access different sections, or visit the Contents page for a complete overview of all available sections. Go to Contents"
-    },
-    {
-      "title": "AirSense 10 User Guide",
-      "file": "index.html",
-      "description": "Select a section below. This site mirrors the structure of the manufacturer user manual.",
-      "keywords": [
-        "device",
-        "therapy",
-        "user",
-        "parts",
-        "information",
-        "airsense",
-        "guide",
-        "quick",
-        "access",
-        "contents",
-        "overview",
-        "power",
-        "save",
-        "data",
-        "back"
-      ],
-      "content": "AirSense 10 User Guide — Quick Access AirSense 10 User Guide — Quick Access Contents Contents Select a section below. This site mirrors the structure of the manufacturer user manual. About your device Device parts, overview and control panel Setup Prepare the device for use Starting therapy Begin therapy / what you should see Stopping therapy End therapy / summary screen Power save mode Entering and exiting power save My Options Comfort settings (where applicable) Caring for your device Cleaning and checks Therapy data Recorded data overview Travelling General travel guidance Troubleshooting Common issues and actions Reassembling parts Putting parts back together Technical specifications Device and component details Symbols Symbols and icons Environmental information Disposal instructions Servicing Servicing information Limited warranty Warranty periods Further information Additional help ← Back to welcome"
-    },
-    {
-      "title": "About Device",
-      "file": "about-device.html",
-      "description": "About Device — AirSense 10 User Guide AirSense 10 User Guide — Quick Access Setup About Your Device Air outlet Air filter cover Power inlet Serial num...",
-      "keywords": [
-        "device",
-        "cover",
-        "airsense",
-        "user",
-        "guide",
-        "number",
-        "quick",
-        "access",
-        "setup",
-        "outlet",
-        "filter",
-        "power",
-        "inlet",
-        "serial",
-        "humidair"
-      ],
-      "content": "About Device — AirSense 10 User Guide AirSense 10 User Guide — Quick Access Setup About Your Device Air outlet Air filter cover Power inlet Serial number and device number HumidAir humidifier Screen Adapter cover SD card cover About the Control panel Related sections About your device Starting therapy ← Back to contents"
+      "content": "Welcome — AirSense 10 User Guide AirSense 10 User Guide Welcome 1. Welcome The AirSense™ 10 AutoSet™ and AirSense 10 Elite are ResMed's premium auto-adjusting pressure and Continuous Positive Airway Pressure (CPAP) devices. WARNING Read this entire guide before using the device. Use the device according to the intended use provided in this guide. The advice provided by your prescribing doctor should be followed ahead of the information provided in this guide. Indications for use AirSense 10 AutoSet The AirSense 10 AutoSet self-adjusting device is indicated for the treatment of obstructive sleep apnoea (OSA) in patients weighing more than 30 kg. It is intended for home and hospital use. The humidifier is intended for single patient use in the home environment and re-use in a hospital/institutional environment. AirSense 10 Elite The AirSense 10 Elite device is indicated for the treatment of obstructive sleep apnoea (OSA) in patients weighing more than 30 kg. It is intended for home and hospital use. The humidifier is intended for single patient use in the home environment and re-use in a hospital/institutional environment. Clinical benefits The clinical benefit of CPAP therapy is a reduction in apnoeas, hypopnoeas and sleepiness, as well as improved quality of life. The clinical benefit of humidification is the reduction of positive airway pressure related side effects. Contraindications Positive airway pressure therapy may be contraindicated in some patients with the following pre-existing conditions: Severe bullous lung disease Pneumothorax Pathologically low blood pressure Dehydration Cerebrospinal fluid leak, recent cranial surgery, or trauma Adverse effects You should report unusual chest pain, severe headache, or increased breathlessness to your prescribing physician. An acute upper respiratory tract infection may require temporary discontinuation of treatment. The following side effects may arise during the course of therapy with the device: Drying of the nose, mouth, or throat Nosebleed Bloating Ear or sinus discomfort Eye irritation Skin rashes At a glance The AirSense 10 includes the following: Device HumidAir™ humidifier (if supplied) Air tubing Power supply unit Travel bag SD card (not available in all devices) Available accessories Contact your care provider for a range of accessories available for use with the device including: Air tubing (heated and non-heated): ClimateLineAir™ , SlimLine™, ClimateLineAir Oxy , Standard Side cover for use without the humidifier Filter: Hypoallergenic filter, standard filter Air10™ DC/DC converter SD card reader Air10 oximeter adapter Air10 USB adapter Power Station II Air10 tubing elbow Getting started If this is your first time using your AirSense 10 device, we recommend starting with: Contents — to review sections of this user guide About your device — to familiarize yourself with the device Setup — to prepare your device for use Starting therapy — to begin your first therapy session Quick navigation Use the navigation menu to access different sections, or visit the Contents page for a complete overview of all available sections. Go to Contents Next: 2. About your device →"
     },
     {
       "title": "Setup",
@@ -79,29 +56,28 @@
         "water",
         "setup",
         "power",
+        "airsense",
         "user",
         "guide",
-        "tubing",
-        "fill",
         "level",
         "connect",
+        "tubing",
+        "fill",
         "mask",
-        "airsense",
-        "maximum",
-        "mark"
+        "rear",
+        "outlet"
       ],
-      "content": "Setup — AirSense 10 User Guide AirSense 10 User Guide — Quick Access Setup Setup ⚠️ CAUTION Do not overfill the humidifier. Water may enter the device and air tubing. Fill the humidifier only up to the maximum water level mark. Do not fill the humidifier with hot water. Setup steps Place the device on a stable, level surface. Plug the power connector into the rear of the device. Connect one end of the power cord into the power supply unit and the other end into a power outlet. Connect the air tubing firmly to the air outlet located on the rear of the device. Open the humidifier and fill it with water up to the maximum water level mark. Close the humidifier and insert it into the side of the device. Connect the free end of the air tubing firmly onto the assembled mask. For detailed information about the mask, refer to the mask user guide. Recommended masks are available from the manufacturer. Related sections About your device Starting therapy ← Back to contents"
+      "content": "Setup — AirSense 10 User Guide AirSense 10 User Guide Setup 3. Setup Setup steps Place the device on a stable, level surface. Plug the power connector into the rear of the device. Connect one end of the power cord into the power supply unit and the other end into a power outlet. Connect the air tubing firmly to the air outlet located on the rear of the device. Open the humidifier and fill it with water up to the maximum water level mark. Close the humidifier and insert it into the side of the device. Connect the free end of the air tubing firmly onto the assembled mask . How to set up & use your new AirSense™ 10 CPAP machine from ResMed For detailed information about the mask, refer to the mask user guide. Recommended masks are available from the manufacturer. ⚠️ CAUTION Do not overfill the humidifier. Water may enter the device and air tubing. Fill the humidifier only up to the maximum water level mark. Do not fill the humidifier with hot water. Related sections About your device Starting therapy ← Back to contents Next: 4. Starting therapy →"
     },
     {
       "title": "Starting Therapy",
       "file": "starting-therapy.html",
-      "description": "Starting Therapy — AirSense 10 User Guide AirSense 10 User Guide — Quick Access Setup Starting Therapy Steps Fit your mask",
+      "description": "Starting Therapy — AirSense 10 User Guide AirSense 10 User Guide Starting therapy 4",
       "keywords": [
         "therapy",
         "screen",
         "starting",
         "pressure",
-        "device",
         "airsense",
         "user",
         "guide",
@@ -111,14 +87,15 @@
         "time",
         "circle",
         "automatically",
-        "back"
+        "back",
+        "power"
       ],
-      "content": "Starting Therapy — AirSense 10 User Guide AirSense 10 User Guide — Quick Access Setup Starting Therapy Steps Fit your mask. Press Start/Stop , or breathe normally if SmartStart™ is enabled. How you know therapy is on The Sleep Report screen is displayed. The current treatment pressure is shown in green . During ramp time the pressure is gradually increasing and you will see a spinning circle. Once the prescribed treatment pressure is reached, the entire circle will be green. Screen behaviour The screen will go black automatically after a short period of time. Press Home or the dial to turn the screen back on. Additional information If power is interrupted during therapy, the device will automatically restart therapy when power is restored. The device has a light sensor that adjusts screen brightness based on the light in the room. Related sections About your device Starting therapy ← Back to contents"
+      "content": "Starting Therapy — AirSense 10 User Guide AirSense 10 User Guide Starting therapy 4. Starting Therapy Steps Fit your mask . Press Start/Stop , or breathe normally if SmartStart™ is enabled. How you know therapy is on The Sleep Report screen is displayed. The current treatment pressure is shown in green . During ramp time the pressure is gradually increasing and you will see a spinning circle. Once the prescribed treatment pressure is reached, the entire circle will be green. Screen behaviour The screen will go black automatically after a short period of time. Press Home or the dial to turn the screen back on. Additional information If power is interrupted during therapy, the device will automatically restart therapy when power is restored. The device has a light sensor that adjusts screen brightness based on the light in the room. Related sections Stopping therapy Therapy data Troubleshooting ← Back to contents Next: 5. Stopping therapy →"
     },
     {
       "title": "Stopping Therapy",
       "file": "stopping-therapy.html",
-      "description": "Stopping Therapy — AirSense 10 User Guide AirSense 10 User Guide — Quick Access Setup Stopping Therapy Steps Remove your mask",
+      "description": "Stopping Therapy — AirSense 10 User Guide AirSense 10 User Guide Stopping therapy 5",
       "keywords": [
         "therapy",
         "mask",
@@ -136,131 +113,16 @@
         "hours",
         "number"
       ],
-      "content": "Stopping Therapy — AirSense 10 User Guide AirSense 10 User Guide — Quick Access Setup Stopping Therapy Steps Remove your mask. Press Start/Stop , or if SmartStart™ is enabled, therapy will stop automatically after a few seconds. Understanding the Sleep Report The Sleep Report screen is displayed and provides a summary of your therapy session. Usage hours – Indicates the number of hours of therapy you received during the last session. Mask Seal – Indicates how well your mask sealed: 😊 – Mask seal is adequate. 😔 – Mask needs adjusting. See Mask Fit . Humidifier – Indicates if your humidifier is working properly: 😊 - Humidifier working . 😔 - Humidifier might be faulty – Contact your care provider. Additional information Events per hour – If set by your care provider, this indicates the number of apnoeas and hypopnoeas experienced per hour. More Info – Turn the dial to scroll down and view more detailed usage data. Related sections About your device Starting therapy ← Back to contents"
-    },
-    {
-      "title": "Power Save Mode",
-      "file": "power-save-mode.html",
-      "description": "Power Save Mode — AirSense 10 User Guide AirSense 10 User Guide — Quick Access Setup Power Save Mode The AirSense 10 device records your therapy data",
-      "keywords": [
-        "save",
-        "power",
-        "mode",
-        "device",
-        "airsense",
-        "user",
-        "guide",
-        "therapy",
-        "data",
-        "press",
-        "start",
-        "stop",
-        "screen",
-        "quick",
-        "access"
-      ],
-      "content": "Power Save Mode — AirSense 10 User Guide AirSense 10 User Guide — Quick Access Setup Power Save Mode The AirSense 10 device records your therapy data. To allow this data to be transmitted to your care provider, you should not unplug the device. You can use power save mode to save electricity while keeping the device plugged in. To enter power save mode Press and hold Start/Stop for three seconds. The screen goes black. To exit power save mode Press Start/Stop once. The Home screen is displayed. Related sections About your device Starting therapy ← Back to contents"
-    },
-    {
-      "title": "My Options",
-      "file": "my-options.html",
-      "description": "My Options — AirSense 10 User Guide AirSense 10 User Guide — Quick Access Setup My Options Navigating My Options Your AirSense 10 device has been set ...",
-      "keywords": [
-        "mask",
-        "dial",
-        "options",
-        "humidity",
-        "therapy",
-        "press",
-        "ramp",
-        "time",
-        "level",
-        "device",
-        "more",
-        "pressure",
-        "adjust",
-        "turn",
-        "make"
-      ],
-      "content": "My Options — AirSense 10 User Guide AirSense 10 User Guide — Quick Access Setup My Options Navigating My Options Your AirSense 10 device has been set up for your needs by your care provider, but you may find you want to make small adjustments to make your therapy more comfortable. Highlight My Options and press the dial to see your current settings. From here, you can personalise your options. Ramp Time Designed to make the beginning of therapy more comfortable, Ramp Time is the period during which the pressure increases from a low start pressure to the prescribed treatment pressure. You can set Ramp Time to Off , 5 to 45 minutes , or Auto . When Ramp Time is set to Auto , the device detects when you have fallen asleep and then automatically rises to the prescribed treatment pressure. To adjust Ramp Time In My Options , turn the dial to highlight Ramp Time , then press the dial. Turn the dial to adjust the ramp time to your preferred setting and press the dial to save the change. Humidity Level The humidifier moistens the air and is designed to make therapy more comfortable. If you are getting a dry nose or mouth, increase the humidity level. If you are getting moisture in your mask, decrease the humidity level. You can set the Humidity Level to Off or between 1 and 8 , where 1 is the lowest humidity setting and 8 is the highest humidity setting. To adjust Humidity Level In My Options , turn the dial to highlight Humidity Level , then press the dial. Turn the dial to adjust the humidity level and press the dial to save the change. If you continue to experience a dry nose or mouth, or moisture in your mask, consider using ClimateLineAir heated air tubing. ClimateLineAir together with Climate Control delivers more comfortable therapy. Mask Fit Mask Fit is designed to help you assess and identify possible air leaks around your mask. To check Mask Fit Fit the mask as described in the mask user guide. In My Options , turn the dial to highlight Run Mask Fit , then press the dial. The device starts blowing air. Adjust the mask, mask cushion, and headgear until you get a Good result. To stop Mask Fit, press the dial or Start/Stop . If you are unable to get a good mask seal, talk to your care provider. More options There are some additional options on your device that you can personalise. Pressure Relief* – When enabled, you may find it easier to breathe out. This can help you get used to therapy. SmartStart* – When enabled, therapy starts automatically when you breathe into your mask. When you remove your mask, therapy stops automatically after a few seconds. *When enabled by your care provider. Related sections About your device Starting therapy ← Back to contents"
-    },
-    {
-      "title": "Caring For Your Device",
-      "file": "caring-for-your-device.html",
-      "description": "Caring For Your Device — AirSense 10 User Guide AirSense 10 User Guide — Quick Access Setup Caring for Your Device It is important that you regularly ...",
-      "keywords": [
-        "humidifier",
-        "device",
-        "tubing",
-        "filter",
-        "water",
-        "replace",
-        "mask",
-        "clean",
-        "check",
-        "airsense",
-        "user",
-        "guide",
-        "regularly",
-        "therapy",
-        "cleaning"
-      ],
-      "content": "Caring For Your Device — AirSense 10 User Guide AirSense 10 User Guide — Quick Access Setup Caring for Your Device It is important that you regularly clean your AirSense 10 device to make sure you receive optimal therapy. The following sections will help you with disassembling, cleaning, checking, and reassembling your device. WARNING Regularly clean your tubing assembly, humidifier, and mask to receive optimal therapy and to prevent the growth of germs that can adversely affect your health. Disassembling Hold the humidifier at the top and bottom, press it gently, and pull it away from the device. Open the humidifier and discard any remaining water. Hold the cuff of the air tubing and gently pull it away from the device. Hold both the cuff of the air tubing and the swivel of the mask, then gently pull them apart. Cleaning You should clean the device weekly as described. Refer to the mask user guide for detailed instructions on cleaning your mask. Wash the humidifier and air tubing in warm water using mild detergent. Rinse the humidifier and air tubing thoroughly and allow to dry out of direct sunlight and/or heat. Wipe the exterior of the device with a dry cloth. Notes The humidifier may be washed in a dishwasher on the delicate or glassware cycle (top shelf only). Do not wash at temperatures higher than 65 °C . Do not wash the air tubing in a dishwasher or washing machine. Empty the humidifier daily and wipe it thoroughly with a clean, disposable cloth. Allow to dry out of direct sunlight and/or heat. Checking You should regularly check the humidifier, air tubing, and the air filter for any damage. Check the humidifier Replace the humidifier if it is leaking or has become cracked, cloudy, or pitted. Replace the humidifier if the seal is cracked or torn. Remove any white powder deposits using a solution of one part household vinegar to 10 parts water . Check the air tubing Replace the air tubing if there are any holes, tears, or cracks. Check the air filter Replace the air filter at least every six months . Replace the air filter more often if there are any holes or blockages caused by dirt or dust. To replace the air filter Open the air filter cover and remove the old air filter. The air filter is not washable or reusable . Place a new air filter onto the air filter cover and then close it. Make sure the air filter is fitted at all times to prevent water and dust from entering the device. Reassembling When the humidifier and air tubing are dry, you can reassemble the parts. Connect the air tubing firmly to the air outlet located on the rear of the device. Open the humidifier and fill it with room temperature water up to the maximum water level mark . Close the humidifier and insert it into the side of the device. Connect the free end of the air tubing firmly onto the assembled mask. Related sections About your device Starting therapy ← Back to contents"
-    },
-    {
-      "title": "Therapy Data",
-      "file": "therapy-data.html",
-      "description": "Therapy Data — AirSense 10 User Guide AirSense 10 User Guide — Quick Access Setup Therapy Data Your AirSense 10 device records your therapy data for y...",
-      "keywords": [
-        "card",
-        "therapy",
-        "data",
-        "device",
-        "care",
-        "provider",
-        "wireless",
-        "airsense",
-        "available",
-        "communication",
-        "remove",
-        "transferred",
-        "network",
-        "transmitted",
-        "user"
-      ],
-      "content": "Therapy Data — AirSense 10 User Guide AirSense 10 User Guide — Quick Access Setup Therapy Data Your AirSense 10 device records your therapy data for you and your care provider so that your therapy can be reviewed and adjusted if required. Therapy data is recorded by the device and transferred to your care provider either wirelessly , if a wireless network is available, or via an SD card . Data transmission Your AirSense 10 device has the capability of wireless communication so that your therapy data can be transmitted to your care provider to improve the quality of your treatment. This is an optional feature and will only be available if you choose to benefit from it and if a wireless network is available. Wireless communication also allows your care provider to update your therapy settings in a more timely manner or upgrade your device software to help ensure you receive the best therapy possible. Therapy data is usually transmitted after therapy has stopped. To help ensure that your data is transferred, leave your device connected to the mains power at all times and make sure it is not in Airplane Mode . Notes Therapy data might not be transmitted if the device is used outside of the country or region of purchase. Wireless communication depends on network availability. Devices with wireless communication might not be available in all regions. SD card An alternative way for your therapy data to be transferred to your care provider is via the SD card . Your care provider may ask you to send the SD card by mail or to bring it in. When instructed by your care provider, remove the SD card. Do not remove the SD card while the SD light is flashing , as data is being written to the card. To remove the SD card Open the SD card cover. Push in the SD card to release it, then remove it from the device. Place the SD card in the protective folder and send it back to your care provider. For more information on the SD card, refer to the SD card protective folder provided with your device. Note: The SD card should not be used for any other purpose. Related sections About your device Starting therapy ← Back to contents"
-    },
-    {
-      "title": "Travelling",
-      "file": "travelling.html",
-      "description": "Travelling — AirSense 10 User Guide AirSense 10 User Guide — Quick Access Setup Travelling You can take your AirSense 10 device with you wherever you ...",
-      "keywords": [
-        "device",
-        "airsense",
-        "humidifier",
-        "turn",
-        "travelling",
-        "plane",
-        "airplane",
-        "mode",
-        "dial",
-        "travel",
-        "user",
-        "guide",
-        "empty",
-        "make",
-        "sure"
-      ],
-      "content": "Travelling — AirSense 10 User Guide AirSense 10 User Guide — Quick Access Setup Travelling You can take your AirSense 10 device with you wherever you go. Please keep the following points in mind: Use the travel bag provided to help prevent damage to the device. Empty the humidifier and pack it separately in the travel bag. Make sure you have the appropriate power cord for the region you are travelling to. For information on purchasing, contact your care provider. If you are using an external battery, turn off the humidifier to maximise battery life by setting the Humidity Level to Off . Travelling by plane Your AirSense 10 device may be taken on board as carry-on luggage. Medical devices do not count toward your carry-on luggage limit. You can use your AirSense 10 device on a plane as it meets UK Civil Aviation Authority (CAA) requirements. Air travel compliance letters can be downloaded and printed from www.resmed.com . When using the device on a plane Make sure the humidifier is completely empty and inserted into the device. The device will not work without the humidifier inserted. Turn on Airplane Mode . To turn on Airplane Mode In My Options , turn the dial to highlight Airplane Mode , then press the dial. Turn the dial to select On and press the dial to save the change. The Airplane Mode icon ✈ is displayed at the top right of the screen. ⚠️ Caution Do not use the device with water in the humidifier on a plane due to the risk of inhalation of water during turbulence. Warnings / cautions [Warning/caution placeholder] Related sections About your device Starting therapy ← Back to contents"
+      "content": "Stopping Therapy — AirSense 10 User Guide AirSense 10 User Guide Stopping therapy 5. Stopping Therapy Steps Remove your mask . Press Start/Stop , or if SmartStart™ is enabled, therapy will stop automatically after a few seconds. Understanding the Sleep Report The Sleep Report screen is displayed and provides a summary of your therapy session. Usage hours – Indicates the number of hours of therapy you received during the last session. Mask Seal – Indicates how well your mask sealed: 😊 – Mask seal is adequate. 😔 – Mask needs adjusting. See Mask Fit . Humidifier – Indicates if your humidifier is working properly: 😊 - Humidifier working . 😔 - Humidifier might be faulty – Contact your care provider. Additional information Events per hour – If set by your care provider, this indicates the number of apnoeas and hypopnoeas experienced per hour. More Info – Turn the dial to scroll down and view more detailed usage data. Related sections Therapy data Power save mode Starting therapy ← Back to contents Next: 6. Power save mode →"
     },
     {
       "title": "Troubleshooting",
       "file": "troubleshooting.html",
-      "description": "Troubleshooting — AirSense 10 User Guide AirSense 10 User Guide — Quick Access Setup Troubleshooting If you experience any problems, refer to the trou...",
+      "description": "Troubleshooting — AirSense 10 User Guide AirSense 10 User Guide Troubleshooting 11",
       "keywords": [
-        "device",
         "mask",
         "tubing",
+        "device",
         "card",
         "check",
         "humidifier",
@@ -269,35 +131,12 @@
         "make",
         "sure",
         "correctly",
+        "troubleshooting",
         "care",
         "provider",
-        "blocked",
-        "inserted"
+        "blocked"
       ],
-      "content": "Troubleshooting — AirSense 10 User Guide AirSense 10 User Guide — Quick Access Setup Troubleshooting If you experience any problems, refer to the troubleshooting topics below. If you are unable to resolve the problem, contact your care provider or ResMed . Do not try to open the device. General troubleshooting Problem / possible cause Solution Air is leaking from around my mask Mask may be fitted incorrectly. Make sure your mask is fitted correctly. See your mask user guide for fitting instructions or use the Mask Fit function to check your mask fit and seal. I am getting a dry or blocked nose Humidity level may be set too low. Adjust the Humidity Level . If you have ClimateLineAir heated air tubing, see the ClimateLineAir user guide. I am getting droplets of water on my nose, in the mask, and in the air tubing Humidity level may be set too high. Adjust the Humidity Level . If you have ClimateLineAir heated air tubing, see the ClimateLineAir user guide. My mouth is very dry and uncomfortable Air may be escaping through your mouth. Increase the Humidity Level . You may need a chin strap to keep your mouth closed or a full face mask. Air pressure in my mask seems too high Ramp may be turned off. Use the Ramp Time option. Air pressure in my mask seems too low Ramp may be in progress. Wait for air pressure to build up or turn Ramp Time off. My screen is black Backlight may have turned off. Power may not be connected. Press Home or the dial to turn the screen back on. Connect the power supply and make sure the plug is fully inserted. I have stopped therapy, but the device is still blowing air Device is cooling down. The device blows a small amount of air to avoid condensation in the tubing. It will stop automatically after 30 minutes. My humidifier is leaking Humidifier may not be assembled correctly. Humidifier may be damaged or cracked. Check for damage and reassemble the humidifier correctly. Contact your care provider for a replacement. My therapy data has not been sent to my care provider Wireless coverage may be poor. Device may be in Airplane Mode. Data transfer may not be enabled. Make sure the device is placed where there is wireless coverage (e.g. on a bedside table, not in a drawer or on the floor). If instructed, send the SD card to your care provider. Turn off Airplane Mode (see Travelling by plane). Talk to your care provider about your settings. My screen and buttons are flashing Software upgrade is in progress. The software upgrade takes approximately 10 minutes to complete. Device messages Device message / possible cause Solution High leak detected, check your water tub, tub seal or side cover Humidifier may not be inserted properly. Humidifier seal may not be inserted properly. Make sure the humidifier is correctly inserted. Open the humidifier and make sure the seal is correctly inserted. High leak detected, connect your tubing Air tubing may not be connected properly. Mask may be fitted incorrectly. Make sure the air tubing is firmly connected at both ends. Make sure your mask is fitted correctly. See your mask user guide or use the Mask Fit function to check your mask fit and seal. Tubing blocked, check your tubing Air tubing may be blocked. Check the air tubing and remove any blockages. Press the dial to clear the message, then press Start/Stop to restart the device. SD card error, remove your card and press Start to begin therapy SD card may not be inserted correctly. Remove and reinsert the SD card. Read only card, please remove, unlock and re-insert SD card SD card switch may be in the lock (read-only) position. Move the switch on the SD card from the lock position 🔒 to the unlock position 🔓, then re-insert the SD card. System fault, refer to user guide, Error 004 Device may have been left in a hot environment. Air filter may be blocked. Air tubing may be blocked. There may be water in the air tubing. Allow the device to cool before re-use. Disconnect the power supply and reconnect it to restart the device. Check the air filter and replace it if blocked. Check the air tubing and remove any blockages. Empty any water from the air tubing. All other error messages (e.g. System fault, Error 0XX) An unrecoverable error has occurred on the device. Contact your care provider . Do not open the device. Related sections About your device Starting therapy ← Back to contents"
-    },
-    {
-      "title": "My Options",
-      "file": "reassembling-parts.html",
-      "description": "My Options — AirSense 10 User Guide AirSense 10 User Guide — Quick Access Setup Reassembling Parts Some parts of your device are designed to easily co...",
-      "keywords": [
-        "device",
-        "power",
-        "parts",
-        "place",
-        "humidifier",
-        "supply",
-        "resmed",
-        "ensure",
-        "damage",
-        "seal",
-        "side",
-        "other",
-        "cord",
-        "only",
-        "oxygen"
-      ],
-      "content": "My Options — AirSense 10 User Guide AirSense 10 User Guide — Quick Access Setup Reassembling Parts Some parts of your device are designed to easily come off to help prevent damage to the parts or the device. You can reassemble them as described below. To insert the humidifier seal Place the seal into the lid. Press down along all edges of the seal until it is firmly in place. To reassemble the humidifier lid Insert one side of the lid into the pivot hole of the base. Slide the other side down the ridge until it clicks into place. WARNING Arrange the air tubing so that it does not twist around the head or neck. Regularly inspect power cords, cables, and the power supply for damage or signs of wear. Discontinue use and replace if damaged. Keep the power cord away from hot surfaces. If you notice unexplained changes in performance, unusual sounds, or if the device or power supply is dropped, mishandled, or the enclosure is broken, discontinue use and contact your care provider or ResMed Service Centre. Do not open or modify the device. There are no user-serviceable parts inside. Repairs must only be performed by an authorised ResMed service agent. Beware of electrocution. Do not immerse the device, power supply, or power cord in water. If liquid is spilled onto the device, unplug it and allow all parts to dry before reuse. Supplemental oxygen must not be used while smoking or in the presence of an open flame. Always ensure the device is turned on and airflow is generated before turning on the oxygen supply. Turn off oxygen before turning off the device. Do not perform maintenance tasks while the device is in operation. The device should not be used adjacent to or stacked with other equipment unless normal operation is verified in that configuration. The use of accessories other than those specified is not recommended and may affect device performance or safety. Regularly check the antibacterial filter for moisture or contamination, particularly during humidification. ⚠️ Caution Use only ResMed parts and accessories with the device. Use only vented masks recommended by ResMed or the prescribing doctor. Ensure mask vent holes remain clear. Do not place the device where it can be bumped or where someone may trip over the power cord. Blocking the air tubing or air inlet during operation may cause overheating. Keep the area around the device clean and clear to prevent blockage of the air inlet or power supply unit. Do not place the device on its side, as water may enter the device. Incorrect system setup may result in incorrect mask pressure readings. Ensure the system is correctly assembled. Do not use bleach, chlorine, alcohol, or scented cleaning solutions. These may damage the device and void the warranty. If using the humidifier, place the device on a level surface lower than your head. Allow the humidifier to cool for at least ten minutes before handling. Ensure the humidifier is empty before transporting the device. Note: Any serious incidents involving this device should be reported to ResMed and the competent authority in your country. Related sections About your device Starting therapy ← Back to contents"
+      "content": "Troubleshooting — AirSense 10 User Guide AirSense 10 User Guide Troubleshooting 11. Troubleshooting If you experience any problems, refer to the troubleshooting topics below. If you are unable to resolve the problem, contact your care provider or ResMed . Do not try to open the device. General troubleshooting Problem / possible cause Solution Air is leaking from around my mask Mask may be fitted incorrectly. Make sure your mask is fitted correctly. See your mask user guide for fitting instructions or use the Mask Fit function to check your mask fit and seal. I am getting a dry or blocked nose Humidity level may be set too low. Adjust the Humidity Level . If you have ClimateLineAir heated air tubing, see the ClimateLineAir user guide . I am getting droplets of water on my nose, in the mask, and in the air tubing Humidity level may be set too high. Adjust the Humidity Level . If you have ClimateLineAir heated air tubing, see the ClimateLineAir user guide . My mouth is very dry and uncomfortable Air may be escaping through your mouth. Increase the Humidity Level . You may need a chin strap to keep your mouth closed or a full face mask. Air pressure in my mask seems too high Ramp may be turned off. Use the Ramp Time option. Air pressure in my mask seems too low Ramp may be in progress. Wait for air pressure to build up or turn Ramp Time off. My screen is black Backlight may have turned off. Power may not be connected. Press Home or the dial to turn the screen back on. Connect the power supply and make sure the plug is fully inserted. I have stopped therapy, but the device is still blowing air Device is cooling down. The device blows a small amount of air to avoid condensation in the tubing. It will stop automatically after 30 minutes. My humidifier is leaking Humidifier may not be assembled correctly. Humidifier may be damaged or cracked. Check for damage and reassemble the humidifier correctly. Contact your care provider for a replacement. My therapy data has not been sent to my care provider Wireless coverage may be poor. Device may be in Airplane Mode. Data transfer may not be enabled. Make sure the device is placed where there is wireless coverage (e.g. on a bedside table, not in a drawer or on the floor). If instructed, send the SD card to your care provider. Turn off Airplane Mode (see Travelling by plane ). Talk to your care provider about your settings. My screen and buttons are flashing Software upgrade is in progress. The software upgrade takes approximately 10 minutes to complete. Device messages Device message / possible cause Solution High leak detected, check your water tub, tub seal or side cover Humidifier may not be inserted properly. Humidifier seal may not be inserted properly. Make sure the humidifier is correctly inserted. Open the humidifier and make sure the seal is correctly inserted. High leak detected, connect your tubing Air tubing may not be connected properly. Mask may be fitted incorrectly. Make sure the air tubing is firmly connected at both ends. Make sure your mask is fitted correctly. See your mask user guide or use the Mask Fit function to check your mask fit and seal. Tubing blocked, check your tubing Air tubing may be blocked. Check the air tubing and remove any blockages. Press the dial to clear the message, then press Start/Stop to restart the device. SD card error, remove your card and press Start to begin therapy SD card may not be inserted correctly. Remove and reinsert the SD card. Read only card, please remove, unlock and re-insert SD card SD card switch may be in the lock (read-only) position. Move the switch on the SD card from the lock position 🔒 to the unlock position 🔓, then re-insert the SD card. System fault, refer to user guide, Error 004 Device may have been left in a hot environment. Air filter may be blocked. Air tubing may be blocked. There may be water in the air tubing. Allow the device to cool before re-use. Disconnect the power supply and reconnect it to restart the device. Check the air filter and replace it if blocked. Check the air tubing and remove any blockages. Empty any water from the air tubing. All other error messages (e.g. System fault, Error 0XX) An unrecoverable error has occurred on the device. Contact your care provider . Do not open the device. ResMed - Troubleshooting your CPAP treatment Related sections Further information Servicing ← Back to contents Next: 12. Reassembling parts →"
     },
     {
       "title": "My Options",
@@ -320,43 +159,135 @@
         "resmed",
         "humidifier"
       ],
-      "content": "My Options — AirSense 10 User Guide AirSense 10 User Guide — Quick Access Setup Technical Specifications Units are expressed in cm H 2 O and hPa . 1 cm H 2 O is equal to 0.98 hPa. Power supply Power supply unit 90 W AC input range 100–240 V, 50–60 Hz, 1.0–1.5 A, Class II 115 V, 400 Hz, 1.5 A, Class II (nominal for aircraft use) DC output 24 V Typical power consumption 53 W (57 VA) Peak power consumption 104 W (108 VA), 3.75 A Environmental conditions Operating temperature +5 °C to +35 °C Operating humidity 10–95% relative humidity, non-condensing Operating altitude Sea level to 2,591 m Air pressure range: 1013 hPa to 738 hPa Storage and transport temperature −20 °C to +60 °C Storage and transport humidity 5–95% relative humidity, non-condensing Note: The airflow produced by the device for breathing may be higher than the room temperature. Under extreme ambient temperature conditions (40 °C), the device remains safe. Electromagnetic compatibility The AirSense 10 complies with all applicable electromagnetic compatibility (EMC) requirements according to IEC 60601-1-2:2014 , for residential, commercial, and light-industry environments. It is recommended that mobile communication devices are kept at least 1 m away from the device. Information regarding electromagnetic emissions and immunity can be found at www.resmed.com/downloads/devices . Classification Electrical safety EN 60601-1:2006 / A1:2013 Protection class Class II (double insulation) Applied part Type BF Ingress protection IP22 Sensors Pressure sensor Internally located at device outlet Analog gauge pressure type 0 to 40 cm H 2 O (0 to 40 hPa) Flow sensor Internally located at device inlet Digital mass flow type −70 to +180 L/min Maximum single-fault steady pressure The device will shut down in the presence of a single fault if the steady-state pressure exceeds: 30 cm H 2 O (30 hPa) for more than 6 seconds, or 40 cm H 2 O (40 hPa) for more than 1 second. Sound Sound pressure level (CPAP mode) SlimLine tubing 25 dBA ±2 dBA SlimLine or Standard with humidification 27 dBA ±2 dBA Sound power level (CPAP mode) SlimLine tubing 33 dBA ±2 dBA SlimLine or Standard with humidification 35 dBA ±2 dBA Noise emission values are declared in accordance with ISO 4871:1996. Measurements performed according to ISO 80601-2-70:2015. Physical – device and humidifier Dimensions (H × W × D) 116 mm × 255 mm × 150 mm Air outlet (complies with ISO 5356-1:2015) 22 mm Weight (device and cleanable humidifier) 1248 g Housing construction Flame retardant engineering thermoplastic Water capacity To maximum fill line 380 mL Cleanable humidifier – material Injection moulded plastic, stainless steel and silicone seal Temperature Maximum heater plate 68 °C Cut-out 74 °C Maximum gas temperature ≤ 41 °C Air filter Standard Material Polyester non woven fibre Average arrestance >75% for ~7 micron dust Hypoallergenic Material Acrylic and polypropylene fibres in a polypropylene carrier Efficiency >98% for ~7-8 micron dust; >80% for ~0.5 micron dust Aircraft use ResMed confirms that device meets the Federal Aviation Administration (FAA) requirements (RTCA/DO-160, section 21, category M) for all phases of air travel. Wireless module Technology used 4G, 3G, 2G Note: It is recommended that the device is a minimum distance of 0.8\" (2 cm) from the body during operation. Not applicable to masks, tubes or accessories. Technology may not be available in all regions. Declaration of Conformity – Radio Equipment Directive ResMed declares that the AirSense 10 device (models 370xx or 371xx) is in compliance with the essential requirements and other relevant provisions of Directive 2014/53/EU (RED). A copy of the Declaration of Conformity (DoC) can be found on Resmed.com/productsupport . 2G radio equipment The 2G radio equipment operates with the following frequency bands and maximum radio-frequency power: GSM 850/900: 35 dBm GSM 1800/1900: 32 dBm 4G device The 4G device can be used in all European countries without any restrictions. Medical Device Directive All ResMed devices are classified as medical devices under the Medical Device Directive. Any labelling of the product and printed material, showing CE 0123, relates to the Council Directive 93/42/EEC including the Medical Device Directive amendment (2007/47/EC). Operating pressure range AutoSet, CPAP 4 to 20 cm H 2 O (4 to 20 hPa) Supplemental oxygen Maximum flow 4 L/min Pneumatic flow path Flow sensor Blower Pressure sensor Mask Air tubing Humidifier Device Inlet filter Design life Device, power supply unit 5 years Cleanable humidifier 2.5 years Air tubing 6 months General The patient is an intended operator. Humidifier performance Mask Pressure (cm H 2 O / hPa) RH output % at 17°C ambient temperature RH output % at 22°C ambient temperature Setting 4 Setting 8 Setting 4 Setting 8 4 85 100 6 >10 10 85 100 6 >10 20 85 90 6 >10 1 AH – Absolute Humidity in mg/L 2 BTPS – Body Temperature Pressure Saturated Note: Nominal system output AH 1 , BTPS 2 Air tubing "
+      "content": "My Options — AirSense 10 User Guide AirSense 10 User Guide Technical specifications 13. Technical Specifications Units are expressed in cm H 2 O and hPa . 1 cm H 2 O is equal to 0.98 hPa. Power supply Power supply unit 90 W AC input range 100–240 V, 50–60 Hz, 1.0–1.5 A, Class II 115 V, 400 Hz, 1.5 A, Class II (nominal for aircraft use) DC output 24 V Typical power consumption 53 W (57 VA) Peak power consumption 104 W (108 VA), 3.75 A Environmental conditions Operating temperature +5 °C to +35 °C Operating humidity 10–95% relative humidity, non-condensing Operating altitude Sea level to 2,591 m Air pressure range: 1013 hPa to 738 hPa Storage and transport temperature −20 °C to +60 °C Storage and transport humidity 5–95% relative humidity, non-condensing Note: The airflow produced by the device for breathing may be higher than the room temperature. Under extreme ambient temperature conditions (40 °C), the device remains safe. Electromagnetic compatibility The AirSense 10 complies with all applicable electromagnetic compatibility (EMC) requirements according to IEC 60601-1-2:2014 , for residential, commercial, and light-industry environments. It is recommended that mobile communication devices are kept at least 1 m away from the device. Information regarding electromagnetic emissions and immunity can be found at www.resmed.com/downloads/devices . Classification Electrical safety EN 60601-1:2006 / A1:2013 Protection class Class II (double insulation) Applied part Type BF Ingress protection IP22 Sensors Pressure sensor Internally located at device outlet Analog gauge pressure type 0 to 40 cm H 2 O (0 to 40 hPa) Flow sensor Internally located at device inlet Digital mass flow type −70 to +180 L/min Maximum single-fault steady pressure The device will shut down in the presence of a single fault if the steady-state pressure exceeds: 30 cm H 2 O (30 hPa) for more than 6 seconds, or 40 cm H 2 O (40 hPa) for more than 1 second. Sound Sound pressure level (CPAP mode) SlimLine tubing 25 dBA ±2 dBA SlimLine or Standard with humidification 27 dBA ±2 dBA Sound power level (CPAP mode) SlimLine tubing 33 dBA ±2 dBA SlimLine or Standard with humidification 35 dBA ±2 dBA Noise emission values are declared in accordance with ISO 4871:1996. Measurements performed according to ISO 80601-2-70:2015. Physical – device and humidifier Dimensions (H × W × D) 116 mm × 255 mm × 150 mm Air outlet (complies with ISO 5356-1:2015) 22 mm Weight (device and cleanable humidifier) 1248 g Housing construction Flame retardant engineering thermoplastic Water capacity To maximum fill line 380 mL Cleanable humidifier – material Injection moulded plastic, stainless steel and silicone seal Temperature Maximum heater plate 68 °C Cut-out 74 °C Maximum gas temperature ≤ 41 °C Air filter Standard Material Polyester non woven fibre Average arrestance >75% for ~7 micron dust Hypoallergenic Material Acrylic and polypropylene fibres in a polypropylene carrier Efficiency >98% for ~7-8 micron dust; >80% for ~0.5 micron dust Aircraft use ResMed confirms that device meets the Federal Aviation Administration (FAA) requirements (RTCA/DO-160, section 21, category M) for all phases of air travel. Wireless module Technology used 4G, 3G, 2G Note: It is recommended that the device is a minimum distance of 0.8\" (2 cm) from the body during operation. Not applicable to masks, tubes or accessories. Technology may not be available in all regions. Declaration of Conformity – Radio Equipment Directive ResMed declares that the AirSense 10 device (models 370xx or 371xx) is in compliance with the essential requirements and other relevant provisions of Directive 2014/53/EU (RED). A copy of the Declaration of Conformity (DoC) can be found on Resmed.com/productsupport . 2G radio equipment The 2G radio equipment operates with the following frequency bands and maximum radio-frequency power: GSM 850/900: 35 dBm GSM 1800/1900: 32 dBm 4G device The 4G device can be used in all European countries without any restrictions. Medical Device Directive All ResMed devices are classified as medical devices under the Medical Device Directive. Any labelling of the product and printed material, showing CE 0123, relates to the Council Directive 93/42/EEC including the Medical Device Directive amendment (2007/47/EC). Operating pressure range AutoSet, CPAP 4 to 20 cm H 2 O (4 to 20 hPa) Supplemental oxygen Maximum flow 4 L/min Pneumatic flow path Flow sensor Blower Pressure sensor Mask Air tubing Humidifier Device Inlet filter Design life Device, power supply unit 5 years Cleanable humidifier 2.5 years Air tubing 6 months General The patient is an intended operator. Humidifier performance Mask Pressure (cm H 2 O / hPa) RH output % at 17°C ambient temperature RH output % at 22°C ambient temperature Setting 4 Setting 8 Setting 4 Setting 8 4 85 100 6 >10 10 85 100 6 >10 20 85 90 6 >10 1 AH – Absolute Humidity in mg/L 2 BTPS – Body Temperature Pressure Saturated Note: Nominal system output AH 1 , BTPS 2 Air"
     },
     {
-      "title": "Symbols",
-      "file": "symbols.html",
-      "description": "Symbols — AirSense 10 User Guide AirSense 10 User Guide — Quick Access Setup Symbols The following symbols may appear on the product or packaging",
+      "title": "Further Information",
+      "file": "further-information.html",
+      "description": "Further Information — AirSense 10 User Guide AirSense 10 User Guide Further information 18",
       "keywords": [
-        "symbols",
+        "information",
+        "further",
         "airsense",
         "user",
         "guide",
-        "quick",
-        "access",
-        "setup",
-        "following",
-        "appear",
-        "product",
-        "packaging",
-        "glossary",
-        "resmed",
+        "questions",
+        "require",
+        "additional",
+        "device",
+        "contact",
+        "care",
+        "provider",
         "related",
-        "sections"
+        "sections",
+        "servicing"
       ],
-      "content": "Symbols — AirSense 10 User Guide AirSense 10 User Guide — Quick Access Setup Symbols The following symbols may appear on the product or packaging. See symbols glossary at ResMed.com/symbols Related sections About your device Environmental information ← Back to contents"
+      "content": "Further Information — AirSense 10 User Guide AirSense 10 User Guide Further information 18. Further Information If you have any questions or require additional information on how to use the device, contact your care provider. Related sections Servicing Limited warranty ← Back to contents"
+    },
+    {
+      "title": "Limited Warranty",
+      "file": "limited-warranty.html",
+      "description": "Limited Warranty — AirSense 10 User Guide AirSense 10 User Guide Limited warranty 17",
+      "keywords": [
+        "warranty",
+        "resmed",
+        "product",
+        "limited",
+        "devices",
+        "damage",
+        "other",
+        "region",
+        "information",
+        "purchase",
+        "period",
+        "including",
+        "water",
+        "cpap",
+        "bilevel"
+      ],
+      "content": "Limited Warranty — AirSense 10 User Guide AirSense 10 User Guide Limited warranty 17. Limited Warranty ResMed Pty Ltd (hereafter 'ResMed') warrants that your ResMed product shall be free from defects in material and workmanship from the date of purchase for the period specified below. Product warranty periods Product Warranty period Mask systems (including mask frame, cushion, headgear and tubing)—excluding single-use devices Accessories—excluding single-use devices Flex-type finger pulse sensors Humidifier water tubs 90 days Batteries for use in ResMed internal and external battery systems Clip-type finger pulse sensors CPAP and bilevel device data modules Oximeters and CPAP and bilevel device oximeter adapters Humidifiers and humidifier cleanable water tubs Titration control devices 1 year CPAP, bilevel and ventilation devices (including external power supply units) Battery accessories Portable diagnostic/screening devices 2 years Warranty details This warranty is only available to the initial consumer. It is not transferable. During the warranty period, if the product fails under conditions of normal use, ResMed will repair or replace, at its option, the defective product or any of its components. What this warranty does not cover This limited warranty does not cover: Any damage caused as a result of improper use, abuse, modification or alteration of the product Repairs carried out by any service organisation that has not been expressly authorised by ResMed to perform such repairs Any damage or contamination due to cigarette, pipe, cigar or other smoke Any damage caused by exposure to ozone, activated oxygen or other gases Any damage caused by water being spilled on or into an electronic device Regional limitations Warranty is void on product sold, or resold, outside the region of original purchase. For product purchased in a country in the European Union (\"EU\") or European Free Trade Association (\"EFTA\"), \"region\" means the EU and EFTA. Warranty claims on defective product must be made by the initial consumer at the point of purchase. Legal disclaimers This warranty replaces all other expressed or implied warranties, including any implied warranty of merchantability or fitness for a particular purpose. Some regions or states do not allow limitations on how long an implied warranty lasts, so the above limitation may not apply to you. ResMed shall not be responsible for any incidental or consequential damages claimed to have resulted from the sale, installation or use of any ResMed product. Some regions or states do not allow the exclusion or limitation of incidental or consequential damages, so the above limitation may not apply to you. This warranty gives you specific legal rights, and you may also have other rights which vary from region to region. For further information on your warranty rights, contact your local ResMed dealer or ResMed office. Visit ResMed.com for the latest information on ResMed's Limited Warranty. Related sections Servicing Further information ← Back to contents Next: 18. Further information →"
+    },
+    {
+      "title": "About Device",
+      "file": "about-device.html",
+      "description": "About Device — AirSense 10 User Guide AirSense 10 User Guide About your device 2",
+      "keywords": [
+        "press",
+        "device",
+        "cover",
+        "humidifier",
+        "screen",
+        "wireless",
+        "airsense",
+        "user",
+        "guide",
+        "power",
+        "number",
+        "start",
+        "stop",
+        "button",
+        "therapy"
+      ],
+      "content": "About Device — AirSense 10 User Guide AirSense 10 User Guide About your device 2. About Your Device Air outlet Air filter cover Power inlet Serial number and device number HumidAir humidifier Screen Adapter cover SD card cover About the Control panel Start/Stop button Press to start/stop therapy. Press and hold for three seconds to enter power save mode. Dial Turn to navigate the menu and press to select an option. Turn to adjust a selected option and press to save your change. Home button Press to return to the Home screen. Different icons may be displayed on the screen at different times including: Ramp Time Wireless signal strength (green) Ramp Time Auto Wireless transfer not enabled (gray) Humidity No wireless connection Humidifier warming Airplane Mode Humidifier cooling Related sections Setup Starting therapy ← Back to contents Next: 3. Setup →"
+    },
+    {
+      "title": "Caring For Your Device",
+      "file": "caring-for-your-device.html",
+      "description": "Caring For Your Device — AirSense 10 User Guide AirSense 10 User Guide Caring for your device 8",
+      "keywords": [
+        "humidifier",
+        "device",
+        "tubing",
+        "filter",
+        "mask",
+        "water",
+        "replace",
+        "clean",
+        "cleaning",
+        "check",
+        "caring",
+        "airsense",
+        "user",
+        "guide",
+        "regularly"
+      ],
+      "content": "Caring For Your Device — AirSense 10 User Guide AirSense 10 User Guide Caring for your device 8. Caring for Your Device It is important that you regularly clean your AirSense 10 device to make sure you receive optimal therapy. The following sections will help you with disassembling, cleaning, checking, and reassembling your device. WARNING Regularly clean your tubing assembly, humidifier, and mask to receive optimal therapy and to prevent the growth of germs that can adversely affect your health. Disassembling Hold the humidifier at the top and bottom, press it gently, and pull it away from the device. Open the humidifier and discard any remaining water. Hold the cuff of the air tubing and gently pull it away from the device. Hold both the cuff of the air tubing and the swivel of the mask, then gently pull them apart. Cleaning You should clean the device weekly as described. Refer to the mask user guide for detailed instructions on cleaning your mask. Wash the humidifier and air tubing in warm water using mild detergent. Rinse the humidifier and air tubing thoroughly and allow to dry out of direct sunlight and/or heat. Wipe the exterior of the device with a dry cloth. Notes The humidifier may be washed in a dishwasher on the delicate or glassware cycle (top shelf only). Do not wash at temperatures higher than 65 °C . Do not wash the air tubing in a dishwasher or washing machine. Empty the humidifier daily and wipe it thoroughly with a clean, disposable cloth. Allow to dry out of direct sunlight and/or heat. Checking You should regularly check the humidifier, air tubing, and the air filter for any damage. Check the humidifier Replace the humidifier if it is leaking or has become cracked, cloudy, or pitted. Replace the humidifier if the seal is cracked or torn. Remove any white powder deposits using a solution of one part household vinegar to 10 parts water . Check the air tubing Replace the air tubing if there are any holes, tears, or cracks. Check the air filter Replace the air filter at least every six months . Replace the air filter more often if there are any holes or blockages caused by dirt or dust. To replace the air filter Open the air filter cover and remove the old air filter. The air filter is not washable or reusable . Place a new air filter onto the air filter cover and then close it. Make sure the air filter is fitted at all times to prevent water and dust from entering the device. Reassembling When the humidifier and air tubing are dry, you can reassemble the parts. Connect the air tubing firmly to the air outlet located on the rear of the device. Open the humidifier and fill it with room temperature water up to the maximum water level mark . Close the humidifier and insert it into the side of the device. Connect the free end of the air tubing firmly onto the assembled mask. ResMed - Care and cleaning of your CPAP mask and machine Related sections Reassembling parts Servicing ← Back to contents Next: 9. Therapy data →"
+    },
+    {
+      "title": "Control Panel",
+      "file": "control-panel.html",
+      "description": "This section mirrors the “Control Panel” section of the manufacturer user manual.",
+      "keywords": [
+        "control",
+        "panel",
+        "placeholder",
+        "user",
+        "step",
+        "airsense",
+        "guide",
+        "section",
+        "mirrors",
+        "manufacturer",
+        "manual",
+        "steps",
+        "warnings",
+        "cautions",
+        "warning"
+      ],
+      "content": "Control Panel — AirSense 10 User Guide AirSense 10 User Guide Control panel Control Panel This section mirrors the “Control Panel” section of the manufacturer user manual. Steps [Step 1 placeholder] [Step 2 placeholder] [Step 3 placeholder] Warnings / cautions [Warning/caution placeholder] Related sections About your device Starting therapy ← Back to contents"
     },
     {
       "title": "Environmental Information",
       "file": "environmental-information.html",
-      "description": "Environmental Information — AirSense 10 User Guide AirSense 10 User Guide — Quick Access Setup Environmental Information This device should be dispose...",
+      "description": "Environmental Information — AirSense 10 User Guide AirSense 10 User Guide Environmental information 15",
       "keywords": [
         "information",
-        "device",
         "systems",
+        "environmental",
+        "device",
         "collection",
         "disposal",
         "resmed",
-        "environmental",
         "airsense",
         "user",
         "guide",
@@ -366,76 +297,191 @@
         "environment",
         "please"
       ],
-      "content": "Environmental Information — AirSense 10 User Guide AirSense 10 User Guide — Quick Access Setup Environmental Information This device should be disposed of separately, not as unsorted municipal waste. To dispose of your device, you should use appropriate collection, reuse and recycling systems available in your region. The use of these collection, reuse and recycling systems is designed to reduce pressure on natural resources and prevent hazardous substances from damaging the environment. If you need information on these disposal systems, please contact your local waste administration. The crossed-bin symbol invites you to use these disposal systems. If you require information on collection and disposal of your ResMed device please contact your ResMed office, local distributor or go to ResMed.com/environment. Related sections About your device Symbols ← Back to contents"
+      "content": "Environmental Information — AirSense 10 User Guide AirSense 10 User Guide Environmental information 15. Environmental Information This device should be disposed of separately, not as unsorted municipal waste. To dispose of your device, you should use appropriate collection, reuse and recycling systems available in your region. The use of these collection, reuse and recycling systems is designed to reduce pressure on natural resources and prevent hazardous substances from damaging the environment. If you need information on these disposal systems, please contact your local waste administration. The crossed-bin symbol invites you to use these disposal systems. If you require information on collection and disposal of your ResMed device please contact your ResMed office, local distributor or go to ResMed.com/environment. Related sections Servicing Further information ← Back to contents Next: 16. Servicing →"
+    },
+    {
+      "title": "My Options",
+      "file": "my-options.html",
+      "description": "My Options — AirSense 10 User Guide AirSense 10 User Guide My Options 7",
+      "keywords": [
+        "mask",
+        "options",
+        "dial",
+        "humidity",
+        "therapy",
+        "level",
+        "press",
+        "ramp",
+        "time",
+        "device",
+        "more",
+        "climatelineair",
+        "pressure",
+        "adjust",
+        "turn"
+      ],
+      "content": "My Options — AirSense 10 User Guide AirSense 10 User Guide My Options 7. My Options Navigating My Options Your AirSense 10 device has been set up for your needs by your care provider, but you may find you want to make small adjustments to make your therapy more comfortable. Highlight My Options and press the dial to see your current settings. From here, you can personalise your options. Note: If using ClimateLineAir tubing, the My Options screen will look like this. When Climate Control is set to Auto with ClimateLineAir , the Humidity Level is set automatically by the machine. To alter humidity settings yourself, Climate Control must be changed to Manual . Refer to the ClimateLineAir tubing manual for instructions. Ramp Time Designed to make the beginning of therapy more comfortable, Ramp Time is the period during which the pressure increases from a low start pressure to the prescribed treatment pressure. You can set Ramp Time to Off , 5 to 45 minutes , or Auto . When Ramp Time is set to Auto , the device detects when you have fallen asleep and then automatically rises to the prescribed treatment pressure. To adjust Ramp Time In My Options , turn the dial to highlight Ramp Time , then press the dial. Turn the dial to adjust the ramp time to your preferred setting and press the dial to save the change. Humidity Level The humidifier moistens the air and is designed to make therapy more comfortable. If you are getting a dry nose or mouth, increase the humidity level. If you are getting moisture in your mask, decrease the humidity level. You can set the Humidity Level to Off or between 1 and 8 , where 1 is the lowest humidity setting and 8 is the highest humidity setting. To adjust Humidity Level In My Options , turn the dial to highlight Humidity Level , then press the dial. Turn the dial to adjust the humidity level and press the dial to save the change. If you continue to experience a dry nose or mouth, or moisture in your mask, consider using ClimateLineAir heated air tubing. ClimateLineAir together with Climate Control delivers more comfortable therapy. Mask Fit Mask Fit is designed to help you assess and identify possible air leaks around your mask. To check Mask Fit Fit the mask as described in the mask user guide . In My Options , turn the dial to highlight Run Mask Fit , then press the dial. The device starts blowing air. Adjust the mask, mask cushion, and headgear until you get a Good result. To stop Mask Fit, press the dial or Start/Stop . If you are unable to get a good mask seal, talk to your care provider. More options There are some additional options on your device that you can personalise. Pressure Relief* – When enabled, you may find it easier to breathe out. This can help you get used to therapy. SmartStart* – When enabled, therapy starts automatically when you breathe into your mask. When you remove your mask, therapy stops automatically after a few seconds. *When enabled by your care provider. Related sections Therapy data Starting therapy ← Back to contents Next: 8. Caring for your device →"
+    },
+    {
+      "title": "Power Save Mode",
+      "file": "power-save-mode.html",
+      "description": "Power Save Mode — AirSense 10 User Guide AirSense 10 User Guide Power save mode 6",
+      "keywords": [
+        "save",
+        "power",
+        "mode",
+        "airsense",
+        "device",
+        "therapy",
+        "user",
+        "guide",
+        "data",
+        "press",
+        "start",
+        "stop",
+        "screen",
+        "records",
+        "allow"
+      ],
+      "content": "Power Save Mode — AirSense 10 User Guide AirSense 10 User Guide Power save mode 6. Power Save Mode The AirSense 10 device records your therapy data. To allow this data to be transmitted to your care provider, you should not unplug the device. You can use power save mode to save electricity while keeping the device plugged in. To enter power save mode Press and hold Start/Stop for three seconds. The screen goes black. To exit power save mode Press Start/Stop once. The Home screen is displayed. Related sections Stopping therapy Starting therapy ← Back to contents Next: 7. My Options →"
+    },
+    {
+      "title": "My Options",
+      "file": "reassembling-parts.html",
+      "description": "My Options — AirSense 10 User Guide AirSense 10 User Guide Reassembling parts 12",
+      "keywords": [
+        "device",
+        "power",
+        "parts",
+        "place",
+        "humidifier",
+        "supply",
+        "resmed",
+        "ensure",
+        "damage",
+        "seal",
+        "side",
+        "other",
+        "cord",
+        "only",
+        "oxygen"
+      ],
+      "content": "My Options — AirSense 10 User Guide AirSense 10 User Guide Reassembling parts 12. Reassembling Parts Some parts of your device are designed to easily come off to help prevent damage to the parts or the device. You can reassemble them as described below. To insert the humidifier seal Place the seal into the lid. Press down along all edges of the seal until it is firmly in place. To reassemble the humidifier lid Insert one side of the lid into the pivot hole of the base. Slide the other side down the ridge until it clicks into place. WARNING Arrange the air tubing so that it does not twist around the head or neck. Regularly inspect power cords, cables, and the power supply for damage or signs of wear. Discontinue use and replace if damaged. Keep the power cord away from hot surfaces. If you notice unexplained changes in performance, unusual sounds, or if the device or power supply is dropped, mishandled, or the enclosure is broken, discontinue use and contact your care provider or ResMed Service Centre. Do not open or modify the device. There are no user-serviceable parts inside. Repairs must only be performed by an authorised ResMed service agent. Beware of electrocution. Do not immerse the device, power supply, or power cord in water. If liquid is spilled onto the device, unplug it and allow all parts to dry before reuse. Supplemental oxygen must not be used while smoking or in the presence of an open flame. Always ensure the device is turned on and airflow is generated before turning on the oxygen supply. Turn off oxygen before turning off the device. Do not perform maintenance tasks while the device is in operation. The device should not be used adjacent to or stacked with other equipment unless normal operation is verified in that configuration. The use of accessories other than those specified is not recommended and may affect device performance or safety. Regularly check the antibacterial filter for moisture or contamination, particularly during humidification. ⚠️ Caution Use only ResMed parts and accessories with the device. Use only vented masks recommended by ResMed or the prescribing doctor. Ensure mask vent holes remain clear. Do not place the device where it can be bumped or where someone may trip over the power cord. Blocking the air tubing or air inlet during operation may cause overheating. Keep the area around the device clean and clear to prevent blockage of the air inlet or power supply unit. Do not place the device on its side, as water may enter the device. Incorrect system setup may result in incorrect mask pressure readings. Ensure the system is correctly assembled. Do not use bleach, chlorine, alcohol, or scented cleaning solutions. These may damage the device and void the warranty. If using the humidifier, place the device on a level surface lower than your head. Allow the humidifier to cool for at least ten minutes before handling. Ensure the humidifier is empty before transporting the device. Note: Any serious incidents involving this device should be reported to ResMed and the competent authority in your country. Related sections Caring for your device Setup ← Back to contents Next: 13. Technical specifications →"
     },
     {
       "title": "Servicing",
       "file": "servicing.html",
-      "description": "Servicing — AirSense 10 User Guide AirSense 10 User Guide — Quick Access Setup Servicing The AirSense 10 device is intended to provide safe and reliab...",
+      "description": "Servicing — AirSense 10 User Guide AirSense 10 User Guide Servicing 16",
       "keywords": [
         "airsense",
+        "servicing",
         "device",
         "resmed",
-        "servicing",
         "user",
         "guide",
         "service",
-        "quick",
-        "access",
-        "setup",
+        "limited",
+        "warranty",
         "intended",
         "provide",
         "safe",
         "reliable",
-        "operation"
+        "operation",
+        "operated"
       ],
-      "content": "Servicing — AirSense 10 User Guide AirSense 10 User Guide — Quick Access Setup Servicing The AirSense 10 device is intended to provide safe and reliable operation when operated in accordance with the instructions provided by ResMed. ResMed recommends that the AirSense 10 device be inspected and serviced by an authorised ResMed Service Centre if there is any sign of wear or concern with device function. Otherwise, service and inspection of the products generally should not be required during their design life. Related sections Caring for your device Limited warranty ← Back to contents"
+      "content": "Servicing — AirSense 10 User Guide AirSense 10 User Guide Servicing 16. Servicing The AirSense 10 device is intended to provide safe and reliable operation when operated in accordance with the instructions provided by ResMed. ResMed recommends that the AirSense 10 device be inspected and serviced by an authorised ResMed Service Centre if there is any sign of wear or concern with device function. Otherwise, service and inspection of the products generally should not be required during their design life. Related sections Limited warranty Further information ← Back to contents Next: 17. Limited warranty →"
     },
     {
-      "title": "Limited Warranty",
-      "file": "limited-warranty.html",
-      "description": "Limited Warranty — AirSense 10 User Guide AirSense 10 User Guide — Quick Access Setup Limited Warranty ResMed Pty Ltd (hereafter 'ResMed') warrants th...",
+      "title": "Symbols",
+      "file": "symbols.html",
+      "description": "Symbols — AirSense 10 User Guide AirSense 10 User Guide Symbols 14",
       "keywords": [
-        "warranty",
-        "resmed",
-        "product",
-        "devices",
-        "limited",
-        "damage",
-        "other",
-        "region",
-        "purchase",
-        "period",
-        "including",
-        "water",
-        "cpap",
-        "bilevel",
-        "device"
-      ],
-      "content": "Limited Warranty — AirSense 10 User Guide AirSense 10 User Guide — Quick Access Setup Limited Warranty ResMed Pty Ltd (hereafter 'ResMed') warrants that your ResMed product shall be free from defects in material and workmanship from the date of purchase for the period specified below. Product warranty periods Product Warranty period Mask systems (including mask frame, cushion, headgear and tubing)—excluding single-use devices Accessories—excluding single-use devices Flex-type finger pulse sensors Humidifier water tubs 90 days Batteries for use in ResMed internal and external battery systems Clip-type finger pulse sensors CPAP and bilevel device data modules Oximeters and CPAP and bilevel device oximeter adapters Humidifiers and humidifier cleanable water tubs Titration control devices 1 year CPAP, bilevel and ventilation devices (including external power supply units) Battery accessories Portable diagnostic/screening devices 2 years Warranty details This warranty is only available to the initial consumer. It is not transferable. During the warranty period, if the product fails under conditions of normal use, ResMed will repair or replace, at its option, the defective product or any of its components. What this warranty does not cover This limited warranty does not cover: Any damage caused as a result of improper use, abuse, modification or alteration of the product Repairs carried out by any service organisation that has not been expressly authorised by ResMed to perform such repairs Any damage or contamination due to cigarette, pipe, cigar or other smoke Any damage caused by exposure to ozone, activated oxygen or other gases Any damage caused by water being spilled on or into an electronic device Regional limitations Warranty is void on product sold, or resold, outside the region of original purchase. For product purchased in a country in the European Union (\"EU\") or European Free Trade Association (\"EFTA\"), \"region\" means the EU and EFTA. Warranty claims on defective product must be made by the initial consumer at the point of purchase. Legal disclaimers This warranty replaces all other expressed or implied warranties, including any implied warranty of merchantability or fitness for a particular purpose. Some regions or states do not allow limitations on how long an implied warranty lasts, so the above limitation may not apply to you. ResMed shall not be responsible for any incidental or consequential damages claimed to have resulted from the sale, installation or use of any ResMed product. Some regions or states do not allow the exclusion or limitation of incidental or consequential damages, so the above limitation may not apply to you. This warranty gives you specific legal rights, and you may also have other rights which vary from region to region. For further information on your warranty rights, contact your local ResMed dealer or ResMed office. Visit ResMed.com for the latest information on ResMed's Limited Warranty. Related sections Servicing Further information ← Back to contents"
-    },
-    {
-      "title": "Further Information",
-      "file": "further-information.html",
-      "description": "Further Information — AirSense 10 User Guide AirSense 10 User Guide — Quick Access Setup Further Information If you have any questions or require addi...",
-      "keywords": [
-        "information",
-        "further",
+        "symbols",
         "airsense",
         "user",
         "guide",
-        "quick",
-        "access",
-        "setup",
-        "questions",
-        "require",
-        "additional",
-        "device",
-        "contact",
-        "care",
-        "provider"
+        "environmental",
+        "information",
+        "following",
+        "appear",
+        "product",
+        "packaging",
+        "glossary",
+        "resmed",
+        "related",
+        "sections",
+        "technical"
       ],
-      "content": "Further Information — AirSense 10 User Guide AirSense 10 User Guide — Quick Access Setup Further Information If you have any questions or require additional information on how to use the device, contact your care provider. Related sections Limited warranty Environmental information ← Back to contents"
+      "content": "Symbols — AirSense 10 User Guide AirSense 10 User Guide Symbols 14. Symbols The following symbols may appear on the product or packaging. See symbols glossary at ResMed.com/symbols Related sections Technical specifications Environmental information ← Back to contents Next: 15. Environmental information →"
+    },
+    {
+      "title": "Therapy Data",
+      "file": "therapy-data.html",
+      "description": "Therapy Data — AirSense 10 User Guide AirSense 10 User Guide Therapy data 9",
+      "keywords": [
+        "card",
+        "therapy",
+        "data",
+        "device",
+        "care",
+        "provider",
+        "wireless",
+        "airsense",
+        "available",
+        "communication",
+        "remove",
+        "transferred",
+        "network",
+        "transmitted",
+        "user"
+      ],
+      "content": "Therapy Data — AirSense 10 User Guide AirSense 10 User Guide Therapy data 9. Therapy Data Your AirSense 10 device records your therapy data for you and your care provider so that your therapy can be reviewed and adjusted if required. Therapy data is recorded by the device and transferred to your care provider either wirelessly , if a wireless network is available, or via an SD card . Data transmission Your AirSense 10 device has the capability of wireless communication so that your therapy data can be transmitted to your care provider to improve the quality of your treatment. This is an optional feature and will only be available if you choose to benefit from it and if a wireless network is available. Wireless communication also allows your care provider to update your therapy settings in a more timely manner or upgrade your device software to help ensure you receive the best therapy possible. Therapy data is usually transmitted after therapy has stopped. To help ensure that your data is transferred, leave your device connected to the mains power at all times and make sure it is not in Airplane Mode . Notes Therapy data might not be transmitted if the device is used outside of the country or region of purchase. Wireless communication depends on network availability. Devices with wireless communication might not be available in all regions. SD card An alternative way for your therapy data to be transferred to your care provider is via the SD card . Your care provider may ask you to send the SD card by mail or to bring it in. When instructed by your care provider, remove the SD card. Do not remove the SD card while the SD light is flashing , as data is being written to the card. To remove the SD card Open the SD card cover. Push in the SD card to release it, then remove it from the device. Place the SD card in the protective folder and send it back to your care provider. For more information on the SD card, refer to the SD card protective folder provided with your device. Note: The SD card should not be used for any other purpose. Related sections My Options Troubleshooting ← Back to contents Next: 10. Travelling →"
+    },
+    {
+      "title": "Travelling",
+      "file": "travelling.html",
+      "description": "Travelling — AirSense 10 User Guide AirSense 10 User Guide Travelling 10",
+      "keywords": [
+        "device",
+        "travelling",
+        "airsense",
+        "humidifier",
+        "turn",
+        "mode",
+        "plane",
+        "airplane",
+        "dial",
+        "travel",
+        "user",
+        "guide",
+        "empty",
+        "make",
+        "sure"
+      ],
+      "content": "Travelling — AirSense 10 User Guide AirSense 10 User Guide Travelling 10. Travelling You can take your AirSense 10 device with you wherever you go. Please keep the following points in mind: Use the travel bag provided to help prevent damage to the device. Empty the humidifier and pack it separately in the travel bag. Make sure you have the appropriate power cord for the region you are travelling to. For information on purchasing, contact your care provider. If you are using an external battery, turn off the humidifier to maximise battery life by setting the Humidity Level to Off . Travelling by plane Your AirSense 10 device may be taken on board as carry-on luggage. Medical devices do not count toward your carry-on luggage limit. You can use your AirSense 10 device on a plane as it meets UK Civil Aviation Authority (CAA) requirements. Air travel compliance letters can be downloaded and printed from https://www.resmed.co.uk/patient/living-with-sleep-apnoea/travelling-with-cpap/ . When using the device on a plane Make sure the humidifier is completely empty and inserted into the device. The device will not work without the humidifier inserted. Turn on Airplane Mode . To turn on Airplane Mode In My Options , turn the dial to highlight Airplane Mode , then press the dial. Turn the dial to select On and press the dial to save the change. The Airplane Mode icon ✈ is displayed at the top right of the screen. ⚠️ Caution Do not use the device with water in the humidifier on a plane due to the risk of inhalation of water during turbulence. Related sections Power save mode Troubleshooting ← Back to contents Next: 11. Troubleshooting →"
+    },
+    {
+      "title": "Video Library",
+      "file": "video-library.html",
+      "description": "Video Library — AirSense 10 User Guide AirSense 10 User Guide Video Library Video Library All videos for the AirSense 10 guide are listed below",
+      "keywords": [
+        "airsense",
+        "video",
+        "library",
+        "guide",
+        "cpap",
+        "resmed",
+        "open",
+        "section",
+        "user",
+        "machine",
+        "troubleshooting",
+        "videos",
+        "listed",
+        "setup",
+        "care"
+      ],
+      "content": "Video Library — AirSense 10 User Guide AirSense 10 User Guide Video Library Video Library All videos for the AirSense 10 guide are listed below. How to set up & use your new AirSense™ 10 CPAP machine from ResMed Open Setup section ResMed - Care and cleaning of your CPAP mask and machine Open Caring for your device section ResMed - Troubleshooting your CPAP treatment Open Troubleshooting section ← Back to contents Go to search →"
     }
   ]
 }
