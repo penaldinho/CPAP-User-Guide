@@ -68,17 +68,39 @@ function searchPages(query) {
     });
 
     if (relevanceScore > 0) {
+      const matchSnippet = getMatchSnippet(page.content, queryWords) || page.description;
       results.push({
         ...page,
         relevanceScore,
         matchedKeywords: [...new Set(matchedKeywords)],
-        matchedWords: [...new Set(matchedWords)]
+        matchedWords: [...new Set(matchedWords)],
+        matchSnippet
       });
     }
   });
 
   results.sort((a, b) => b.relevanceScore - a.relevanceScore);
   return results;
+}
+
+function getMatchSnippet(content, queryWords) {
+  if (!content) return '';
+
+  const normalizedWords = queryWords.map(word => word.toLowerCase());
+  const sentences = content
+    .replace(/\s+/g, ' ')
+    .split(/(?<=[.!?])\s+/)
+    .map(sentence => sentence.trim())
+    .filter(Boolean);
+
+  const matchedSentence = sentences.find(sentence => {
+    const sentenceLower = sentence.toLowerCase();
+    return normalizedWords.some(word => sentenceLower.includes(word));
+  });
+
+  if (!matchedSentence) return '';
+  if (matchedSentence.length <= 220) return matchedSentence;
+  return `${matchedSentence.slice(0, 217).trim()}...`;
 }
 
 function displayResults(query) {
@@ -104,7 +126,7 @@ function displayResults(query) {
     <div class="search-result card">
       <a href="${result.file}?highlight=${encodeURIComponent(query)}" class="search-result-title">${result.title}</a>
       <p class="search-result-description">${result.description}</p>
-      ${result.matchedKeywords.length > 0 ? `<p class="search-result-keywords"><strong>Keywords:</strong> ${result.matchedKeywords.join(', ')}</p>` : ''}
+      ${result.matchSnippet ? `<p class="search-result-keywords"><strong>Matched text:</strong> ${result.matchSnippet}</p>` : ''}
     </div>
   `).join('');
 
