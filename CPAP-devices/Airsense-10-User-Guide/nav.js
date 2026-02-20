@@ -79,6 +79,13 @@ function injectNav(currentPageFile) {
     const chatHref = isLocalHost && window.location.port !== '3000'
       ? localChatHref
       : hostedChatHrefWithSetup;
+    const isChatCalloutDismissed = (() => {
+      try {
+        return sessionStorage.getItem('chat-callout-dismissed') === 'true';
+      } catch {
+        return false;
+      }
+    })();
     const chatCurrent = currentPageFile === 'chat' ? ' aria-current="page"' : '';
     const searchCurrent = currentPageFile === 'search' ? ' aria-current="page"' : '';
     const videoLibraryCurrent = currentPageFile === 'video-library' ? ' aria-current="page"' : '';
@@ -180,6 +187,125 @@ function injectNav(currentPageFile) {
     if (handleIcon) {
       const isCollapsed = document.body.classList.contains('nav-collapsed');
       handleIcon.textContent = isCollapsed ? '❯' : '❮';
+    }
+
+    if (!document.getElementById('mobile-chat-fab-style')) {
+      const styleEl = document.createElement('style');
+      styleEl.id = 'mobile-chat-fab-style';
+      styleEl.textContent = `
+        .mobile-chat-dock {
+          display: none;
+        }
+
+        @media (max-width: 768px) {
+          .mobile-chat-dock {
+            position: fixed;
+            right: 14px;
+            bottom: 10px;
+            transform: none;
+            z-index: 1600;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 88px;
+            height: 88px;
+            border-radius: 999px;
+            background: rgba(18, 24, 38, 0.92);
+            box-shadow: 0 12px 28px rgba(18, 24, 38, 0.35);
+          }
+
+          .mobile-chat-fab {
+            width: 72px;
+            height: 72px;
+            border-radius: 999px;
+            border: 2px solid #ffffff;
+            overflow: hidden;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: #ffffff;
+          }
+
+          .mobile-chat-fab img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+          }
+
+          .mobile-chat-callout {
+            position: absolute;
+            right: 84px;
+            bottom: 48px;
+            width: 280px;
+            max-width: 280px;
+            padding: 6px 12px;
+            border-radius: 12px;
+            background: #ffffff;
+            color: #121826;
+            border: 1px solid #d9e1f2;
+            box-shadow: 0 10px 24px rgba(18, 24, 38, 0.2);
+            font-size: 12px;
+            line-height: 1.2;
+            padding-right: 28px;
+          }
+
+          .mobile-chat-callout-close {
+            position: absolute;
+            top: 4px;
+            right: 6px;
+            border: 0;
+            background: transparent;
+            color: #4a5568;
+            font-size: 14px;
+            line-height: 1;
+            cursor: pointer;
+          }
+        }
+      `;
+      document.head.appendChild(styleEl);
+    }
+
+    if (currentPageFile !== 'chat' && !document.querySelector('.mobile-chat-dock')) {
+      const dock = document.createElement('div');
+      dock.className = 'mobile-chat-dock';
+      const launcher = document.createElement('a');
+      launcher.className = 'mobile-chat-fab';
+      launcher.href = chatHref;
+      launcher.setAttribute('aria-label', 'Open Chat Assistant');
+      launcher.innerHTML = '<img alt="Chat Assistant" />';
+
+      const logo = launcher.querySelector('img');
+      const candidates = ['/images/chatface.png', 'https://medtechguides.uk/images/chatface.png'];
+      let index = 0;
+      const applySource = () => {
+        if (index >= candidates.length) return;
+        logo.src = candidates[index++];
+      };
+      logo.onerror = applySource;
+      applySource();
+
+      if (!isChatCalloutDismissed) {
+        const callout = document.createElement('div');
+        callout.className = 'mobile-chat-callout';
+        callout.innerHTML = '<button type="button" class="mobile-chat-callout-close" aria-label="Close chat message">×</button><span>I\'m your virtual chat assistant. Click here if you have any queries.</span>';
+        const closeBtn = callout.querySelector('.mobile-chat-callout-close');
+        if (closeBtn) {
+          closeBtn.addEventListener('click', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            try {
+              sessionStorage.setItem('chat-callout-dismissed', 'true');
+            } catch {
+              // Ignore storage errors
+            }
+            callout.remove();
+          });
+        }
+        dock.appendChild(callout);
+      }
+
+      dock.appendChild(launcher);
+      document.body.appendChild(dock);
     }
   }
 
