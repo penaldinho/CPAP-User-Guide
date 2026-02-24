@@ -38,11 +38,11 @@
 
   <div class="card-body">
     <div class="table-wrapper">
-      <table class="troubleshooting-table">
+      <table class="troubleshooting-table" style="table-layout: fixed; width: 100%;">
         <thead>
           <tr>
-            <th>Problem / possible cause</th>
-            <th>Solution</th>
+            <th style="width: 50%;">Problem / possible cause</th>
+            <th style="width: 50%;">Solution</th>
           </tr>
         </thead>
 
@@ -113,14 +113,18 @@
           </tr>
 
           <tr>
-            <td>
-              <strong>My screen is black</strong><br>
-              Backlight may have turned off.<br>
-              Power may not be connected.
-            </td>
-            <td>
-              Press <span style="display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;"><strong>Home</strong><img src="images/homebutton.PNG" alt="Home button icon" style="width: 72px; height: 72px; object-fit: contain;"></span> or the <span style="display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;">dial<img src="images/dial.PNG" alt="Dial icon" style="width: 72px; height: 72px; object-fit: contain;"></span> to turn the screen back on.
-              Connect the power supply and make sure the plug is fully inserted.
+            <td colspan="2">
+              <strong>My screen is black</strong>
+              <table style="width: 100%; border-collapse: collapse; margin-top: 8px;">
+                <tr>
+                  <td style="width: 50%; vertical-align: top; padding: 4px 8px 4px 0;">Backlight may have turned off.</td>
+                  <td style="width: 50%; vertical-align: top; padding: 4px 0 4px 8px;">Press <span style="display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;"><strong>Home</strong><img src="images/homebutton.PNG" alt="Home button icon" style="width: 72px; height: 72px; object-fit: contain;"></span> or the <span style="display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;">dial<img src="images/dial.PNG" alt="Dial icon" style="width: 72px; height: 72px; object-fit: contain;"></span> to turn the screen back on.</td>
+                </tr>
+                <tr>
+                  <td style="width: 50%; vertical-align: top; padding: 4px 8px 4px 0;">Power may not be connected.</td>
+                  <td style="width: 50%; vertical-align: top; padding: 4px 0 4px 8px;">Connect the power supply and make sure the plug is fully inserted.</td>
+                </tr>
+              </table>
             </td>
           </tr>
 
@@ -136,30 +140,38 @@
           </tr>
 
           <tr>
-            <td>
-              <strong>My humidifier is leaking</strong><br>
-              Humidifier may not be assembled correctly.<br>
-              Humidifier may be damaged or cracked.
-            </td>
-            <td>
-              Check for damage and reassemble the humidifier correctly.
-              Contact your care provider for a replacement.
+            <td colspan="2">
+              <strong>My humidifier is leaking</strong>
+              <table style="width: 100%; border-collapse: collapse; margin-top: 8px;">
+                <tr>
+                  <td style="width: 50%; vertical-align: top; padding: 4px 8px 4px 0;">Humidifier may not be assembled correctly.</td>
+                  <td style="width: 50%; vertical-align: top; padding: 4px 0 4px 8px;">Check for damage and reassemble the humidifier correctly.</td>
+                </tr>
+                <tr>
+                  <td style="width: 50%; vertical-align: top; padding: 4px 8px 4px 0;">Humidifier may be damaged or cracked.</td>
+                  <td style="width: 50%; vertical-align: top; padding: 4px 0 4px 8px;">Contact your care provider for a replacement.</td>
+                </tr>
+              </table>
             </td>
           </tr>
 
           <tr>
-            <td>
-              <strong>My therapy data has not been sent to my care provider</strong><br>
-              Wireless coverage may be poor.<br>
-              Device may be in Airplane Mode.<br>
-              Data transfer may not be enabled.
-            </td>
-            <td>
-              Make sure the device is placed where there is wireless coverage
-              (e.g. on a bedside table, not in a drawer or on the floor).<br>
-              If instructed, send the <strong>SD card</strong> to your care provider.<br>
-              Turn off <span style="display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;"><strong>Airplane Mode</strong><img src="images/airplanemodelogo.PNG" alt="Airplane Mode icon" style="width: 60px; height: 60px; object-fit: contain;"></span> (see <a href="travelling.html">Travelling by plane</a>).<br>
-              Talk to your care provider about your settings.
+            <td colspan="2">
+              <strong>My therapy data has not been sent to my care provider</strong>
+              <table style="width: 100%; border-collapse: collapse; margin-top: 8px;">
+                <tr>
+                  <td style="width: 50%; vertical-align: top; padding: 4px 8px 4px 0;">Wireless coverage may be poor.</td>
+                  <td style="width: 50%; vertical-align: top; padding: 4px 0 4px 8px;">Make sure the device is placed where there is wireless coverage (e.g. on a bedside table, not in a drawer or on the floor).</td>
+                </tr>
+                <tr>
+                  <td style="width: 50%; vertical-align: top; padding: 4px 8px 4px 0;">Device may be in Airplane Mode.</td>
+                  <td style="width: 50%; vertical-align: top; padding: 4px 0 4px 8px;">Turn off <span style="display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;"><strong>Airplane Mode</strong><img src="images/airplanemodelogo.PNG" alt="Airplane Mode icon" style="width: 60px; height: 60px; object-fit: contain;"></span> (see <a href="travelling.html">Travelling by plane</a>).</td>
+                </tr>
+                <tr>
+                  <td style="width: 50%; vertical-align: top; padding: 4px 8px 4px 0;">Data transfer may not be enabled.</td>
+                  <td style="width: 50%; vertical-align: top; padding: 4px 0 4px 8px;">Talk to your care provider about your settings. If instructed, send the <strong>SD card</strong> to your care provider.</td>
+                </tr>
+              </table>
             </td>
           </tr>
 
@@ -184,97 +196,116 @@
 
   <div class="card-body">
     <div class="table-wrapper">
-      <table class="troubleshooting-table">
+      <table class="troubleshooting-table" style="table-layout: fixed; width: 100%;">
         <thead>
           <tr>
-            <th>Device message / possible cause</th>
-            <th>Solution</th>
+            <th style="width: 50%;">Device message / possible cause</th>
+            <th style="width: 50%;">Solution</th>
           </tr>
         </thead>
 
         <tbody>
           <tr>
-            <td>
-              <strong>High leak detected, check your water tub, tub seal or side cover</strong><br>
-              Humidifier may not be inserted properly.<br>
-              Humidifier seal may not be inserted properly.
-            </td>
-            <td>
-              Make sure the humidifier is correctly inserted.
-              Open the humidifier and make sure the seal is correctly inserted.
-            </td>
-          </tr>
-
-          <tr>
-            <td>
-              <strong>High leak detected, connect your tubing</strong><br>
-              Air tubing may not be connected properly.<br>
-              Mask may be fitted incorrectly.
-            </td>
-            <td>
-              Make sure the air tubing is firmly connected at both ends.
-              Make sure your mask is fitted correctly.
-              See your <a href="../index.html#masks-card" target="_blank" rel="noopener noreferrer">mask user guide</a> or use the <strong>Mask Fit</strong> function to check your mask fit and seal.
+            <td colspan="2">
+              <strong>High leak detected, check your water tub, tub seal or side cover</strong>
+              <table style="width: 100%; border-collapse: collapse; margin-top: 8px;">
+                <tr>
+                  <td style="width: 50%; vertical-align: top; padding: 4px 8px 4px 0;">Humidifier may not be inserted properly.</td>
+                  <td style="width: 50%; vertical-align: top; padding: 4px 0 4px 8px;">Make sure the humidifier is correctly inserted.</td>
+                </tr>
+                <tr>
+                  <td style="width: 50%; vertical-align: top; padding: 4px 8px 4px 0;">Humidifier seal may not be inserted properly.</td>
+                  <td style="width: 50%; vertical-align: top; padding: 4px 0 4px 8px;">Open the humidifier and make sure the seal is correctly inserted.</td>
+                </tr>
+              </table>
             </td>
           </tr>
 
           <tr>
-            <td>
-              <strong>Tubing blocked, check your tubing</strong><br>
-              Air tubing may be blocked.
-            </td>
-            <td>
-              Check the air tubing and remove any blockages.
-              Press the <span style="display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;">dial<img src="images/dial.PNG" alt="Dial icon" style="width: 72px; height: 72px; object-fit: contain;"></span> to clear the message, then press <span style="display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;"><strong>Start/Stop</strong><img src="images/startstop.PNG" alt="Start/Stop button icon" style="width: 72px; height: 72px; object-fit: contain;"></span> to restart the device.
-            </td>
-          </tr>
-
-          <tr>
-            <td>
-              <strong>SD card error, remove your card and press Start to begin therapy</strong><br>
-              SD card may not be inserted correctly.
-            </td>
-            <td>
-              Remove and reinsert the SD card.
+            <td colspan="2">
+              <strong>High leak detected, connect your tubing</strong>
+              <table style="width: 100%; border-collapse: collapse; margin-top: 8px;">
+                <tr>
+                  <td style="width: 50%; vertical-align: top; padding: 4px 8px 4px 0;">Air tubing may not be connected properly.</td>
+                  <td style="width: 50%; vertical-align: top; padding: 4px 0 4px 8px;">Make sure the air tubing is firmly connected at both ends.</td>
+                </tr>
+                <tr>
+                  <td style="width: 50%; vertical-align: top; padding: 4px 8px 4px 0;">Mask may be fitted incorrectly.</td>
+                  <td style="width: 50%; vertical-align: top; padding: 4px 0 4px 8px;">Make sure your mask is fitted correctly. See your <a href="../index.html#masks-card" target="_blank" rel="noopener noreferrer">mask user guide</a> or use the <strong>Mask Fit</strong> function to check your mask fit and seal.</td>
+                </tr>
+              </table>
             </td>
           </tr>
 
           <tr>
-            <td>
-              <strong>Read only card, please remove, unlock and re-insert SD card</strong><br>
-              SD card switch may be in the lock (read-only) position.
-            </td>
-            <td>
-              Move the switch on the SD card from the lock position 🔒 to the unlock position 🔓,
-              then re-insert the SD card.
-            </td>
-          </tr>
-
-          <tr>
-            <td>
-              <strong>System fault, refer to user guide, Error 004</strong><br>
-              Device may have been left in a hot environment.<br>
-              Air filter may be blocked.<br>
-              Air tubing may be blocked.<br>
-              There may be water in the air tubing.
-            </td>
-            <td>
-              Allow the device to cool before re-use.<br>
-              Disconnect the power supply and reconnect it to restart the device.<br>
-              Check the air filter and replace it if blocked.<br>
-              Check the air tubing and remove any blockages.<br>
-              Empty any water from the air tubing.
+            <td colspan="2">
+              <strong>Tubing blocked, check your tubing</strong>
+              <table style="width: 100%; border-collapse: collapse; margin-top: 8px;">
+                <tr>
+                  <td style="width: 50%; vertical-align: top; padding: 4px 8px 4px 0;">Air tubing may be blocked.</td>
+                  <td style="width: 50%; vertical-align: top; padding: 4px 0 4px 8px;">Check the air tubing and remove any blockages. Press the <span style="display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;">dial<img src="images/dial.PNG" alt="Dial icon" style="width: 72px; height: 72px; object-fit: contain;"></span> to clear the message, then press <span style="display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;"><strong>Start/Stop</strong><img src="images/startstop.PNG" alt="Start/Stop button icon" style="width: 72px; height: 72px; object-fit: contain;"></span> to restart the device.</td>
+                </tr>
+              </table>
             </td>
           </tr>
 
           <tr>
-            <td>
-              <strong>All other error messages (e.g. System fault, Error 0XX)</strong><br>
-              An unrecoverable error has occurred on the device.
+            <td colspan="2">
+              <strong>SD card error, remove your card and press Start to begin therapy</strong>
+              <table style="width: 100%; border-collapse: collapse; margin-top: 8px;">
+                <tr>
+                  <td style="width: 50%; vertical-align: top; padding: 4px 8px 4px 0;">SD card may not be inserted correctly.</td>
+                  <td style="width: 50%; vertical-align: top; padding: 4px 0 4px 8px;">Remove and reinsert the SD card.</td>
+                </tr>
+              </table>
             </td>
-            <td>
-              Contact your <strong>care provider</strong>.
-              <strong>Do not open the device.</strong>
+          </tr>
+
+          <tr>
+            <td colspan="2">
+              <strong>Read only card, please remove, unlock and re-insert SD card</strong>
+              <table style="width: 100%; border-collapse: collapse; margin-top: 8px;">
+                <tr>
+                  <td style="width: 50%; vertical-align: top; padding: 4px 8px 4px 0;">SD card switch may be in the lock (read-only) position.</td>
+                  <td style="width: 50%; vertical-align: top; padding: 4px 0 4px 8px;">Move the switch on the SD card from the lock position 🔒 to the unlock position 🔓, then re-insert the SD card.</td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <tr>
+            <td colspan="2">
+              <strong>System fault, refer to user guide, Error 004</strong>
+              <table style="width: 100%; border-collapse: collapse; margin-top: 8px;">
+                <tr>
+                  <td style="width: 50%; vertical-align: top; padding: 4px 8px 4px 0;">Device may have been left in a hot environment.</td>
+                  <td style="width: 50%; vertical-align: top; padding: 4px 0 4px 8px;">Allow the device to cool before re-use. Disconnect the power supply and reconnect it to restart the device.</td>
+                </tr>
+                <tr>
+                  <td style="width: 50%; vertical-align: top; padding: 4px 8px 4px 0;">Air filter may be blocked.</td>
+                  <td style="width: 50%; vertical-align: top; padding: 4px 0 4px 8px;">Check the air filter and replace it if blocked.</td>
+                </tr>
+                <tr>
+                  <td style="width: 50%; vertical-align: top; padding: 4px 8px 4px 0;">Air tubing may be blocked.</td>
+                  <td style="width: 50%; vertical-align: top; padding: 4px 0 4px 8px;">Check the air tubing and remove any blockages.</td>
+                </tr>
+                <tr>
+                  <td style="width: 50%; vertical-align: top; padding: 4px 8px 4px 0;">There may be water in the air tubing.</td>
+                  <td style="width: 50%; vertical-align: top; padding: 4px 0 4px 8px;">Empty any water from the air tubing.</td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <tr>
+            <td colspan="2">
+              <strong>All other error messages (e.g. System fault, Error 0XX)</strong>
+              <table style="width: 100%; border-collapse: collapse; margin-top: 8px;">
+                <tr>
+                  <td style="width: 50%; vertical-align: top; padding: 4px 8px 4px 0;">An unrecoverable error has occurred on the device.</td>
+                  <td style="width: 50%; vertical-align: top; padding: 4px 0 4px 8px;">Contact your <strong>care provider</strong>. <strong>Do not open the device.</strong></td>
+                </tr>
+              </table>
             </td>
           </tr>
         </tbody>
