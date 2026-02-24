@@ -173,6 +173,31 @@ const loadManualBundle = (guideKeys) => {
   };
 };
 
+const parseExplicitErrorCode = (message) => {
+  const text = String(message || '');
+  const match = text.match(/\berror\s*[-: ]?\s*(\d{3})\b/i);
+  if (!match) return null;
+  return match[1];
+};
+
+const getDeterministicErrorCodeResponse = (message, guideKeys) => {
+  const errorCode = parseExplicitErrorCode(message);
+  if (!errorCode) return null;
+
+  const isAirsenseGuide = Array.isArray(guideKeys) && guideKeys.includes('airsense-10');
+  if (!isAirsenseGuide) return null;
+
+  if (errorCode === '004') {
+    return null;
+  }
+
+  if (/^0\d{2}$/.test(errorCode)) {
+    return 'For “System fault, refer to user guide, Error ' + errorCode + '”, this is treated as an Error 0XX case. Contact your care provider and do not open the device.';
+  }
+
+  return null;
+};
+
 // Warm cache for the default guide
 try {
   loadManualContent(defaultGuide);
@@ -422,6 +447,14 @@ app.post('/api/chat', async (req, res) => {
     const primaryGuide = (guide || defaultGuide).toLowerCase();
     const familyKey = String(family || '').trim().toLowerCase();
     const guideKeys = normalizeGuideKeys(primaryGuide, guides, familyKey);
+
+    const deterministicResponse = getDeterministicErrorCodeResponse(message, guideKeys);
+    if (deterministicResponse) {
+      console.log(`[${new Date().toISOString()}] Guides: ${guideKeys.join(', ')}`);
+      console.log(`[${new Date().toISOString()}] Assistant: ${deterministicResponse.substring(0, 100)}...`);
+      return res.json({ response: deterministicResponse });
+    }
+
     const { manualContent, guideName } = loadManualBundle(guideKeys);
 
     let response;
