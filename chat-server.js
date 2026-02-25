@@ -297,7 +297,30 @@ const storeTelemetryRecord = async (record) => {
 
 const readTelemetryRecordsForExport = async (participantId) => {
   if (telemetryUsePostgres) {
-    return readTelemetryRecordsPostgres(participantId);
+    try {
+      const postgresRecords = await readTelemetryRecordsPostgres(participantId);
+      if (postgresRecords.length > 0 || !telemetryFallbackToFile) {
+        return postgresRecords;
+      }
+
+      const sourcePath = participantId
+        ? getParticipantTelemetryPath(participantId)
+        : telemetryFilePath;
+      const fileRecords = readTelemetryRecordsFromNdjson(sourcePath);
+      if (fileRecords.length > 0) {
+        console.warn('Telemetry export served from file fallback because postgres returned no records.');
+      }
+      return fileRecords;
+    } catch (error) {
+      if (!telemetryFallbackToFile) {
+        throw error;
+      }
+      const sourcePath = participantId
+        ? getParticipantTelemetryPath(participantId)
+        : telemetryFilePath;
+      console.error('Telemetry export postgres read failed, using file fallback:', error.message);
+      return readTelemetryRecordsFromNdjson(sourcePath);
+    }
   }
 
   ensureTelemetryStorage();
