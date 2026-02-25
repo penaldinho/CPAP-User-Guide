@@ -63,6 +63,13 @@ const telemetryUsePostgres = telemetryStoreMode === 'postgres';
 const telemetryDatabaseUrl = process.env.DATABASE_URL;
 const telemetryFallbackToFile = String(process.env.TELEMETRY_FALLBACK_FILE || 'true').trim().toLowerCase() !== 'false';
 let telemetryPgPool = null;
+let telemetryLastWriteStatus = {
+  at: null,
+  mode: telemetryUsePostgres ? 'postgres' : 'file',
+  ok: null,
+  fallbackUsed: false,
+  error: null
+};
 const telemetryDir = path.join(__dirname, 'data');
 const telemetryFilePath = path.join(telemetryDir, 'telemetry-events.ndjson');
 const participantTelemetryDir = path.join(telemetryDir, 'participants');
@@ -282,17 +289,45 @@ const storeTelemetryRecord = async (record) => {
   if (telemetryUsePostgres) {
     try {
       await insertTelemetryRecordPostgres(record);
+      telemetryLastWriteStatus = {
+        at: new Date().toISOString(),
+        mode: 'postgres',
+        ok: true,
+        fallbackUsed: false,
+        error: null
+      };
     } catch (error) {
       if (!telemetryFallbackToFile) {
+        telemetryLastWriteStatus = {
+          at: new Date().toISOString(),
+          mode: 'postgres',
+          ok: false,
+          fallbackUsed: false,
+          error: String(error.message || error)
+        };
         throw error;
       }
       console.error('Postgres telemetry write failed, falling back to file store:', error.message);
       writeTelemetryRecordToFiles(record);
+      telemetryLastWriteStatus = {
+        at: new Date().toISOString(),
+        mode: 'postgres',
+        ok: false,
+        fallbackUsed: true,
+        error: String(error.message || error)
+      };
     }
     return;
   }
 
   writeTelemetryRecordToFiles(record);
+  telemetryLastWriteStatus = {
+    at: new Date().toISOString(),
+    mode: 'file',
+    ok: true,
+    fallbackUsed: false,
+    error: null
+  };
 };
 
 const readTelemetryRecordsForExport = async (participantId) => {
@@ -940,7 +975,8 @@ app.get('/api/telemetry/status', async (req, res) => {
   const base = {
     mode: telemetryUsePostgres ? 'postgres' : 'file',
     fallbackToFile: telemetryFallbackToFile,
-    hasDatabaseUrl: Boolean(telemetryDatabaseUrl)
+    hasDatabaseUrl: Boolean(telemetryDatabaseUrl),
+    lastWrite: telemetryLastWriteStatus
   };
 
   if (!telemetryUsePostgres) {
