@@ -8,6 +8,17 @@ function injectNav(currentPageFile) {
   const textSize = localStorage.getItem('text-size') || 'medium';
   document.body.classList.add(`text-size-${textSize}`);
 
+  if (!window.__mtgTelemetryClientInjected) {
+    const isHostedChatHost = /(^|\.)chat\.medtechguides\.uk$/i.test(window.location.hostname);
+    const telemetryScript = document.createElement('script');
+    telemetryScript.src = isHostedChatHost
+      ? 'https://medtechguides.uk/CPAP-devices/telemetry-client.js'
+      : '/CPAP-devices/telemetry-client.js';
+    telemetryScript.defer = true;
+    document.head.appendChild(telemetryScript);
+    window.__mtgTelemetryClientInjected = true;
+  }
+
   const navItems = [
     { href: 'index.html', label: 'Contents', icon: '📚' },
     { href: 'welcome.html', label: 'Welcome', number: 1 },

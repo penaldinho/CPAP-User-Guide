@@ -1,0 +1,330 @@
+(function () {
+  if (window.MTGTelemetry) return;
+
+  const sessionKey = 'mtg-telemetry-session-id';
+  const participantKey = 'mtg-telemetry-participant-id';
+  const taskStateKey = 'mtg-telemetry-task-state';
+
+  const getApiUrl = () => {
+    const host = window.location.hostname;
+    const isLocalHost = host === 'localhost' || host === '127.0.0.1';
+    const isHostedChat = /(^|\.)chat\.medtechguides\.uk$/i.test(host);
+    if (isLocalHost || isHostedChat) return '/api/telemetry';
+    return 'https://chat.medtechguides.uk/api/telemetry';
+  };
+
+  const safeJsonParse = (value, fallback) => {
+    try {
+      return JSON.parse(value);
+    } catch {
+      return fallback;
+    }
+  };
+
+  const randomId = () => {
+    const stamp = Date.now().toString(36);
+    const rand = Math.random().toString(36).slice(2, 10);
+    return `s_${stamp}_${rand}`;
+  };
+
+  const getOrCreateSessionId = () => {
+    const existing = sessionStorage.getItem(sessionKey);
+    if (existing) return existing;
+    const created = randomId();
+    sessionStorage.setItem(sessionKey, created);
+    return created;
+  };
+
+  const getParticipantId = () => localStorage.getItem(participantKey) || '';
+
+  const getTaskState = () => safeJsonParse(sessionStorage.getItem(taskStateKey) || '{}', {});
+
+  const setTaskState = (state) => {
+    sessionStorage.setItem(taskStateKey, JSON.stringify(state || {}));
+  };
+
+  const isResearchMode = () => {
+    const url = new URL(window.location.href);
+    const flag = String(url.searchParams.get('research') || '').toLowerCase();
+    return flag === '1' || flag === 'true' || flag === 'yes';
+  };
+
+  const buildBasePayload = () => {
+    const url = new URL(window.location.href);
+    return {
+      session_id: getOrCreateSessionId(),
+      participant_id: getParticipantId(),
+      timestamp: new Date().toISOString(),
+      page_path: `${url.pathname}${url.search}`,
+      page_title: document.title || '',
+      guide: (url.searchParams.get('guide') || '').toLowerCase(),
+      family: (url.searchParams.get('family') || '').toLowerCase()
+    };
+  };
+
+  const postEvent = (event) => {
+    const body = JSON.stringify(event);
+    const apiUrl = getApiUrl();
+
+    if (navigator.sendBeacon) {
+      const blob = new Blob([body], { type: 'application/json' });
+      const sent = navigator.sendBeacon(apiUrl, blob);
+      if (sent) return;
+    }
+
+    fetch(apiUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body,
+      keepalive: true
+    }).catch(() => {
+      // fail silently; telemetry must not break UX
+    });
+  };
+
+  const track = (eventType, payload) => {
+    if (!eventType) return;
+    const taskState = getTaskState();
+    const event = {
+      ...buildBasePayload(),
+      event_type: eventType,
+      task_id: taskState.task_id || '',
+      ...payload
+    };
+    postEvent(event);
+  };
+
+  const setParticipantId = (participantId) => {
+    const value = String(participantId || '').trim();
+    if (!value) {
+      localStorage.removeItem(participantKey);
+      return;
+    }
+    localStorage.setItem(participantKey, value);
+    track('participant_set', { participant_id: value });
+  };
+
+  const startTask = (taskId, label) => {
+    if (!taskId) return;
+    setTaskState({
+      task_id: String(taskId),
+      task_label: String(label || ''),
+      started_at: new Date().toISOString()
+    });
+    track('task_start', {
+      task_id: String(taskId),
+      task_label: String(label || '')
+    });
+  };
+
+  const endTask = (status) => {
+    const state = getTaskState();
+    if (!state.task_id) return;
+
+    const startedAt = state.started_at ? Date.parse(state.started_at) : null;
+    const durationMs = Number.isFinite(startedAt) ? Math.max(0, Date.now() - startedAt) : null;
+
+    track('task_end', {
+      task_id: state.task_id,
+      task_label: state.task_label || '',
+      task_status: String(status || ''),
+      duration_ms: durationMs
+    });
+
+    setTaskState({});
+  };
+
+  const renderResearchPanel = () => {
+    if (!isResearchMode()) return;
+    if (document.getElementById('mtg-research-panel')) return;
+
+    const panel = document.createElement('aside');
+    panel.id = 'mtg-research-panel';
+    panel.style.position = 'fixed';
+    panel.style.right = '12px';
+    panel.style.bottom = '12px';
+    panel.style.width = '320px';
+    panel.style.maxWidth = 'calc(100vw - 24px)';
+    panel.style.background = '#ffffff';
+    panel.style.border = '1px solid #d7dce5';
+    panel.style.borderRadius = '10px';
+    panel.style.boxShadow = '0 10px 24px rgba(0,0,0,0.15)';
+    panel.style.padding = '12px';
+    panel.style.zIndex = '9999';
+    panel.style.fontFamily = 'system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif';
+    panel.style.fontSize = '13px';
+    panel.style.color = '#1f2937';
+
+    panel.innerHTML = `
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+        <strong>Research Controls</strong>
+        <button id="mtg-research-close" type="button" style="border:0;background:transparent;cursor:pointer;font-size:16px;line-height:1;">×</button>
+      </div>
+      <div style="display:grid; gap:8px;">
+        <label style="display:grid; gap:4px;">
+          <span>Participant ID</span>
+          <input id="mtg-participant-input" type="text" placeholder="e.g. P01" style="padding:6px 8px; border:1px solid #cbd5e1; border-radius:6px;" />
+        </label>
+        <button id="mtg-participant-save" type="button" style="padding:7px 10px; border:1px solid #cbd5e1; border-radius:6px; background:#f8fafc; cursor:pointer;">Save participant</button>
+        <hr style="border:0; border-top:1px solid #e5e7eb; margin:2px 0;" />
+        <label style="display:grid; gap:4px;">
+          <span>Task ID</span>
+          <input id="mtg-task-id-input" type="text" placeholder="e.g. T1" style="padding:6px 8px; border:1px solid #cbd5e1; border-radius:6px;" />
+        </label>
+        <label style="display:grid; gap:4px;">
+          <span>Task label</span>
+          <input id="mtg-task-label-input" type="text" placeholder="e.g. First-time setup" style="padding:6px 8px; border:1px solid #cbd5e1; border-radius:6px;" />
+        </label>
+        <div style="display:flex; gap:8px;">
+          <button id="mtg-task-start" type="button" style="flex:1; padding:7px 10px; border:1px solid #cbd5e1; border-radius:6px; background:#ecfdf3; cursor:pointer;">Start task</button>
+          <button id="mtg-task-end" type="button" style="flex:1; padding:7px 10px; border:1px solid #cbd5e1; border-radius:6px; background:#eff6ff; cursor:pointer;">End task</button>
+        </div>
+        <div id="mtg-task-timer" style="padding:7px 10px; border:1px solid #e5e7eb; border-radius:6px; background:#f8fafc; font-weight:600;">Task timer: 00:00</div>
+        <div id="mtg-research-state" style="font-size:12px; color:#4b5563;"></div>
+      </div>
+    `;
+
+    document.body.appendChild(panel);
+
+    const participantInput = document.getElementById('mtg-participant-input');
+    const participantSave = document.getElementById('mtg-participant-save');
+    const taskIdInput = document.getElementById('mtg-task-id-input');
+    const taskLabelInput = document.getElementById('mtg-task-label-input');
+    const taskStart = document.getElementById('mtg-task-start');
+    const taskEnd = document.getElementById('mtg-task-end');
+    const taskTimer = document.getElementById('mtg-task-timer');
+    const stateText = document.getElementById('mtg-research-state');
+    const closeBtn = document.getElementById('mtg-research-close');
+    let timerInterval = null;
+
+    const formatDuration = (durationMs) => {
+      const totalSeconds = Math.max(0, Math.floor((durationMs || 0) / 1000));
+      const minutes = Math.floor(totalSeconds / 60);
+      const seconds = totalSeconds % 60;
+      return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    };
+
+    const updateTimer = () => {
+      if (!taskTimer) return;
+      const taskState = getTaskState();
+      if (!taskState.task_id || !taskState.started_at) {
+        taskTimer.textContent = 'Task timer: 00:00';
+        return;
+      }
+
+      const startedAt = Date.parse(taskState.started_at);
+      const durationMs = Number.isFinite(startedAt) ? Math.max(0, Date.now() - startedAt) : 0;
+      taskTimer.textContent = `Task timer: ${formatDuration(durationMs)}`;
+    };
+
+    const ensureTimerRunning = () => {
+      if (timerInterval) {
+        window.clearInterval(timerInterval);
+      }
+      timerInterval = window.setInterval(updateTimer, 1000);
+      updateTimer();
+    };
+
+    const refreshState = () => {
+      const participantId = getParticipantId();
+      const taskState = getTaskState();
+      if (participantInput) {
+        participantInput.value = participantId;
+      }
+      if (taskIdInput && taskState.task_id) {
+        taskIdInput.value = taskState.task_id;
+      }
+      if (taskLabelInput && taskState.task_label) {
+        taskLabelInput.value = taskState.task_label;
+      }
+
+      const taskSummary = taskState.task_id
+        ? `Active task: ${taskState.task_id}${taskState.task_label ? ` (${taskState.task_label})` : ''}`
+        : 'No active task';
+      if (stateText) {
+        stateText.textContent = `Participant: ${participantId || 'not set'} • ${taskSummary}`;
+      }
+
+      updateTimer();
+    };
+
+    if (participantSave) {
+      participantSave.addEventListener('click', () => {
+        setParticipantId(participantInput ? participantInput.value : '');
+        refreshState();
+      });
+    }
+
+    if (taskStart) {
+      taskStart.addEventListener('click', () => {
+        const taskId = taskIdInput ? taskIdInput.value : '';
+        const taskLabel = taskLabelInput ? taskLabelInput.value : '';
+        startTask(taskId, taskLabel);
+        refreshState();
+      });
+    }
+
+    if (taskEnd) {
+      taskEnd.addEventListener('click', () => {
+        endTask('ended');
+        refreshState();
+      });
+    }
+
+    if (closeBtn) {
+      closeBtn.addEventListener('click', () => {
+        if (timerInterval) {
+          window.clearInterval(timerInterval);
+          timerInterval = null;
+        }
+        panel.remove();
+      });
+    }
+
+    ensureTimerRunning();
+    refreshState();
+  };
+
+  const init = () => {
+    getOrCreateSessionId();
+    track('page_view', {
+      referrer: document.referrer || ''
+    });
+
+    renderResearchPanel();
+
+    document.addEventListener('click', (event) => {
+      const link = event.target && event.target.closest ? event.target.closest('a[href]') : null;
+      if (!link) return;
+
+      const href = link.getAttribute('href') || '';
+      if (!href || href.startsWith('#')) return;
+
+      track('nav_click', {
+        target_href: href,
+        link_text: (link.textContent || '').trim().slice(0, 140)
+      });
+    });
+
+    const pageEnteredAt = Date.now();
+    window.addEventListener('pagehide', () => {
+      track('page_exit', {
+        duration_ms: Math.max(0, Date.now() - pageEnteredAt)
+      });
+    });
+  };
+
+  window.MTGTelemetry = {
+    init,
+    track,
+    setParticipantId,
+    startTask,
+    endTask
+  };
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init, { once: true });
+  } else {
+    init();
+  }
+})();

@@ -128,6 +128,13 @@ function displayResults(query) {
 
   const results = searchPages(query);
 
+  if (window.MTGTelemetry && query && query.trim()) {
+    window.MTGTelemetry.track('search_submit', {
+      query: query.trim(),
+      result_count: results.length
+    });
+  }
+
   if (results.length === 0) {
     resultsContainer.innerHTML = '<p class="muted">No results found for your search.</p>';
     resultsCount.textContent = '0 results';
@@ -153,6 +160,7 @@ function displayResults(query) {
 function setupSearchForm() {
   const form = document.getElementById('search-form');
   const input = document.getElementById('search-input');
+  const resultsContainer = document.getElementById('search-results');
 
   if (form) {
     form.addEventListener('submit', (e) => {
@@ -161,6 +169,18 @@ function setupSearchForm() {
       if (query.trim()) {
         displayResults(query);
       }
+    });
+  }
+
+  if (resultsContainer) {
+    resultsContainer.addEventListener('click', (event) => {
+      const link = event.target.closest('a.search-result-title');
+      if (!link || !window.MTGTelemetry) return;
+
+      window.MTGTelemetry.track('search_result_click', {
+        query: (input && input.value ? input.value : '').trim(),
+        target_href: link.getAttribute('href') || ''
+      });
     });
   }
 

@@ -204,6 +204,12 @@ class ChatBot {
     const userMessage = this.inputField.value.trim();
     if (!userMessage || this.isLoading) return;
 
+    if (window.MTGTelemetry) {
+      window.MTGTelemetry.track('chat_submit', {
+        chat_message: userMessage.slice(0, 500)
+      });
+    }
+
     const urlParams = new URLSearchParams(window.location.search);
     const guide = urlParams.get('guide') || 'airsense-10';
     const family = (urlParams.get('family') || 'cpap').toLowerCase();
@@ -260,8 +266,19 @@ class ChatBot {
 
       const data = await response.json();
       this.addMessage(data.response, 'assistant');
+
+      if (window.MTGTelemetry) {
+        window.MTGTelemetry.track('chat_response', {
+          response_length: String(data.response || '').length
+        });
+      }
     } catch (error) {
       console.error('Chat error:', error);
+      if (window.MTGTelemetry) {
+        window.MTGTelemetry.track('chat_error', {
+          error_message: String(error.message || 'unknown error').slice(0, 200)
+        });
+      }
       this.addMessage(
         `<div class="chat-error">Sorry, I encountered an error: ${error.message}. Please make sure the chat server is running.</div>`,
         'assistant',

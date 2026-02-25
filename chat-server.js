@@ -58,6 +58,8 @@ const resolveDefaultGuideForFamily = (familyKey) => {
 const defaultGuide = resolveDefaultGuideForFamily('cpap');
 const manualCache = new Map();
 let airsenseErrorActionsCache = null;
+const telemetryDir = path.join(__dirname, 'data');
+const telemetryFilePath = path.join(telemetryDir, 'telemetry-events.ndjson');
 
 const excludedHtmlFiles = new Set(['chat.html', 'chat-setup.html', 'search.html']);
 
@@ -68,6 +70,77 @@ app.use(express.json());
 app.use(express.static(baseDir));
 app.use('/CPAP-devices', express.static(path.join(__dirname, 'CPAP-devices')));
 app.use('/images', express.static(path.join(__dirname, 'images')));
+
+const ensureTelemetryStorage = () => {
+  if (!fs.existsSync(telemetryDir)) {
+    fs.mkdirSync(telemetryDir, { recursive: true });
+  }
+  if (!fs.existsSync(telemetryFilePath)) {
+    fs.writeFileSync(telemetryFilePath, '');
+  }
+};
+
+const csvEscape = (value) => {
+  const text = String(value ?? '');
+  if (/[",\n]/.test(text)) {
+    return `"${text.replace(/"/g, '""')}"`;
+  }
+  return text;
+};
+
+const telemetryCsvColumns = [
+  'received_at',
+  'timestamp',
+  'session_id',
+  'participant_id',
+  'event_type',
+  'task_id',
+  'task_label',
+  'task_status',
+  'question_id',
+  'page_path',
+  'page_title',
+  'guide',
+  'family',
+  'query',
+  'result_count',
+  'target_href',
+  'link_text',
+  'chat_message',
+  'response_length',
+  'duration_ms',
+  'referrer'
+];
+
+const projectTelemetryRecord = (record) => ({
+  received_at: record.received_at || '',
+  timestamp: record.timestamp || '',
+  session_id: record.session_id || '',
+  participant_id: record.participant_id || '',
+  event_type: record.event_type || '',
+  task_id: record.task_id || '',
+  task_label: record.task_label || '',
+  task_status: record.task_status || '',
+  question_id: record.question_id || '',
+  page_path: record.page_path || '',
+  page_title: record.page_title || '',
+  guide: record.guide || '',
+  family: record.family || '',
+  query: record.query || '',
+  result_count: record.result_count ?? '',
+  target_href: record.target_href || '',
+  link_text: record.link_text || '',
+  chat_message: record.chat_message || '',
+  response_length: record.response_length ?? '',
+  duration_ms: record.duration_ms ?? '',
+  referrer: record.referrer || ''
+});
+
+const withTelemetryCors = (res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+};
 
 const buildManualContent = (searchIndex) => searchIndex.pages
   .map(page => `# ${page.title}\n\n${page.description}\n\n${page.content}`)
@@ -556,6 +629,66 @@ app.post('/api/chat', async (req, res) => {
       error: error.message || 'Failed to generate response',
       details: process.env.DEBUG ? error.toString() : undefined
     });
+  }
+});
+
+app.options('/api/telemetry', (req, res) => {
+  withTelemetryCors(res);
+  res.status(204).end();
+});
+
+app.post('/api/telemetry', (req, res) => {
+  withTelemetryCors(res);
+
+  try {
+    const payload = req.body && typeof req.body === 'object' ? req.body : null;
+    if (!payload || !payload.event_type) {
+      return res.status(400).json({ error: 'event_type is required' });
+    }
+
+    ensureTelemetryStorage();
+
+    const record = {
+      ...payload,
+      received_at: new Date().toISOString()
+    };
+
+    fs.appendFileSync(telemetryFilePath, `${JSON.stringify(record)}\n`, 'utf8');
+    res.status(204).end();
+  } catch (error) {
+    console.error('Telemetry write error:', error);
+    res.status(500).json({ error: 'Failed to store telemetry event' });
+  }
+});
+
+app.get('/api/telemetry/export.csv', (req, res) => {
+  withTelemetryCors(res);
+
+  try {
+    ensureTelemetryStorage();
+    const raw = fs.readFileSync(telemetryFilePath, 'utf8');
+    const lines = raw.split(/\r?\n/).filter(Boolean);
+    const records = [];
+
+    for (const line of lines) {
+      try {
+        const parsed = JSON.parse(line);
+        records.push(projectTelemetryRecord(parsed));
+      } catch {
+        // ignore malformed lines
+      }
+    }
+
+    const header = telemetryCsvColumns.join(',');
+    const rows = records.map((record) => telemetryCsvColumns.map((column) => csvEscape(record[column])).join(','));
+    const csv = [header, ...rows].join('\n');
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename="telemetry-events.csv"');
+    res.status(200).send(csv);
+  } catch (error) {
+    console.error('Telemetry export error:', error);
+    res.status(500).json({ error: 'Failed to export telemetry events' });
   }
 });
 
