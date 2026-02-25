@@ -61,6 +61,7 @@ let airsenseErrorActionsCache = null;
 const telemetryStoreMode = String(process.env.TELEMETRY_STORE || 'file').trim().toLowerCase();
 const telemetryUsePostgres = telemetryStoreMode === 'postgres';
 const telemetryDatabaseUrl = process.env.DATABASE_URL;
+const telemetryFallbackToFile = String(process.env.TELEMETRY_FALLBACK_FILE || 'true').trim().toLowerCase() !== 'false';
 let telemetryPgPool = null;
 const telemetryDir = path.join(__dirname, 'data');
 const telemetryFilePath = path.join(telemetryDir, 'telemetry-events.ndjson');
@@ -267,12 +268,7 @@ const readTelemetryRecordsPostgres = async (participantId) => {
   return result.rows.map(projectTelemetryRecord);
 };
 
-const storeTelemetryRecord = async (record) => {
-  if (telemetryUsePostgres) {
-    await insertTelemetryRecordPostgres(record);
-    return;
-  }
-
+const writeTelemetryRecordToFiles = (record) => {
   ensureTelemetryStorage();
   fs.appendFileSync(telemetryFilePath, `${JSON.stringify(record)}\n`, 'utf8');
 
@@ -280,6 +276,23 @@ const storeTelemetryRecord = async (record) => {
   if (participantLogPath) {
     fs.appendFileSync(participantLogPath, `${JSON.stringify(record)}\n`, 'utf8');
   }
+};
+
+const storeTelemetryRecord = async (record) => {
+  if (telemetryUsePostgres) {
+    try {
+      await insertTelemetryRecordPostgres(record);
+    } catch (error) {
+      if (!telemetryFallbackToFile) {
+        throw error;
+      }
+      console.error('Postgres telemetry write failed, falling back to file store:', error.message);
+      writeTelemetryRecordToFiles(record);
+    }
+    return;
+  }
+
+  writeTelemetryRecordToFiles(record);
 };
 
 const readTelemetryRecordsForExport = async (participantId) => {
@@ -898,6 +911,30 @@ app.get('/api/health', (req, res) => {
     provider: LLM_PROVIDER,
     hasApiKey: !!API_KEY
   });
+});
+
+app.get('/api/telemetry/status', async (req, res) => {
+  const base = {
+    mode: telemetryUsePostgres ? 'postgres' : 'file',
+    fallbackToFile: telemetryFallbackToFile,
+    hasDatabaseUrl: Boolean(telemetryDatabaseUrl)
+  };
+
+  if (!telemetryUsePostgres) {
+    return res.json({ ...base, dbReachable: null });
+  }
+
+  try {
+    const pool = getTelemetryPgPool();
+    await pool.query('SELECT 1');
+    return res.json({ ...base, dbReachable: true });
+  } catch (error) {
+    return res.status(503).json({
+      ...base,
+      dbReachable: false,
+      error: String(error.message || error)
+    });
+  }
 });
 
 /**

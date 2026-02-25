@@ -97,12 +97,6 @@
     const body = JSON.stringify(event);
     const apiUrl = getApiUrl();
 
-    if (navigator.sendBeacon) {
-      const blob = new Blob([body], { type: 'application/json' });
-      const sent = navigator.sendBeacon(apiUrl, blob);
-      if (sent) return;
-    }
-
     fetch(apiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
