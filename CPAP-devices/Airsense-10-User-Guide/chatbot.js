@@ -46,8 +46,10 @@ class ChatBot {
 
   renderChatbotSwitcher() {
     const container = document.querySelector('.container');
+    const tipsSection = document.getElementById('chat-tips-title')?.closest('.card') || null;
     const footer = container ? container.querySelector('.footer') : null;
-    if (!container || !footer) return;
+    const anchor = tipsSection || footer;
+    if (!container || !anchor) return;
 
     const currentGuide = this.getCurrentGuide();
     const currentGuideName = this.guideNames[currentGuide] || 'selected device';
@@ -68,7 +70,7 @@ class ChatBot {
       </div>
     `;
 
-    container.insertBefore(switcherCard, footer);
+    container.insertBefore(switcherCard, anchor);
 
     const select = document.getElementById('chatbot-switch-select');
     const link = document.getElementById('chatbot-switch-link');
