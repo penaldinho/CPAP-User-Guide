@@ -217,6 +217,15 @@ const parseDateSafely = (value) => {
   return Number.isNaN(date.getTime()) ? null : date;
 };
 
+const parseIntegerSafely = (value) => {
+  if (value === null || value === undefined || value === '') {
+    return null;
+  }
+
+  const parsed = Number.parseInt(String(value), 10);
+  return Number.isNaN(parsed) ? null : parsed;
+};
+
 const getTelemetryPgPool = () => {
   if (!telemetryUsePostgres) return null;
   if (telemetryPgPool) return telemetryPgPool;
@@ -243,7 +252,10 @@ const normalizeTelemetryRecordForSql = (record) => {
   return {
     ...projected,
     received_at: parseDateSafely(record.received_at || projected.received_at || new Date().toISOString()),
-    timestamp: parseDateSafely(record.timestamp || projected.timestamp)
+    timestamp: parseDateSafely(record.timestamp || projected.timestamp),
+    result_count: parseIntegerSafely(projected.result_count),
+    response_length: parseIntegerSafely(projected.response_length),
+    duration_ms: parseIntegerSafely(projected.duration_ms)
   };
 };
 
