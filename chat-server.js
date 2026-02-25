@@ -57,6 +57,7 @@ const resolveDefaultGuideForFamily = (familyKey) => {
 
 const defaultGuide = resolveDefaultGuideForFamily('cpap');
 const manualCache = new Map();
+let airsenseErrorActionsCache = null;
 
 const excludedHtmlFiles = new Set(['chat.html', 'chat-setup.html', 'search.html']);
 
@@ -173,11 +174,90 @@ const loadManualBundle = (guideKeys) => {
   };
 };
 
+const stripHtmlToText = (html) => String(html || '')
+  .replace(/<br\s*\/?>/gi, ' ')
+  .replace(/<[^>]+>/g, ' ')
+  .replace(/&nbsp;/gi, ' ')
+  .replace(/\s+/g, ' ')
+  .trim();
+
+const getAirsenseErrorActions = () => {
+  const airsenseGuide = guideConfigs['airsense-10'];
+  if (!airsenseGuide) {
+    return { specificByCode: {}, generic0xx: null };
+  }
+
+  const troubleshootingPath = path.join(airsenseGuide.dir, 'troubleshooting.html');
+  if (!fs.existsSync(troubleshootingPath)) {
+    return { specificByCode: {}, generic0xx: null };
+  }
+
+  const mtimeMs = fs.statSync(troubleshootingPath).mtimeMs;
+  if (airsenseErrorActionsCache && airsenseErrorActionsCache.mtimeMs === mtimeMs) {
+    return airsenseErrorActionsCache.actions;
+  }
+
+  const html = fs.readFileSync(troubleshootingPath, 'utf8');
+  const rowPattern = /<strong>([^<]*(?:Error\s*\d{3}|0XX)[^<]*)<\/strong>[\s\S]*?<table[\s\S]*?<\/table>/gi;
+  const specificByCode = {};
+  let generic0xx = null;
+
+  let rowMatch;
+  while ((rowMatch = rowPattern.exec(html)) !== null) {
+    const heading = stripHtmlToText(rowMatch[1]);
+    const block = rowMatch[0];
+    const tdMatches = [...block.matchAll(/<td[^>]*>([\s\S]*?)<\/td>/gi)]
+      .map((match) => stripHtmlToText(match[1]));
+
+    const solutions = tdMatches
+      .filter((_, index) => index % 2 === 1)
+      .filter(Boolean);
+    const solutionText = [...new Set(solutions)].join(' ');
+
+    if (!solutionText) {
+      continue;
+    }
+
+    const specificCodeMatch = heading.match(/Error\s*(\d{3})\b/i);
+    if (specificCodeMatch) {
+      specificByCode[specificCodeMatch[1]] = solutionText;
+      continue;
+    }
+
+    if (/0XX/i.test(heading)) {
+      generic0xx = solutionText;
+    }
+  }
+
+  const actions = { specificByCode, generic0xx };
+  airsenseErrorActionsCache = { mtimeMs, actions };
+  return actions;
+};
+
 const parseExplicitErrorCode = (message) => {
   const text = String(message || '');
-  const match = text.match(/\berror\s*[-: ]?\s*(\d{3})\b/i);
-  if (!match) return null;
-  return match[1];
+  const patterns = [
+    /\berror\s*[-: ]?\s*(\d{3})\b/i,
+    /\bsystem\s*fault\s*[-: ]?\s*(\d{3})\b/i,
+    /\bfault\s*[-: ]?\s*(\d{3})\b/i
+  ];
+
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    if (match) {
+      return match[1];
+    }
+  }
+
+  const hasFaultIntent = /\bsystem\s*fault\b|\bfault\b/i.test(text);
+  if (hasFaultIntent) {
+    const fallbackMatch = text.match(/\b(0\d{2})\b/);
+    if (fallbackMatch) {
+      return fallbackMatch[1];
+    }
+  }
+
+  return null;
 };
 
 const getDeterministicErrorCodeResponse = (message, guideKeys) => {
@@ -187,12 +267,14 @@ const getDeterministicErrorCodeResponse = (message, guideKeys) => {
   const isAirsenseGuide = Array.isArray(guideKeys) && guideKeys.includes('airsense-10');
   if (!isAirsenseGuide) return null;
 
-  if (errorCode === '004') {
-    return null;
+  const { specificByCode, generic0xx } = getAirsenseErrorActions();
+
+  if (specificByCode[errorCode]) {
+    return 'For “System fault, refer to user guide, Error ' + errorCode + '”, follow the Troubleshooting action: ' + specificByCode[errorCode];
   }
 
-  if (/^0\d{2}$/.test(errorCode)) {
-    return 'For “System fault, refer to user guide, Error ' + errorCode + '”, this is treated as an Error 0XX case. Contact your care provider and do not open the device.';
+  if (/^0\d{2}$/.test(errorCode) && generic0xx) {
+    return 'For “System fault, refer to user guide, Error ' + errorCode + '”, this is treated as an Error 0XX case. ' + generic0xx;
   }
 
   return null;
