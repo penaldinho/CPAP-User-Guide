@@ -4,6 +4,7 @@
   const sessionKey = 'mtg-telemetry-session-id';
   const participantKey = 'mtg-telemetry-participant-id';
   const taskStateKey = 'mtg-telemetry-task-state';
+  const lastTaskResultKey = 'mtg-telemetry-last-task-result';
 
   const getApiUrl = () => {
     const host = window.location.hostname;
@@ -11,6 +12,15 @@
     const isHostedChat = /(^|\.)chat\.medtechguides\.uk$/i.test(host);
     if (isLocalHost || isHostedChat) return '/api/telemetry';
     return 'https://chat.medtechguides.uk/api/telemetry';
+  };
+
+  const getExportUrl = () => {
+    const apiUrl = getApiUrl();
+    const participantId = getParticipantId();
+    if (participantId) {
+      return `${apiUrl.replace(/\/api\/telemetry$/, '/api/telemetry/export.csv')}?participant_id=${encodeURIComponent(participantId)}`;
+    }
+    return apiUrl.replace(/\/api\/telemetry$/, '/api/telemetry/export.csv');
   };
 
   const safeJsonParse = (value, fallback) => {
@@ -43,10 +53,31 @@
     sessionStorage.setItem(taskStateKey, JSON.stringify(state || {}));
   };
 
+  const getLastTaskResult = () => safeJsonParse(sessionStorage.getItem(lastTaskResultKey) || '{}', {});
+
+  const setLastTaskResult = (result) => {
+    sessionStorage.setItem(lastTaskResultKey, JSON.stringify(result || {}));
+  };
+
   const isResearchMode = () => {
     const url = new URL(window.location.href);
     const flag = String(url.searchParams.get('research') || '').toLowerCase();
     return flag === '1' || flag === 'true' || flag === 'yes';
+  };
+
+  const enableResearchModeInUrl = () => {
+    const url = new URL(window.location.href);
+    const current = String(url.searchParams.get('research') || '').toLowerCase();
+    if (current === '1') return;
+    url.searchParams.set('research', '1');
+    window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
+  };
+
+  const disableResearchModeInUrl = () => {
+    const url = new URL(window.location.href);
+    if (!url.searchParams.has('research')) return;
+    url.searchParams.delete('research');
+    window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
   };
 
   const buildBasePayload = () => {
@@ -131,11 +162,67 @@
       duration_ms: durationMs
     });
 
+    setLastTaskResult({
+      task_id: state.task_id,
+      task_label: state.task_label || '',
+      task_status: String(status || ''),
+      duration_ms: durationMs,
+      ended_at: new Date().toISOString()
+    });
+
     setTaskState({});
   };
 
-  const renderResearchPanel = () => {
-    if (!isResearchMode()) return;
+  const ensureParticipantEndButton = () => {
+    const existing = document.getElementById('mtg-participant-end-task-wrap');
+    if (existing) return existing;
+
+    const wrap = document.createElement('div');
+    wrap.id = 'mtg-participant-end-task-wrap';
+    wrap.style.position = 'fixed';
+    wrap.style.left = '50%';
+    wrap.style.bottom = '12px';
+    wrap.style.transform = 'translateX(-50%)';
+    wrap.style.zIndex = '9500';
+    wrap.style.display = 'none';
+
+    const button = document.createElement('button');
+    button.id = 'mtg-participant-end-task-btn';
+    button.type = 'button';
+    button.style.padding = '12px 18px';
+    button.style.border = '1px solid #0f766e';
+    button.style.background = '#0f766e';
+    button.style.color = '#ffffff';
+    button.style.borderRadius = '999px';
+    button.style.fontSize = '15px';
+    button.style.fontWeight = '600';
+    button.style.cursor = 'pointer';
+    button.style.boxShadow = '0 10px 24px rgba(0,0,0,0.2)';
+    button.textContent = 'I have finished this task';
+
+    button.addEventListener('click', () => {
+      track('task_end_clicked_by_participant', {
+        task_id: getTaskState().task_id || ''
+      });
+      endTask('participant_clicked_end');
+      syncParticipantEndButton();
+      enableResearchModeInUrl();
+      renderResearchPanel();
+    });
+
+    wrap.appendChild(button);
+    document.body.appendChild(wrap);
+    return wrap;
+  };
+
+  const syncParticipantEndButton = () => {
+    const wrap = ensureParticipantEndButton();
+    const taskState = getTaskState();
+    wrap.style.display = taskState.task_id ? 'block' : 'none';
+  };
+
+  const renderResearchPanel = (forceOpen = false) => {
+    if (!forceOpen && !isResearchMode()) return;
     if (document.getElementById('mtg-research-panel')) return;
 
     const panel = document.createElement('aside');
@@ -180,6 +267,7 @@
           <button id="mtg-task-end" type="button" style="flex:1; padding:7px 10px; border:1px solid #cbd5e1; border-radius:6px; background:#eff6ff; cursor:pointer;">End task</button>
         </div>
         <div id="mtg-task-timer" style="padding:7px 10px; border:1px solid #e5e7eb; border-radius:6px; background:#f8fafc; font-weight:600;">Task timer: 00:00</div>
+        <button id="mtg-export-csv" type="button" style="padding:7px 10px; border:1px solid #cbd5e1; border-radius:6px; background:#fff7ed; cursor:pointer;">Export CSV</button>
         <div id="mtg-research-state" style="font-size:12px; color:#4b5563;"></div>
       </div>
     `;
@@ -193,6 +281,7 @@
     const taskStart = document.getElementById('mtg-task-start');
     const taskEnd = document.getElementById('mtg-task-end');
     const taskTimer = document.getElementById('mtg-task-timer');
+    const exportCsvBtn = document.getElementById('mtg-export-csv');
     const stateText = document.getElementById('mtg-research-state');
     const closeBtn = document.getElementById('mtg-research-close');
     let timerInterval = null;
@@ -208,7 +297,12 @@
       if (!taskTimer) return;
       const taskState = getTaskState();
       if (!taskState.task_id || !taskState.started_at) {
-        taskTimer.textContent = 'Task timer: 00:00';
+        const lastTaskResult = getLastTaskResult();
+        if (Number.isFinite(lastTaskResult.duration_ms)) {
+          taskTimer.textContent = `Last task: ${formatDuration(lastTaskResult.duration_ms)}`;
+        } else {
+          taskTimer.textContent = 'Task timer: 00:00';
+        }
         return;
       }
 
@@ -260,6 +354,8 @@
         const taskId = taskIdInput ? taskIdInput.value : '';
         const taskLabel = taskLabelInput ? taskLabelInput.value : '';
         startTask(taskId, taskLabel);
+        disableResearchModeInUrl();
+        panel.remove();
         refreshState();
       });
     }
@@ -268,6 +364,13 @@
       taskEnd.addEventListener('click', () => {
         endTask('ended');
         refreshState();
+      });
+    }
+
+    if (exportCsvBtn) {
+      exportCsvBtn.addEventListener('click', () => {
+        const exportUrl = getExportUrl();
+        window.open(exportUrl, '_blank', 'noopener,noreferrer');
       });
     }
 
@@ -291,6 +394,8 @@
       referrer: document.referrer || ''
     });
 
+    syncParticipantEndButton();
+
     renderResearchPanel();
 
     document.addEventListener('click', (event) => {
@@ -312,6 +417,14 @@
         duration_ms: Math.max(0, Date.now() - pageEnteredAt)
       });
     });
+
+    window.addEventListener('storage', (event) => {
+      if (event.key === taskStateKey) {
+        syncParticipantEndButton();
+      }
+    });
+
+    window.setInterval(syncParticipantEndButton, 1000);
   };
 
   window.MTGTelemetry = {

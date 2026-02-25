@@ -60,6 +60,7 @@ const manualCache = new Map();
 let airsenseErrorActionsCache = null;
 const telemetryDir = path.join(__dirname, 'data');
 const telemetryFilePath = path.join(telemetryDir, 'telemetry-events.ndjson');
+const participantTelemetryDir = path.join(telemetryDir, 'participants');
 
 const excludedHtmlFiles = new Set(['chat.html', 'chat-setup.html', 'search.html']);
 
@@ -78,6 +79,20 @@ const ensureTelemetryStorage = () => {
   if (!fs.existsSync(telemetryFilePath)) {
     fs.writeFileSync(telemetryFilePath, '');
   }
+  if (!fs.existsSync(participantTelemetryDir)) {
+    fs.mkdirSync(participantTelemetryDir, { recursive: true });
+  }
+};
+
+const sanitizeParticipantId = (participantId) => String(participantId || '')
+  .trim()
+  .replace(/[^a-zA-Z0-9._-]/g, '_')
+  .slice(0, 80);
+
+const getParticipantTelemetryPath = (participantId) => {
+  const safeId = sanitizeParticipantId(participantId);
+  if (!safeId) return null;
+  return path.join(participantTelemetryDir, `${safeId}.ndjson`);
 };
 
 const csvEscape = (value) => {
@@ -135,6 +150,31 @@ const projectTelemetryRecord = (record) => ({
   duration_ms: record.duration_ms ?? '',
   referrer: record.referrer || ''
 });
+
+const readTelemetryRecordsFromNdjson = (filePath) => {
+  if (!filePath || !fs.existsSync(filePath)) return [];
+
+  const raw = fs.readFileSync(filePath, 'utf8');
+  const lines = raw.split(/\r?\n/).filter(Boolean);
+  const records = [];
+
+  for (const line of lines) {
+    try {
+      const parsed = JSON.parse(line);
+      records.push(projectTelemetryRecord(parsed));
+    } catch {
+      // ignore malformed lines
+    }
+  }
+
+  return records;
+};
+
+const buildTelemetryCsv = (records) => {
+  const header = telemetryCsvColumns.join(',');
+  const rows = records.map((record) => telemetryCsvColumns.map((column) => csvEscape(record[column])).join(','));
+  return [header, ...rows].join('\n');
+};
 
 const withTelemetryCors = (res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -654,6 +694,12 @@ app.post('/api/telemetry', (req, res) => {
     };
 
     fs.appendFileSync(telemetryFilePath, `${JSON.stringify(record)}\n`, 'utf8');
+
+    const participantLogPath = getParticipantTelemetryPath(record.participant_id);
+    if (participantLogPath) {
+      fs.appendFileSync(participantLogPath, `${JSON.stringify(record)}\n`, 'utf8');
+    }
+
     res.status(204).end();
   } catch (error) {
     console.error('Telemetry write error:', error);
@@ -666,29 +712,44 @@ app.get('/api/telemetry/export.csv', (req, res) => {
 
   try {
     ensureTelemetryStorage();
-    const raw = fs.readFileSync(telemetryFilePath, 'utf8');
-    const lines = raw.split(/\r?\n/).filter(Boolean);
-    const records = [];
+    const participantId = String(req.query.participant_id || '').trim();
+    const sourcePath = participantId
+      ? getParticipantTelemetryPath(participantId)
+      : telemetryFilePath;
 
-    for (const line of lines) {
-      try {
-        const parsed = JSON.parse(line);
-        records.push(projectTelemetryRecord(parsed));
-      } catch {
-        // ignore malformed lines
-      }
-    }
+    const records = readTelemetryRecordsFromNdjson(sourcePath);
+    const csv = buildTelemetryCsv(records);
 
-    const header = telemetryCsvColumns.join(',');
-    const rows = records.map((record) => telemetryCsvColumns.map((column) => csvEscape(record[column])).join(','));
-    const csv = [header, ...rows].join('\n');
+    const filename = participantId
+      ? `telemetry-${sanitizeParticipantId(participantId)}.csv`
+      : 'telemetry-events.csv';
 
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', 'attachment; filename="telemetry-events.csv"');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.status(200).send(csv);
   } catch (error) {
     console.error('Telemetry export error:', error);
     res.status(500).json({ error: 'Failed to export telemetry events' });
+  }
+});
+
+app.get('/api/telemetry/export/participant/:participantId.csv', (req, res) => {
+  withTelemetryCors(res);
+
+  try {
+    ensureTelemetryStorage();
+    const participantId = String(req.params.participantId || '').trim();
+    const participantPath = getParticipantTelemetryPath(participantId);
+    const records = readTelemetryRecordsFromNdjson(participantPath);
+    const csv = buildTelemetryCsv(records);
+    const safeId = sanitizeParticipantId(participantId) || 'participant';
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="telemetry-${safeId}.csv"`);
+    res.status(200).send(csv);
+  } catch (error) {
+    console.error('Participant telemetry export error:', error);
+    res.status(500).json({ error: 'Failed to export participant telemetry events' });
   }
 });
 
