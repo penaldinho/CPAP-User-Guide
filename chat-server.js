@@ -58,6 +58,10 @@ const resolveDefaultGuideForFamily = (familyKey) => {
 const defaultGuide = resolveDefaultGuideForFamily('cpap');
 const manualCache = new Map();
 let airsenseErrorActionsCache = null;
+const telemetryStoreMode = String(process.env.TELEMETRY_STORE || 'file').trim().toLowerCase();
+const telemetryUsePostgres = telemetryStoreMode === 'postgres';
+const telemetryDatabaseUrl = process.env.DATABASE_URL;
+let telemetryPgPool = null;
 const telemetryDir = path.join(__dirname, 'data');
 const telemetryFilePath = path.join(telemetryDir, 'telemetry-events.ndjson');
 const participantTelemetryDir = path.join(telemetryDir, 'participants');
@@ -104,6 +108,30 @@ const csvEscape = (value) => {
 };
 
 const telemetryCsvColumns = [
+  'received_at',
+  'timestamp',
+  'session_id',
+  'participant_id',
+  'event_type',
+  'task_id',
+  'task_label',
+  'task_status',
+  'question_id',
+  'page_path',
+  'page_title',
+  'guide',
+  'family',
+  'query',
+  'result_count',
+  'target_href',
+  'link_text',
+  'chat_message',
+  'response_length',
+  'duration_ms',
+  'referrer'
+];
+
+const telemetrySqlColumns = [
   'received_at',
   'timestamp',
   'session_id',
@@ -174,6 +202,96 @@ const buildTelemetryCsv = (records) => {
   const header = telemetryCsvColumns.join(',');
   const rows = records.map((record) => telemetryCsvColumns.map((column) => csvEscape(record[column])).join(','));
   return [header, ...rows].join('\n');
+};
+
+const parseDateSafely = (value) => {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+
+const getTelemetryPgPool = () => {
+  if (!telemetryUsePostgres) return null;
+  if (telemetryPgPool) return telemetryPgPool;
+
+  if (!telemetryDatabaseUrl) {
+    throw new Error('TELEMETRY_STORE=postgres requires DATABASE_URL');
+  }
+
+  const { Pool } = require('pg');
+  telemetryPgPool = new Pool({
+    connectionString: telemetryDatabaseUrl,
+    ssl: { rejectUnauthorized: false }
+  });
+
+  telemetryPgPool.on('error', (error) => {
+    console.error('Postgres pool error:', error);
+  });
+
+  return telemetryPgPool;
+};
+
+const normalizeTelemetryRecordForSql = (record) => {
+  const projected = projectTelemetryRecord(record);
+  return {
+    ...projected,
+    received_at: parseDateSafely(record.received_at || projected.received_at || new Date().toISOString()),
+    timestamp: parseDateSafely(record.timestamp || projected.timestamp)
+  };
+};
+
+const insertTelemetryRecordPostgres = async (record) => {
+  const pool = getTelemetryPgPool();
+  const normalized = normalizeTelemetryRecordForSql(record);
+
+  const placeholders = telemetrySqlColumns.map((_, index) => `$${index + 1}`).join(', ');
+  const queryText = `INSERT INTO telemetry_events (${telemetrySqlColumns.join(', ')}) VALUES (${placeholders})`;
+  const values = telemetrySqlColumns.map((column) => normalized[column]);
+
+  await pool.query(queryText, values);
+};
+
+const readTelemetryRecordsPostgres = async (participantId) => {
+  const pool = getTelemetryPgPool();
+  const baseQuery = `
+    SELECT ${telemetrySqlColumns.join(', ')}
+    FROM telemetry_events
+  `;
+
+  const hasParticipantFilter = Boolean(String(participantId || '').trim());
+  const queryText = hasParticipantFilter
+    ? `${baseQuery} WHERE participant_id = $1 ORDER BY received_at ASC`
+    : `${baseQuery} ORDER BY received_at ASC`;
+  const queryValues = hasParticipantFilter ? [String(participantId).trim()] : [];
+
+  const result = await pool.query(queryText, queryValues);
+  return result.rows.map(projectTelemetryRecord);
+};
+
+const storeTelemetryRecord = async (record) => {
+  if (telemetryUsePostgres) {
+    await insertTelemetryRecordPostgres(record);
+    return;
+  }
+
+  ensureTelemetryStorage();
+  fs.appendFileSync(telemetryFilePath, `${JSON.stringify(record)}\n`, 'utf8');
+
+  const participantLogPath = getParticipantTelemetryPath(record.participant_id);
+  if (participantLogPath) {
+    fs.appendFileSync(participantLogPath, `${JSON.stringify(record)}\n`, 'utf8');
+  }
+};
+
+const readTelemetryRecordsForExport = async (participantId) => {
+  if (telemetryUsePostgres) {
+    return readTelemetryRecordsPostgres(participantId);
+  }
+
+  ensureTelemetryStorage();
+  const sourcePath = participantId
+    ? getParticipantTelemetryPath(participantId)
+    : telemetryFilePath;
+  return readTelemetryRecordsFromNdjson(sourcePath);
 };
 
 const withTelemetryCors = (res) => {
@@ -677,7 +795,7 @@ app.options('/api/telemetry', (req, res) => {
   res.status(204).end();
 });
 
-app.post('/api/telemetry', (req, res) => {
+app.post('/api/telemetry', async (req, res) => {
   withTelemetryCors(res);
 
   try {
@@ -693,12 +811,7 @@ app.post('/api/telemetry', (req, res) => {
       received_at: new Date().toISOString()
     };
 
-    fs.appendFileSync(telemetryFilePath, `${JSON.stringify(record)}\n`, 'utf8');
-
-    const participantLogPath = getParticipantTelemetryPath(record.participant_id);
-    if (participantLogPath) {
-      fs.appendFileSync(participantLogPath, `${JSON.stringify(record)}\n`, 'utf8');
-    }
+    await storeTelemetryRecord(record);
 
     res.status(204).end();
   } catch (error) {
@@ -707,17 +820,12 @@ app.post('/api/telemetry', (req, res) => {
   }
 });
 
-app.get('/api/telemetry/export.csv', (req, res) => {
+app.get('/api/telemetry/export.csv', async (req, res) => {
   withTelemetryCors(res);
 
   try {
-    ensureTelemetryStorage();
     const participantId = String(req.query.participant_id || '').trim();
-    const sourcePath = participantId
-      ? getParticipantTelemetryPath(participantId)
-      : telemetryFilePath;
-
-    const records = readTelemetryRecordsFromNdjson(sourcePath);
+    const records = await readTelemetryRecordsForExport(participantId);
     const csv = buildTelemetryCsv(records);
 
     const filename = participantId
@@ -733,14 +841,12 @@ app.get('/api/telemetry/export.csv', (req, res) => {
   }
 });
 
-app.get('/api/telemetry/export/participant/:participantId.csv', (req, res) => {
+app.get('/api/telemetry/export/participant/:participantId.csv', async (req, res) => {
   withTelemetryCors(res);
 
   try {
-    ensureTelemetryStorage();
     const participantId = String(req.params.participantId || '').trim();
-    const participantPath = getParticipantTelemetryPath(participantId);
-    const records = readTelemetryRecordsFromNdjson(participantPath);
+    const records = await readTelemetryRecordsForExport(participantId);
     const csv = buildTelemetryCsv(records);
     const safeId = sanitizeParticipantId(participantId) || 'participant';
 
