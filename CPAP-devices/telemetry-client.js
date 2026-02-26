@@ -233,7 +233,12 @@
     }
 
     const taskId = String(url.searchParams.get('mtg_task_id') || '').trim();
-    if (!taskId) return;
+    if (!taskId) {
+      if (isHostedChatHost(url.hostname)) {
+        setTaskState({});
+      }
+      return;
+    }
 
     const taskLabel = String(url.searchParams.get('mtg_task_label') || '').trim();
     const taskStartedAt = String(url.searchParams.get('mtg_task_started_at') || '').trim();
