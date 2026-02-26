@@ -26,9 +26,10 @@ function injectNav(currentPageFile) {
   if (!window.__mtgTelemetryClientInjected) {
     const isHostedChatHost = /(^|\.)chat\.medtechguides\.uk$/i.test(window.location.hostname);
     const telemetryScript = document.createElement('script');
+    const telemetryVersion = '20260226e';
     telemetryScript.src = isHostedChatHost
-      ? 'https://medtechguides.uk/CPAP-devices/telemetry-client.js'
-      : '/CPAP-devices/telemetry-client.js';
+      ? `https://medtechguides.uk/CPAP-devices/telemetry-client.js?v=${telemetryVersion}`
+      : `/CPAP-devices/telemetry-client.js?v=${telemetryVersion}`;
     telemetryScript.defer = true;
     document.head.appendChild(telemetryScript);
     window.__mtgTelemetryClientInjected = true;
