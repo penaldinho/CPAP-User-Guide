@@ -16,6 +16,14 @@
 
   const isHostedChatHost = (host) => /(^|\.)chat\.medtechguides\.uk$/i.test(String(host || ''));
 
+  const isFirstPartyNavigationHost = (host) => {
+    const value = String(host || '').toLowerCase();
+    if (!value) return false;
+    if (value === 'localhost' || value === '127.0.0.1') return true;
+    return value === 'medtechguides.uk'
+      || value.endsWith('.medtechguides.uk');
+  };
+
   const buildNavigationContextParams = (includeTaskClear) => {
     const currentUrl = new URL(window.location.href);
     const params = new URLSearchParams();
@@ -57,7 +65,7 @@
     if (!href || href.startsWith('#') || /^javascript:/i.test(href)) return rawHref;
 
     const currentUrl = new URL(window.location.href);
-    if (!isHostedChatHost(currentUrl.hostname)) return rawHref;
+    if (!isFirstPartyNavigationHost(currentUrl.hostname)) return rawHref;
 
     const hasActiveTask = Boolean(getTaskState().task_id);
     const hasUrlContext = Array.from(currentUrl.searchParams.keys())
@@ -70,6 +78,10 @@
     try {
       targetUrl = new URL(href, currentUrl.origin);
     } catch {
+      return rawHref;
+    }
+
+    if (!isFirstPartyNavigationHost(targetUrl.hostname)) {
       return rawHref;
     }
 
