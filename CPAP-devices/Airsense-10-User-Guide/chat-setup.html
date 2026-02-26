@@ -94,6 +94,11 @@
       .split(',')
       .map((item) => item.trim().toLowerCase())
       .filter(Boolean);
+    const incomingParticipantId = (urlParams.get('mtg_participant_id') || '').trim();
+    const incomingTaskId = (urlParams.get('mtg_task_id') || '').trim();
+    const incomingTaskLabel = (urlParams.get('mtg_task_label') || '').trim();
+    const incomingTaskStartedAt = (urlParams.get('mtg_task_started_at') || '').trim();
+    const incomingResearch = (urlParams.get('research') || '').trim();
 
     const setOptions = (selectEl, options, includeNone = false) => {
       selectEl.innerHTML = '';
@@ -345,6 +350,21 @@
           family: resolvedFamily
         });
         chatQuery.set('guides', String(selectedGuide));
+        if (incomingParticipantId) {
+          chatQuery.set('mtg_participant_id', incomingParticipantId);
+        }
+        if (incomingTaskId) {
+          chatQuery.set('mtg_task_id', incomingTaskId);
+        }
+        if (incomingTaskLabel) {
+          chatQuery.set('mtg_task_label', incomingTaskLabel);
+        }
+        if (incomingTaskStartedAt) {
+          chatQuery.set('mtg_task_started_at', incomingTaskStartedAt);
+        }
+        if (incomingResearch) {
+          chatQuery.set('research', incomingResearch);
+        }
         const targetPath = guideChatPathMap[selectedGuide] || guideChatPathMap['airsense-10'];
         window.location.href = `${targetPath}?${chatQuery.toString()}`;
       });
