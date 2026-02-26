@@ -57,6 +57,20 @@ function injectNav(currentPageFile) {
     const buildTelemetryContextParams = (includeTaskClear = false) => {
       const params = new URLSearchParams();
       const currentParams = new URLSearchParams(window.location.search);
+      const hasUrlContext = Array.from(currentParams.keys()).some((key) => key === 'research' || key.startsWith('mtg_'));
+      let hasActiveTask = false;
+
+      try {
+        const activeTask = JSON.parse(sessionStorage.getItem('mtg-telemetry-task-state') || '{}');
+        hasActiveTask = Boolean(activeTask.task_id);
+      } catch {
+        hasActiveTask = false;
+      }
+
+      if (!hasUrlContext && !hasActiveTask) {
+        return params;
+      }
+
       const participantId = String(localStorage.getItem('mtg-telemetry-participant-id') || '').trim();
       if (participantId) {
         params.set('mtg_participant_id', participantId);
@@ -554,6 +568,22 @@ function injectNav(currentPageFile) {
         : '';
       const buildChatHref = () => {
         const params = new URLSearchParams(window.location.search);
+        const hasUrlContext = Array.from(params.keys()).some((key) => key === 'research' || key.startsWith('mtg_'));
+        let hasActiveTask = false;
+
+        try {
+          const activeTask = JSON.parse(sessionStorage.getItem('mtg-telemetry-task-state') || '{}');
+          hasActiveTask = Boolean(activeTask.task_id);
+        } catch {
+          hasActiveTask = false;
+        }
+
+        if (!hasUrlContext && !hasActiveTask) {
+          const localBase = `http://localhost:3000/chat-setup.html?guide=climatelineair&family=cpap${setupGuidesQuery}`;
+          const hostedBase = `${hostedChatSetupHref}${setupGuidesQuery}`;
+          return isLocalHost && window.location.port !== '3000' ? localBase : hostedBase;
+        }
+
         const participantId = String(localStorage.getItem('mtg-telemetry-participant-id') || '').trim();
         if (participantId) {
           params.set('mtg_participant_id', participantId);

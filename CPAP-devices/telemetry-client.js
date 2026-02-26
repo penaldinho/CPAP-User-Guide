@@ -59,6 +59,13 @@
     const currentUrl = new URL(window.location.href);
     if (!isHostedChatHost(currentUrl.hostname)) return rawHref;
 
+    const hasActiveTask = Boolean(getTaskState().task_id);
+    const hasUrlContext = Array.from(currentUrl.searchParams.keys())
+      .some((key) => key === 'research' || key.startsWith('mtg_'));
+    if (!hasActiveTask && !hasUrlContext) {
+      return rawHref;
+    }
+
     let targetUrl;
     try {
       targetUrl = new URL(href, currentUrl.origin);
