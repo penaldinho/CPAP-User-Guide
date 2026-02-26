@@ -26,7 +26,7 @@ function injectNav(currentPageFile) {
   if (!window.__mtgTelemetryClientInjected) {
     const isHostedChatHost = /(^|\.)chat\.medtechguides\.uk$/i.test(window.location.hostname);
     const telemetryScript = document.createElement('script');
-    const telemetryVersion = '20260226e';
+    const telemetryVersion = '20260226f';
     telemetryScript.src = isHostedChatHost
       ? `https://medtechguides.uk/CPAP-devices/telemetry-client.js?v=${telemetryVersion}`
       : `/CPAP-devices/telemetry-client.js?v=${telemetryVersion}`;

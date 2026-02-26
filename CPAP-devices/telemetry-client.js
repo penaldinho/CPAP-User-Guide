@@ -211,18 +211,6 @@
     const body = JSON.stringify(event);
     const apiUrl = getApiUrl();
 
-    if (typeof navigator !== 'undefined' && typeof navigator.sendBeacon === 'function') {
-      try {
-        const blob = new Blob([body], { type: 'application/json' });
-        const queued = navigator.sendBeacon(apiUrl, blob);
-        if (queued) {
-          return;
-        }
-      } catch {
-        // Fallback to fetch below
-      }
-    }
-
     fetch(apiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
