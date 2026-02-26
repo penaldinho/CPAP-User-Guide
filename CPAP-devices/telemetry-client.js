@@ -14,6 +14,66 @@
     return 'https://chat.medtechguides.uk/api/telemetry';
   };
 
+  const isHostedChatHost = (host) => /(^|\.)chat\.medtechguides\.uk$/i.test(String(host || ''));
+
+  const buildNavigationContextParams = (includeTaskClear) => {
+    const currentUrl = new URL(window.location.href);
+    const params = new URLSearchParams();
+
+    const participantId = getParticipantId();
+    if (participantId) {
+      params.set('mtg_participant_id', participantId);
+    }
+
+    const taskState = getTaskState();
+    if (taskState.task_id) {
+      params.set('mtg_task_id', String(taskState.task_id));
+      if (taskState.task_label) {
+        params.set('mtg_task_label', String(taskState.task_label));
+      }
+      if (taskState.started_at) {
+        params.set('mtg_task_started_at', String(taskState.started_at));
+      }
+    } else if (includeTaskClear) {
+      params.set('mtg_task_clear', '1');
+    }
+
+    const research = String(currentUrl.searchParams.get('research') || '').trim();
+    if (research) {
+      params.set('research', research);
+    }
+
+    return params;
+  };
+
+  const decorateNavigationHref = (rawHref) => {
+    if (!rawHref) return rawHref;
+    const href = String(rawHref || '').trim();
+    if (!href || href.startsWith('#') || /^javascript:/i.test(href)) return rawHref;
+
+    const currentUrl = new URL(window.location.href);
+    if (!isHostedChatHost(currentUrl.hostname)) return rawHref;
+
+    let targetUrl;
+    try {
+      targetUrl = new URL(href, currentUrl.origin);
+    } catch {
+      return rawHref;
+    }
+
+    const targetIsChatHost = isHostedChatHost(targetUrl.hostname);
+    const targetPath = String(targetUrl.pathname || '').toLowerCase();
+    const targetIsChatPage = targetPath.endsWith('/chat.html') || targetPath.endsWith('/chat-setup.html');
+
+    const includeTaskClear = !targetIsChatHost && !targetIsChatPage;
+    const contextParams = buildNavigationContextParams(includeTaskClear);
+    contextParams.forEach((value, key) => {
+      targetUrl.searchParams.set(key, value);
+    });
+
+    return targetUrl.toString();
+  };
+
   const getExportUrl = () => {
     const apiUrl = getApiUrl();
     const participantId = getParticipantId();
@@ -125,6 +185,15 @@
     window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
   };
 
+  const markTaskClearedInUrl = () => {
+    const url = new URL(window.location.href);
+    url.searchParams.delete('mtg_task_id');
+    url.searchParams.delete('mtg_task_label');
+    url.searchParams.delete('mtg_task_started_at');
+    url.searchParams.set('mtg_task_clear', '1');
+    window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
+  };
+
   const buildBasePayload = () => {
     const url = new URL(window.location.href);
     return {
@@ -141,6 +210,18 @@
   const postEvent = (event) => {
     const body = JSON.stringify(event);
     const apiUrl = getApiUrl();
+
+    if (typeof navigator !== 'undefined' && typeof navigator.sendBeacon === 'function') {
+      try {
+        const blob = new Blob([body], { type: 'application/json' });
+        const queued = navigator.sendBeacon(apiUrl, blob);
+        if (queued) {
+          return;
+        }
+      } catch {
+        // Fallback to fetch below
+      }
+    }
 
     fetch(apiUrl, {
       method: 'POST',
@@ -220,6 +301,7 @@
     });
 
     setTaskState({});
+    markTaskClearedInUrl();
   };
 
   const ensureParticipantEndButton = () => {
@@ -453,11 +535,16 @@
       const link = event.target && event.target.closest ? event.target.closest('a[href]') : null;
       if (!link) return;
 
-      const href = link.getAttribute('href') || '';
-      if (!href || href.startsWith('#')) return;
+      const originalHref = link.getAttribute('href') || '';
+      if (!originalHref || originalHref.startsWith('#')) return;
+
+      const decoratedHref = decorateNavigationHref(originalHref);
+      if (decoratedHref && decoratedHref !== originalHref) {
+        link.setAttribute('href', decoratedHref);
+      }
 
       track('nav_click', {
-        target_href: href,
+        target_href: link.getAttribute('href') || originalHref,
         link_text: (link.textContent || '').trim().slice(0, 140)
       });
     });
