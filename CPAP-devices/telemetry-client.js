@@ -76,7 +76,7 @@
 
     let targetUrl;
     try {
-      targetUrl = new URL(href, currentUrl.origin);
+      targetUrl = new URL(href, currentUrl.href);
     } catch {
       return rawHref;
     }
