@@ -80,7 +80,6 @@ const baseDir = guideConfigs[defaultGuide].dir;
 
 const app = express();
 app.use(express.json());
-app.use('/api/telemetry', express.text({ type: '*/*' }));
 app.use(express.static(baseDir));
 app.use('/CPAP-devices', express.static(path.join(__dirname, 'CPAP-devices')));
 app.use('/images', express.static(path.join(__dirname, 'images')));
@@ -138,7 +137,13 @@ const telemetryCsvColumns = [
   'response_message',
   'response_length',
   'duration_ms',
-  'referrer'
+  'referrer',
+  'task_instance_seq',
+  'task_instance_started_at',
+  'task_instance_ended_at',
+  'task_total_duration_ms',
+  'task_elapsed_ms_at_event',
+  'task_page_dwell_ms'
 ];
 
 const telemetrySqlColumns = [
@@ -210,9 +215,115 @@ const readTelemetryRecordsFromNdjson = (filePath) => {
   return records;
 };
 
+const getRecordTimeMs = (record) => {
+  const value = record.timestamp || record.received_at;
+  const parsed = Date.parse(String(value || ''));
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+const addDerivedTaskMetrics = (records) => {
+  const activeTaskInstances = new Map();
+  const sequenceBySessionTask = new Map();
+  const rowTaskInstance = new Array(records.length).fill(null);
+
+  const nextSequence = (sessionTaskKey) => {
+    const next = (sequenceBySessionTask.get(sessionTaskKey) || 0) + 1;
+    sequenceBySessionTask.set(sessionTaskKey, next);
+    return next;
+  };
+
+  records.forEach((record, index) => {
+    const sessionId = String(record.session_id || '').trim();
+    const taskId = String(record.task_id || '').trim();
+    if (!taskId) {
+      return;
+    }
+
+    const sessionTaskKey = `${sessionId}::${taskId}`;
+    const eventType = String(record.event_type || '').trim().toLowerCase();
+    const eventTimeMs = getRecordTimeMs(record);
+    let instance = activeTaskInstances.get(sessionTaskKey);
+
+    if (eventType === 'task_start') {
+      instance = {
+        sequence: nextSequence(sessionTaskKey),
+        startedAt: record.timestamp || record.received_at || '',
+        startedAtMs: eventTimeMs,
+        endedAt: '',
+        endedAtMs: null,
+        totalDurationMs: null
+      };
+      activeTaskInstances.set(sessionTaskKey, instance);
+    } else if (!instance) {
+      instance = {
+        sequence: nextSequence(sessionTaskKey),
+        startedAt: '',
+        startedAtMs: null,
+        endedAt: '',
+        endedAtMs: null,
+        totalDurationMs: null
+      };
+      activeTaskInstances.set(sessionTaskKey, instance);
+    }
+
+    rowTaskInstance[index] = instance;
+
+    if (eventType === 'task_end') {
+      instance.endedAt = record.timestamp || record.received_at || instance.endedAt || '';
+      instance.endedAtMs = eventTimeMs;
+
+      const explicitDuration = parseIntegerSafely(record.duration_ms);
+      if (explicitDuration !== null) {
+        instance.totalDurationMs = explicitDuration;
+      } else if (Number.isFinite(instance.startedAtMs) && Number.isFinite(instance.endedAtMs)) {
+        instance.totalDurationMs = Math.max(0, instance.endedAtMs - instance.startedAtMs);
+      }
+
+      activeTaskInstances.delete(sessionTaskKey);
+    }
+  });
+
+  return records.map((record, index) => {
+    const instance = rowTaskInstance[index];
+    if (!instance) {
+      return {
+        ...record,
+        task_instance_seq: '',
+        task_instance_started_at: '',
+        task_instance_ended_at: '',
+        task_total_duration_ms: '',
+        task_elapsed_ms_at_event: '',
+        task_page_dwell_ms: ''
+      };
+    }
+
+    const eventTimeMs = getRecordTimeMs(record);
+    let elapsedMs = '';
+    if (Number.isFinite(instance.startedAtMs) && Number.isFinite(eventTimeMs)) {
+      const cappedEventTime = Number.isFinite(instance.endedAtMs)
+        ? Math.min(eventTimeMs, instance.endedAtMs)
+        : eventTimeMs;
+      elapsedMs = Math.max(0, cappedEventTime - instance.startedAtMs);
+    }
+
+    return {
+      ...record,
+      task_instance_seq: instance.sequence,
+      task_instance_started_at: instance.startedAt,
+      task_instance_ended_at: instance.endedAt,
+      task_total_duration_ms: instance.totalDurationMs ?? '',
+      task_elapsed_ms_at_event: elapsedMs,
+      task_page_dwell_ms: String(record.event_type || '').trim().toLowerCase() === 'page_exit'
+        ? (record.duration_ms ?? '')
+        : ''
+    };
+  });
+};
+
 const buildTelemetryCsv = (records) => {
+  const recordsWithMetrics = addDerivedTaskMetrics(records);
   const header = telemetryCsvColumns.join(',');
-  const rows = records.map((record) => telemetryCsvColumns.map((column) => csvEscape(record[column])).join(','));
+  const rows = recordsWithMetrics.map((record) => telemetryCsvColumns.map((column) => csvEscape(record[column])).join(','));
   return [header, ...rows].join('\n');
 };
 
@@ -886,20 +997,7 @@ app.post('/api/telemetry', async (req, res) => {
   withTelemetryCors(res);
 
   try {
-    let payload = null;
-    if (req.body && typeof req.body === 'object' && !Array.isArray(req.body)) {
-      payload = req.body;
-    } else if (typeof req.body === 'string' && req.body.trim()) {
-      try {
-        const parsed = JSON.parse(req.body);
-        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-          payload = parsed;
-        }
-      } catch {
-        payload = null;
-      }
-    }
-
+    const payload = req.body && typeof req.body === 'object' ? req.body : null;
     if (!payload || !payload.event_type) {
       return res.status(400).json({ error: 'event_type is required' });
     }
