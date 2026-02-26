@@ -269,7 +269,8 @@ class ChatBot {
 
       if (window.MTGTelemetry) {
         window.MTGTelemetry.track('chat_response', {
-          response_length: String(data.response || '').length
+          response_length: String(data.response || '').length,
+          response_message: String(data.response || '').slice(0, 4000)
         });
       }
     } catch (error) {

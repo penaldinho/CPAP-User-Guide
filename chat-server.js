@@ -134,6 +134,7 @@ const telemetryCsvColumns = [
   'target_href',
   'link_text',
   'chat_message',
+  'response_message',
   'response_length',
   'duration_ms',
   'referrer'
@@ -158,6 +159,7 @@ const telemetrySqlColumns = [
   'target_href',
   'link_text',
   'chat_message',
+  'response_message',
   'response_length',
   'duration_ms',
   'referrer'
@@ -182,6 +184,7 @@ const projectTelemetryRecord = (record) => ({
   target_href: record.target_href || '',
   link_text: record.link_text || '',
   chat_message: record.chat_message || '',
+  response_message: record.response_message || '',
   response_length: record.response_length ?? '',
   duration_ms: record.duration_ms ?? '',
   referrer: record.referrer || ''

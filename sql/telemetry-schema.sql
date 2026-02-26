@@ -18,10 +18,14 @@ CREATE TABLE IF NOT EXISTS telemetry_events (
   target_href TEXT,
   link_text TEXT,
   chat_message TEXT,
+  response_message TEXT,
   response_length INTEGER,
   duration_ms INTEGER,
   referrer TEXT
 );
+
+ALTER TABLE telemetry_events
+  ADD COLUMN IF NOT EXISTS response_message TEXT;
 
 CREATE INDEX IF NOT EXISTS idx_telemetry_participant_timestamp
   ON telemetry_events (participant_id, received_at DESC);
