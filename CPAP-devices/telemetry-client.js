@@ -71,6 +71,12 @@
 
   const hydrateTaskStateFromUrl = () => {
     const url = new URL(window.location.href);
+    const shouldClearTask = String(url.searchParams.get('mtg_task_clear') || '').trim() === '1';
+    if (shouldClearTask) {
+      setTaskState({});
+      return;
+    }
+
     const taskId = String(url.searchParams.get('mtg_task_id') || '').trim();
     if (!taskId) return;
 

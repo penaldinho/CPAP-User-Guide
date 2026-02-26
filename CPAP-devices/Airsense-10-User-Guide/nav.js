@@ -62,7 +62,55 @@ function injectNav(currentPageFile) {
     const isHostedChat = /(^|\.)chat\.medtechguides\.uk$/i.test(window.location.hostname);
     const hostedChatSetupHref = 'https://chat.medtechguides.uk/chat-setup.html?guide=airsense-10&family=cpap';
     const guideBaseHref = isHostedChat ? 'https://medtechguides.uk/CPAP-devices/Airsense-10-User-Guide/' : '';
-    const guideHref = (path) => guideBaseHref ? `${guideBaseHref}${path}` : path;
+    const buildTelemetryContextParams = (includeTaskClear = false) => {
+      const params = new URLSearchParams();
+      const currentParams = new URLSearchParams(window.location.search);
+      const participantId = String(localStorage.getItem('mtg-telemetry-participant-id') || '').trim();
+      if (participantId) {
+        params.set('mtg_participant_id', participantId);
+      }
+
+      try {
+        const activeTask = JSON.parse(sessionStorage.getItem('mtg-telemetry-task-state') || '{}');
+        if (activeTask.task_id) {
+          params.set('mtg_task_id', String(activeTask.task_id));
+          if (activeTask.task_label) {
+            params.set('mtg_task_label', String(activeTask.task_label));
+          }
+          if (activeTask.started_at) {
+            params.set('mtg_task_started_at', String(activeTask.started_at));
+          }
+        } else if (includeTaskClear) {
+          params.set('mtg_task_clear', '1');
+        }
+      } catch {
+        if (includeTaskClear) {
+          params.set('mtg_task_clear', '1');
+        }
+      }
+
+      const research = String(currentParams.get('research') || '').trim();
+      if (research) {
+        params.set('research', research);
+      }
+
+      return params;
+    };
+
+    const appendContextToHref = (href, includeTaskClear = false) => {
+      const url = new URL(href, window.location.origin);
+      const params = buildTelemetryContextParams(includeTaskClear);
+      params.forEach((value, key) => {
+        url.searchParams.set(key, value);
+      });
+      return url.toString();
+    };
+
+    const guideHref = (path) => {
+      const base = guideBaseHref ? `${guideBaseHref}${path}` : path;
+      if (!isHostedChat) return base;
+      return appendContextToHref(base, true);
+    };
     // Always link home button to the main landing page at the root
     const getLandingHref = () => 'https://medtechguides.uk/index.html';
     const getSetupGuides = () => {
@@ -81,45 +129,17 @@ function injectNav(currentPageFile) {
       }
     };
     const landingHref = getLandingHref();
-    const setupGuides = [...new Set(getSetupGuides())];
-    const setupGuidesQuery = setupGuides.length
-      ? `&guides=${encodeURIComponent(setupGuides.join(','))}`
-      : '';
-    const activeTaskQuery = (() => {
-      try {
-        const activeTask = JSON.parse(sessionStorage.getItem('mtg-telemetry-task-state') || '{}');
-        if (!activeTask.task_id) return '';
-        const params = new URLSearchParams();
-        params.set('mtg_task_id', String(activeTask.task_id));
-        if (activeTask.task_label) {
-          params.set('mtg_task_label', String(activeTask.task_label));
-        }
-        if (activeTask.started_at) {
-          params.set('mtg_task_started_at', String(activeTask.started_at));
-        }
-        return `&${params.toString()}`;
-      } catch {
-        return '';
-      }
-    })();
-    const participantQuery = (() => {
-      try {
-        const participantId = String(localStorage.getItem('mtg-telemetry-participant-id') || '').trim();
-        if (!participantId) return '';
-        return `&mtg_participant_id=${encodeURIComponent(participantId)}`;
-      } catch {
-        return '';
-      }
-    })();
-    const researchQuery = (() => {
-      const research = String(urlParams.get('research') || '').trim();
-      return research ? `&research=${encodeURIComponent(research)}` : '';
-    })();
-    const localChatHref = `http://localhost:3000/chat-setup.html?guide=airsense-10&family=cpap${setupGuidesQuery}${activeTaskQuery}${participantQuery}${researchQuery}`;
-    const hostedChatHrefWithSetup = `${hostedChatSetupHref}${setupGuidesQuery}${activeTaskQuery}${participantQuery}${researchQuery}`;
-    const chatHref = isLocalHost && window.location.port !== '3000'
-      ? localChatHref
-      : hostedChatHrefWithSetup;
+    const buildChatHref = () => {
+      const setupGuides = [...new Set(getSetupGuides())];
+      const setupGuidesQuery = setupGuides.length
+        ? `&guides=${encodeURIComponent(setupGuides.join(','))}`
+        : '';
+      const localBase = `http://localhost:3000/chat-setup.html?guide=airsense-10&family=cpap${setupGuidesQuery}`;
+      const hostedBase = `${hostedChatSetupHref}${setupGuidesQuery}`;
+      const base = isLocalHost && window.location.port !== '3000' ? localBase : hostedBase;
+      return appendContextToHref(base, false);
+    };
+    const chatHref = buildChatHref();
     const isChatCalloutDismissed = (() => {
       try {
         return sessionStorage.getItem('chat-callout-dismissed') === 'true';
@@ -141,7 +161,7 @@ function injectNav(currentPageFile) {
       <div class="nav-list">
         <a class="nav-link-primary nav-link-home" href="${landingHref}"><span class="nav-link-icon" aria-hidden="true">🏠</span>MedTech Guides</a>
         <a class="nav-link-primary" href="${guideHref('index.html')}"><span class="nav-link-icon" aria-hidden="true">📚</span>Contents</a>
-        <a class="nav-link-primary" href="${chatHref}"${chatCurrent}><span class="nav-link-icon" aria-hidden="true">💬</span>Chat Assistant</a>
+        <a class="nav-link-primary nav-link-primary-chat" href="${chatHref}"${chatCurrent}><span class="nav-link-icon" aria-hidden="true">💬</span>Chat Assistant</a>
         <a class="nav-link-primary" href="${guideHref('search.html')}"${searchCurrent}><span class="nav-link-icon" aria-hidden="true">🔍</span>Search</a>
         <a class="nav-link-primary" href="${guideHref('video-library.html')}"${videoLibraryCurrent}><span class="nav-link-icon" aria-hidden="true">🎬</span>Video Library</a>
         ${navItems.map(item => {
@@ -172,6 +192,20 @@ function injectNav(currentPageFile) {
         </a>
       </div>
     `;
+
+    const refreshChatLinks = () => {
+      const latestChatHref = buildChatHref();
+      navContainer.querySelectorAll('.nav-link-primary-chat, .nav-action-chat').forEach((link) => {
+        link.href = latestChatHref;
+      });
+    };
+
+    refreshChatLinks();
+    navContainer.querySelectorAll('.nav-link-primary-chat, .nav-action-chat').forEach((link) => {
+      link.addEventListener('mouseenter', refreshChatLinks);
+      link.addEventListener('focus', refreshChatLinks);
+      link.addEventListener('click', refreshChatLinks);
+    });
     
     // Initialize nav text size controls
     const navTextSizeBtns = navContainer.querySelectorAll('.nav-text-size-btn');
@@ -521,45 +555,47 @@ function injectNav(currentPageFile) {
       const setupGuidesQuery = setupGuides.length
         ? `&guides=${encodeURIComponent(setupGuides.join(','))}`
         : '';
-      const currentParams = new URLSearchParams(window.location.search);
-      const participantQuery = (() => {
-        try {
-          const participantId = String(localStorage.getItem('mtg-telemetry-participant-id') || '').trim();
-          if (!participantId) return '';
-          return `&mtg_participant_id=${encodeURIComponent(participantId)}`;
-        } catch {
-          return '';
+      const buildChatHref = () => {
+        const params = new URLSearchParams(window.location.search);
+        const participantId = String(localStorage.getItem('mtg-telemetry-participant-id') || '').trim();
+        if (participantId) {
+          params.set('mtg_participant_id', participantId);
         }
-      })();
-      const activeTaskQuery = (() => {
         try {
           const activeTask = JSON.parse(sessionStorage.getItem('mtg-telemetry-task-state') || '{}');
-          if (!activeTask.task_id) return '';
-          const params = new URLSearchParams();
-          params.set('mtg_task_id', String(activeTask.task_id));
-          if (activeTask.task_label) {
-            params.set('mtg_task_label', String(activeTask.task_label));
+          if (activeTask.task_id) {
+            params.set('mtg_task_id', String(activeTask.task_id));
+            if (activeTask.task_label) {
+              params.set('mtg_task_label', String(activeTask.task_label));
+            }
+            if (activeTask.started_at) {
+              params.set('mtg_task_started_at', String(activeTask.started_at));
+            }
           }
-          if (activeTask.started_at) {
-            params.set('mtg_task_started_at', String(activeTask.started_at));
-          }
-          return `&${params.toString()}`;
         } catch {
-          return '';
+          // Ignore task read errors
         }
-      })();
-      const researchQuery = (() => {
-        const research = String(currentParams.get('research') || '').trim();
-        return research ? `&research=${encodeURIComponent(research)}` : '';
-      })();
-      const localChatHref = `http://localhost:3000/chat-setup.html?guide=airsense-10&family=cpap${setupGuidesQuery}${activeTaskQuery}${participantQuery}${researchQuery}`;
-      const hostedChatHrefWithSetup = `${hostedChatSetupHref}${setupGuidesQuery}${activeTaskQuery}${participantQuery}${researchQuery}`;
-      const chatHref = isLocalHost && window.location.port !== '3000'
-        ? localChatHref
-        : hostedChatHrefWithSetup;
+        const contextQuery = params.toString();
+        const localBase = `http://localhost:3000/chat-setup.html?guide=airsense-10&family=cpap${setupGuidesQuery}`;
+        const hostedBase = `${hostedChatSetupHref}${setupGuidesQuery}`;
+        const base = isLocalHost && window.location.port !== '3000' ? localBase : hostedBase;
+        const url = new URL(base, window.location.origin);
+        const contextParams = new URLSearchParams(contextQuery);
+        contextParams.forEach((value, key) => {
+          if (key === 'guide' || key === 'family' || key === 'guides') return;
+          url.searchParams.set(key, value);
+        });
+        return url.toString();
+      };
       const chatButton = document.createElement('a');
       chatButton.className = 'chat-button';
-      chatButton.href = chatHref;
+      chatButton.href = buildChatHref();
+      const refreshChatButtonHref = () => {
+        chatButton.href = buildChatHref();
+      };
+      chatButton.addEventListener('mouseenter', refreshChatButtonHref);
+      chatButton.addEventListener('focus', refreshChatButtonHref);
+      chatButton.addEventListener('click', refreshChatButtonHref);
       chatButton.setAttribute('aria-label', 'Chat Assistant');
       chatButton.innerHTML = '<span class="chat-icon" aria-hidden="true">💬</span><span class="visually-hidden">Chat Assistant</span><span class="tooltip" role="tooltip">Chat assistant</span>';
       header.appendChild(chatButton);
