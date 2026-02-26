@@ -454,6 +454,15 @@
   };
 
   const renderResearchPanel = (forceOpen = false) => {
+    const activeTask = getTaskState();
+    if (activeTask.task_id) {
+      const existingPanel = document.getElementById('mtg-research-panel');
+      if (existingPanel) {
+        existingPanel.remove();
+      }
+      return;
+    }
+
     if (!forceOpen && !isResearchMode()) return;
     if (document.getElementById('mtg-research-panel')) return;
 
