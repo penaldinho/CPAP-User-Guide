@@ -107,8 +107,21 @@ function injectNav(currentPageFile) {
         return '';
       }
     })();
-    const localChatHref = `http://localhost:3000/chat-setup.html?guide=fp-vitera&family=cpap${setupGuidesQuery}${activeTaskQuery}`;
-    const hostedChatHrefWithSetup = `${hostedChatSetupHref}${setupGuidesQuery}${activeTaskQuery}`;
+    const participantQuery = (() => {
+      try {
+        const participantId = String(safeGetItem('mtg-telemetry-participant-id') || '').trim();
+        if (!participantId) return '';
+        return `&mtg_participant_id=${encodeURIComponent(participantId)}`;
+      } catch {
+        return '';
+      }
+    })();
+    const researchQuery = (() => {
+      const research = String(urlParams.get('research') || '').trim();
+      return research ? `&research=${encodeURIComponent(research)}` : '';
+    })();
+    const localChatHref = `http://localhost:3000/chat-setup.html?guide=fp-vitera&family=cpap${setupGuidesQuery}${activeTaskQuery}${participantQuery}${researchQuery}`;
+    const hostedChatHrefWithSetup = `${hostedChatSetupHref}${setupGuidesQuery}${activeTaskQuery}${participantQuery}${researchQuery}`;
     const chatHref = isLocalHost && window.location.port !== '3000'
       ? localChatHref
       : hostedChatHrefWithSetup;

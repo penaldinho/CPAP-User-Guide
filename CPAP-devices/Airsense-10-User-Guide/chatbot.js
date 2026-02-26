@@ -36,14 +36,26 @@ class ChatBot {
 
     const currentParams = new URLSearchParams(window.location.search);
     const family = (currentParams.get('family') || 'cpap').toLowerCase();
+    const telemetryContext = window.MTGTelemetry && typeof window.MTGTelemetry.getContext === 'function'
+      ? window.MTGTelemetry.getContext()
+      : {};
 
     url.searchParams.set('family', family);
     url.searchParams.set('guide', guideKey);
     url.searchParams.set('guides', guideKey);
 
-    const taskId = currentParams.get('mtg_task_id');
-    const taskLabel = currentParams.get('mtg_task_label');
-    const taskStartedAt = currentParams.get('mtg_task_started_at');
+    const participantId = currentParams.get('mtg_participant_id')
+      || telemetryContext.participant_id
+      || localStorage.getItem('mtg-telemetry-participant-id')
+      || '';
+    const taskId = currentParams.get('mtg_task_id') || telemetryContext.task_id || '';
+    const taskLabel = currentParams.get('mtg_task_label') || telemetryContext.task_label || '';
+    const taskStartedAt = currentParams.get('mtg_task_started_at') || telemetryContext.task_started_at || '';
+    const research = currentParams.get('research');
+
+    if (participantId) {
+      url.searchParams.set('mtg_participant_id', participantId);
+    }
     if (taskId) {
       url.searchParams.set('mtg_task_id', taskId);
     }
@@ -52,6 +64,9 @@ class ChatBot {
     }
     if (taskStartedAt) {
       url.searchParams.set('mtg_task_started_at', taskStartedAt);
+    }
+    if (research) {
+      url.searchParams.set('research', research);
     }
 
     return `${url.pathname}${url.search}`;

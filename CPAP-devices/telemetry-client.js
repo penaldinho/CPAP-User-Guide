@@ -47,6 +47,16 @@
 
   const getParticipantId = () => localStorage.getItem(participantKey) || '';
 
+  const setParticipantIdRaw = (participantId) => {
+    const value = String(participantId || '').trim();
+    if (!value) {
+      localStorage.removeItem(participantKey);
+      return '';
+    }
+    localStorage.setItem(participantKey, value);
+    return value;
+  };
+
   const getTaskState = () => safeJsonParse(sessionStorage.getItem(taskStateKey) || '{}', {});
 
   const setTaskState = (state) => {
@@ -76,6 +86,16 @@
       task_label: taskLabel,
       started_at: startedAt
     });
+  };
+
+  const hydrateParticipantFromUrl = () => {
+    const url = new URL(window.location.href);
+    const participantId = String(url.searchParams.get('mtg_participant_id') || '').trim();
+    if (!participantId) return;
+
+    const existing = getParticipantId();
+    if (existing === participantId) return;
+    setParticipantIdRaw(participantId);
   };
 
   const isResearchMode = () => {
@@ -139,14 +159,24 @@
   };
 
   const setParticipantId = (participantId) => {
-    const value = String(participantId || '').trim();
-    if (!value) {
-      localStorage.removeItem(participantKey);
-      return;
-    }
-    localStorage.setItem(participantKey, value);
+    const value = setParticipantIdRaw(participantId);
+    if (!value) return;
     track('participant_set', { participant_id: value });
   };
+
+  const getActiveTaskContext = () => {
+    const taskState = getTaskState();
+    return {
+      task_id: taskState.task_id || '',
+      task_label: taskState.task_label || '',
+      task_started_at: taskState.started_at || ''
+    };
+  };
+
+  const getContext = () => ({
+    participant_id: getParticipantId(),
+    ...getActiveTaskContext()
+  });
 
   const startTask = (taskId, label) => {
     if (!taskId) return;
@@ -402,6 +432,7 @@
   };
 
   const init = () => {
+    hydrateParticipantFromUrl();
     hydrateTaskStateFromUrl();
     getOrCreateSessionId();
     track('page_view', {
@@ -446,7 +477,9 @@
     track,
     setParticipantId,
     startTask,
-    endTask
+    endTask,
+    getContext,
+    getActiveTaskContext
   };
 
   if (document.readyState === 'loading') {
