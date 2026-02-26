@@ -44,6 +44,25 @@ class ChatBot {
     url.searchParams.set('guide', guideKey);
     url.searchParams.set('guides', guideKey);
 
+    const hasUrlContext = Array.from(currentParams.keys()).some((key) => key === 'research' || key.startsWith('mtg_'));
+    const hasActiveTask = Boolean(
+      currentParams.get('mtg_task_id')
+      || telemetryContext.task_id
+      || telemetryContext.task_started_at
+      || (() => {
+        try {
+          const state = JSON.parse(sessionStorage.getItem('mtg-telemetry-task-state') || '{}');
+          return state && state.task_id;
+        } catch {
+          return false;
+        }
+      })()
+    );
+
+    if (!hasUrlContext && !hasActiveTask) {
+      return `${url.pathname}${url.search}`;
+    }
+
     const participantId = currentParams.get('mtg_participant_id')
       || telemetryContext.participant_id
       || localStorage.getItem('mtg-telemetry-participant-id')
