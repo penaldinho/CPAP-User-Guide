@@ -76,8 +76,25 @@ function injectNav(currentPageFile) {
     const setupGuidesQuery = setupGuides.length
       ? `&guides=${encodeURIComponent(setupGuides.join(','))}`
       : '';
-    const localChatHref = `http://localhost:3000/chat-setup.html?guide=climatelineair&family=cpap${setupGuidesQuery}`;
-    const hostedChatHrefWithSetup = `${hostedChatSetupHref}${setupGuidesQuery}`;
+    const activeTaskQuery = (() => {
+      try {
+        const activeTask = JSON.parse(sessionStorage.getItem('mtg-telemetry-task-state') || '{}');
+        if (!activeTask.task_id) return '';
+        const params = new URLSearchParams();
+        params.set('mtg_task_id', String(activeTask.task_id));
+        if (activeTask.task_label) {
+          params.set('mtg_task_label', String(activeTask.task_label));
+        }
+        if (activeTask.started_at) {
+          params.set('mtg_task_started_at', String(activeTask.started_at));
+        }
+        return `&${params.toString()}`;
+      } catch {
+        return '';
+      }
+    })();
+    const localChatHref = `http://localhost:3000/chat-setup.html?guide=climatelineair&family=cpap${setupGuidesQuery}${activeTaskQuery}`;
+    const hostedChatHrefWithSetup = `${hostedChatSetupHref}${setupGuidesQuery}${activeTaskQuery}`;
     const chatHref = isLocalHost && window.location.port !== '3000'
       ? localChatHref
       : hostedChatHrefWithSetup;

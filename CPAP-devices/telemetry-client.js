@@ -59,6 +59,25 @@
     sessionStorage.setItem(lastTaskResultKey, JSON.stringify(result || {}));
   };
 
+  const hydrateTaskStateFromUrl = () => {
+    const url = new URL(window.location.href);
+    const taskId = String(url.searchParams.get('mtg_task_id') || '').trim();
+    if (!taskId) return;
+
+    const existing = getTaskState();
+    if (existing.task_id) return;
+
+    const taskLabel = String(url.searchParams.get('mtg_task_label') || '').trim();
+    const taskStartedAt = String(url.searchParams.get('mtg_task_started_at') || '').trim();
+    const startedAt = taskStartedAt || new Date().toISOString();
+
+    setTaskState({
+      task_id: taskId,
+      task_label: taskLabel,
+      started_at: startedAt
+    });
+  };
+
   const isResearchMode = () => {
     const url = new URL(window.location.href);
     const flag = String(url.searchParams.get('research') || '').toLowerCase();
@@ -383,6 +402,7 @@
   };
 
   const init = () => {
+    hydrateTaskStateFromUrl();
     getOrCreateSessionId();
     track('page_view', {
       referrer: document.referrer || ''

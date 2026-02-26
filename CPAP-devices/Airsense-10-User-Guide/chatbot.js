@@ -41,6 +41,19 @@ class ChatBot {
     url.searchParams.set('guide', guideKey);
     url.searchParams.set('guides', guideKey);
 
+    const taskId = currentParams.get('mtg_task_id');
+    const taskLabel = currentParams.get('mtg_task_label');
+    const taskStartedAt = currentParams.get('mtg_task_started_at');
+    if (taskId) {
+      url.searchParams.set('mtg_task_id', taskId);
+    }
+    if (taskLabel) {
+      url.searchParams.set('mtg_task_label', taskLabel);
+    }
+    if (taskStartedAt) {
+      url.searchParams.set('mtg_task_started_at', taskStartedAt);
+    }
+
     return `${url.pathname}${url.search}`;
   }
 
