@@ -236,6 +236,18 @@
   const track = (eventType, payload) => {
     if (!eventType) return;
     const taskState = getTaskState();
+
+    const alwaysAllowedWithoutTask = new Set([
+      'participant_set',
+      'task_start',
+      'task_end',
+      'task_end_clicked_by_participant'
+    ]);
+
+    if (!taskState.task_id && !alwaysAllowedWithoutTask.has(eventType)) {
+      return;
+    }
+
     const event = {
       ...buildBasePayload(),
       event_type: eventType,
