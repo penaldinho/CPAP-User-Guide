@@ -71,6 +71,21 @@
     const targetIsChatPage = targetPath.endsWith('/chat.html') || targetPath.endsWith('/chat-setup.html');
 
     const includeTaskClear = !targetIsChatHost && !targetIsChatPage;
+
+    [
+      'mtg_task_id',
+      'mtg_task_label',
+      'mtg_task_started_at',
+      'mtg_task_clear',
+      'mtg_last_task_id',
+      'mtg_last_task_label',
+      'mtg_last_task_status',
+      'mtg_last_task_duration_ms',
+      'mtg_last_task_ended_at'
+    ].forEach((key) => {
+      targetUrl.searchParams.delete(key);
+    });
+
     const contextParams = buildNavigationContextParams(includeTaskClear);
     contextParams.forEach((value, key) => {
       targetUrl.searchParams.set(key, value);
