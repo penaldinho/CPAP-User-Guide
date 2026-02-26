@@ -20,12 +20,16 @@ CREATE TABLE IF NOT EXISTS telemetry_events (
   chat_message TEXT,
   response_message TEXT,
   response_length INTEGER,
+  task_action_index INTEGER,
   duration_ms INTEGER,
   referrer TEXT
 );
 
 ALTER TABLE telemetry_events
   ADD COLUMN IF NOT EXISTS response_message TEXT;
+
+ALTER TABLE telemetry_events
+  ADD COLUMN IF NOT EXISTS task_action_index INTEGER;
 
 CREATE INDEX IF NOT EXISTS idx_telemetry_participant_timestamp
   ON telemetry_events (participant_id, received_at DESC);
@@ -47,6 +51,7 @@ WITH ordered AS (
     NULLIF(task_id, '') AS task_id,
     task_label,
     event_type,
+    task_action_index,
     duration_ms,
     page_path,
     SUM(CASE WHEN event_type = 'task_start' THEN 1 ELSE 0 END)
@@ -82,6 +87,7 @@ SELECT
   s.task_id,
   s.task_label,
   s.event_type,
+  s.task_action_index,
   s.duration_ms,
   s.page_path,
   s.task_instance_seq,

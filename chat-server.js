@@ -136,6 +136,7 @@ const telemetryCsvColumns = [
   'chat_message',
   'response_message',
   'response_length',
+  'task_action_index',
   'duration_ms',
   'referrer',
   'task_instance_seq',
@@ -167,6 +168,7 @@ const telemetrySqlColumns = [
   'chat_message',
   'response_message',
   'response_length',
+  'task_action_index',
   'duration_ms',
   'referrer'
 ];
@@ -192,6 +194,7 @@ const projectTelemetryRecord = (record) => ({
   chat_message: record.chat_message || '',
   response_message: record.response_message || '',
   response_length: record.response_length ?? '',
+  task_action_index: record.task_action_index ?? '',
   duration_ms: record.duration_ms ?? '',
   referrer: record.referrer || ''
 });
@@ -370,19 +373,85 @@ const normalizeTelemetryRecordForSql = (record) => {
     timestamp: parseDateSafely(record.timestamp || projected.timestamp),
     result_count: parseIntegerSafely(projected.result_count),
     response_length: parseIntegerSafely(projected.response_length),
+    task_action_index: parseIntegerSafely(projected.task_action_index),
     duration_ms: parseIntegerSafely(projected.duration_ms)
   };
+};
+
+const computeTaskActionIndexPostgres = async (client, normalizedRecord) => {
+  const eventType = String(normalizedRecord.event_type || '').trim().toLowerCase();
+  const taskId = String(normalizedRecord.task_id || '').trim();
+  const sessionId = String(normalizedRecord.session_id || '').trim();
+  const participantId = String(normalizedRecord.participant_id || '').trim();
+
+  if (!taskId || !sessionId || !participantId) {
+    return null;
+  }
+
+  if (eventType === 'task_start') {
+    return 0;
+  }
+
+  const lockKey = `${sessionId}|${participantId}|${taskId}`;
+  await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [lockKey]);
+
+  const lastStartResult = await client.query(
+    `
+      SELECT id
+      FROM telemetry_events
+      WHERE session_id = $1
+        AND participant_id = $2
+        AND task_id = $3
+        AND event_type = 'task_start'
+      ORDER BY id DESC
+      LIMIT 1
+    `,
+    [sessionId, participantId, taskId]
+  );
+
+  const lastStartId = lastStartResult.rows[0] ? Number(lastStartResult.rows[0].id) : null;
+
+  const maxIndexResult = await client.query(
+    `
+      SELECT MAX(task_action_index) AS max_index
+      FROM telemetry_events
+      WHERE session_id = $1
+        AND participant_id = $2
+        AND task_id = $3
+        AND ($4::BIGINT IS NULL OR id >= $4::BIGINT)
+    `,
+    [sessionId, participantId, taskId, Number.isFinite(lastStartId) ? lastStartId : null]
+  );
+
+  const maxIndex = parseIntegerSafely(maxIndexResult.rows[0] && maxIndexResult.rows[0].max_index);
+  if (maxIndex === null) {
+    return 1;
+  }
+
+  return maxIndex + 1;
 };
 
 const insertTelemetryRecordPostgres = async (record) => {
   const pool = getTelemetryPgPool();
   const normalized = normalizeTelemetryRecordForSql(record);
+  const client = await pool.connect();
 
-  const placeholders = telemetrySqlColumns.map((_, index) => `$${index + 1}`).join(', ');
-  const queryText = `INSERT INTO telemetry_events (${telemetrySqlColumns.join(', ')}) VALUES (${placeholders})`;
-  const values = telemetrySqlColumns.map((column) => normalized[column]);
+  try {
+    await client.query('BEGIN');
+    normalized.task_action_index = await computeTaskActionIndexPostgres(client, normalized);
 
-  await pool.query(queryText, values);
+    const placeholders = telemetrySqlColumns.map((_, index) => `$${index + 1}`).join(', ');
+    const queryText = `INSERT INTO telemetry_events (${telemetrySqlColumns.join(', ')}) VALUES (${placeholders})`;
+    const values = telemetrySqlColumns.map((column) => normalized[column]);
+
+    await client.query(queryText, values);
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
 };
 
 const readTelemetryRecordsPostgres = async (participantId) => {
