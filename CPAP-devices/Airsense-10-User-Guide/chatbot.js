@@ -51,6 +51,12 @@ class ChatBot {
     const taskId = currentParams.get('mtg_task_id') || telemetryContext.task_id || '';
     const taskLabel = currentParams.get('mtg_task_label') || telemetryContext.task_label || '';
     const taskStartedAt = currentParams.get('mtg_task_started_at') || telemetryContext.task_started_at || '';
+    const taskClear = currentParams.get('mtg_task_clear') || '';
+    const lastTaskId = currentParams.get('mtg_last_task_id') || '';
+    const lastTaskLabel = currentParams.get('mtg_last_task_label') || '';
+    const lastTaskStatus = currentParams.get('mtg_last_task_status') || '';
+    const lastTaskDuration = currentParams.get('mtg_last_task_duration_ms') || '';
+    const lastTaskEndedAt = currentParams.get('mtg_last_task_ended_at') || '';
     const research = currentParams.get('research');
 
     if (participantId) {
@@ -64,6 +70,24 @@ class ChatBot {
     }
     if (taskStartedAt) {
       url.searchParams.set('mtg_task_started_at', taskStartedAt);
+    }
+    if (taskClear) {
+      url.searchParams.set('mtg_task_clear', taskClear);
+    }
+    if (lastTaskId) {
+      url.searchParams.set('mtg_last_task_id', lastTaskId);
+    }
+    if (lastTaskLabel) {
+      url.searchParams.set('mtg_last_task_label', lastTaskLabel);
+    }
+    if (lastTaskStatus) {
+      url.searchParams.set('mtg_last_task_status', lastTaskStatus);
+    }
+    if (lastTaskDuration) {
+      url.searchParams.set('mtg_last_task_duration_ms', lastTaskDuration);
+    }
+    if (lastTaskEndedAt) {
+      url.searchParams.set('mtg_last_task_ended_at', lastTaskEndedAt);
     }
     if (research) {
       url.searchParams.set('research', research);

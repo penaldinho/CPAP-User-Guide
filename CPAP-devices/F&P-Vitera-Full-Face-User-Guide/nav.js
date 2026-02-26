@@ -96,6 +96,27 @@ function injectNav(currentPageFile) {
         }
       }
 
+      try {
+        const lastTask = JSON.parse(sessionStorage.getItem('mtg-telemetry-last-task-result') || '{}');
+        if (lastTask.task_id) {
+          params.set('mtg_last_task_id', String(lastTask.task_id));
+          if (lastTask.task_label) {
+            params.set('mtg_last_task_label', String(lastTask.task_label));
+          }
+          if (lastTask.task_status) {
+            params.set('mtg_last_task_status', String(lastTask.task_status));
+          }
+          if (Number.isFinite(lastTask.duration_ms)) {
+            params.set('mtg_last_task_duration_ms', String(lastTask.duration_ms));
+          }
+          if (lastTask.ended_at) {
+            params.set('mtg_last_task_ended_at', String(lastTask.ended_at));
+          }
+        }
+      } catch {
+        // Ignore last task read errors
+      }
+
       const research = String(currentParams.get('research') || '').trim();
       if (research) {
         params.set('research', research);

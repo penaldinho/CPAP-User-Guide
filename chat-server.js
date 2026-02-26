@@ -80,6 +80,7 @@ const baseDir = guideConfigs[defaultGuide].dir;
 
 const app = express();
 app.use(express.json());
+app.use('/api/telemetry', express.text({ type: '*/*' }));
 app.use(express.static(baseDir));
 app.use('/CPAP-devices', express.static(path.join(__dirname, 'CPAP-devices')));
 app.use('/images', express.static(path.join(__dirname, 'images')));
@@ -885,7 +886,20 @@ app.post('/api/telemetry', async (req, res) => {
   withTelemetryCors(res);
 
   try {
-    const payload = req.body && typeof req.body === 'object' ? req.body : null;
+    let payload = null;
+    if (req.body && typeof req.body === 'object' && !Array.isArray(req.body)) {
+      payload = req.body;
+    } else if (typeof req.body === 'string' && req.body.trim()) {
+      try {
+        const parsed = JSON.parse(req.body);
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          payload = parsed;
+        }
+      } catch {
+        payload = null;
+      }
+    }
+
     if (!payload || !payload.event_type) {
       return res.status(400).json({ error: 'event_type is required' });
     }

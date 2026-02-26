@@ -98,6 +98,12 @@
     const incomingTaskId = (urlParams.get('mtg_task_id') || '').trim();
     const incomingTaskLabel = (urlParams.get('mtg_task_label') || '').trim();
     const incomingTaskStartedAt = (urlParams.get('mtg_task_started_at') || '').trim();
+    const incomingTaskClear = (urlParams.get('mtg_task_clear') || '').trim();
+    const incomingLastTaskId = (urlParams.get('mtg_last_task_id') || '').trim();
+    const incomingLastTaskLabel = (urlParams.get('mtg_last_task_label') || '').trim();
+    const incomingLastTaskStatus = (urlParams.get('mtg_last_task_status') || '').trim();
+    const incomingLastTaskDuration = (urlParams.get('mtg_last_task_duration_ms') || '').trim();
+    const incomingLastTaskEndedAt = (urlParams.get('mtg_last_task_ended_at') || '').trim();
     const incomingResearch = (urlParams.get('research') || '').trim();
 
     const setOptions = (selectEl, options, includeNone = false) => {
@@ -361,6 +367,24 @@
         }
         if (incomingTaskStartedAt) {
           chatQuery.set('mtg_task_started_at', incomingTaskStartedAt);
+        }
+        if (incomingTaskClear) {
+          chatQuery.set('mtg_task_clear', incomingTaskClear);
+        }
+        if (incomingLastTaskId) {
+          chatQuery.set('mtg_last_task_id', incomingLastTaskId);
+        }
+        if (incomingLastTaskLabel) {
+          chatQuery.set('mtg_last_task_label', incomingLastTaskLabel);
+        }
+        if (incomingLastTaskStatus) {
+          chatQuery.set('mtg_last_task_status', incomingLastTaskStatus);
+        }
+        if (incomingLastTaskDuration) {
+          chatQuery.set('mtg_last_task_duration_ms', incomingLastTaskDuration);
+        }
+        if (incomingLastTaskEndedAt) {
+          chatQuery.set('mtg_last_task_ended_at', incomingLastTaskEndedAt);
         }
         if (incomingResearch) {
           chatQuery.set('research', incomingResearch);

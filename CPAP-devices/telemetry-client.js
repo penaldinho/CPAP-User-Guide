@@ -38,6 +38,11 @@
       params.set('mtg_task_clear', '1');
     }
 
+    const lastTaskParams = buildLastTaskParams();
+    lastTaskParams.forEach((value, key) => {
+      params.set(key, value);
+    });
+
     const research = String(currentUrl.searchParams.get('research') || '').trim();
     if (research) {
       params.set('research', research);
@@ -129,6 +134,62 @@
     sessionStorage.setItem(lastTaskResultKey, JSON.stringify(result || {}));
   };
 
+  const buildLastTaskParams = () => {
+    const params = new URLSearchParams();
+    const lastTask = getLastTaskResult();
+    if (!lastTask || !lastTask.task_id) {
+      return params;
+    }
+
+    params.set('mtg_last_task_id', String(lastTask.task_id));
+    if (lastTask.task_label) {
+      params.set('mtg_last_task_label', String(lastTask.task_label));
+    }
+    if (lastTask.task_status) {
+      params.set('mtg_last_task_status', String(lastTask.task_status));
+    }
+    if (Number.isFinite(lastTask.duration_ms)) {
+      params.set('mtg_last_task_duration_ms', String(lastTask.duration_ms));
+    }
+    if (lastTask.ended_at) {
+      params.set('mtg_last_task_ended_at', String(lastTask.ended_at));
+    }
+
+    return params;
+  };
+
+  const hydrateLastTaskResultFromUrl = () => {
+    const url = new URL(window.location.href);
+    const taskId = String(url.searchParams.get('mtg_last_task_id') || '').trim();
+    if (!taskId) {
+      return;
+    }
+
+    const taskLabel = String(url.searchParams.get('mtg_last_task_label') || '').trim();
+    const taskStatus = String(url.searchParams.get('mtg_last_task_status') || '').trim();
+    const durationRaw = String(url.searchParams.get('mtg_last_task_duration_ms') || '').trim();
+    const durationMs = /^-?\d+$/.test(durationRaw) ? Number(durationRaw) : null;
+    const endedAt = String(url.searchParams.get('mtg_last_task_ended_at') || '').trim();
+
+    const incoming = {
+      task_id: taskId,
+      task_label: taskLabel,
+      task_status: taskStatus,
+      duration_ms: Number.isFinite(durationMs) ? durationMs : null,
+      ended_at: endedAt || ''
+    };
+
+    const existing = getLastTaskResult();
+    const existingEndedAt = Date.parse(existing.ended_at || '');
+    const incomingEndedAt = Date.parse(incoming.ended_at || '');
+    const hasExisting = Boolean(existing && existing.task_id);
+    const incomingIsNewer = Number.isFinite(incomingEndedAt) && (!Number.isFinite(existingEndedAt) || incomingEndedAt >= existingEndedAt);
+
+    if (!hasExisting || incomingIsNewer) {
+      setLastTaskResult(incoming);
+    }
+  };
+
   const hydrateTaskStateFromUrl = () => {
     const url = new URL(window.location.href);
     const shouldClearTask = String(url.searchParams.get('mtg_task_clear') || '').trim() === '1';
@@ -139,9 +200,6 @@
 
     const taskId = String(url.searchParams.get('mtg_task_id') || '').trim();
     if (!taskId) return;
-
-    const existing = getTaskState();
-    if (existing.task_id) return;
 
     const taskLabel = String(url.searchParams.get('mtg_task_label') || '').trim();
     const taskStartedAt = String(url.searchParams.get('mtg_task_started_at') || '').trim();
@@ -191,6 +249,32 @@
     url.searchParams.delete('mtg_task_label');
     url.searchParams.delete('mtg_task_started_at');
     url.searchParams.set('mtg_task_clear', '1');
+
+    const lastTaskParams = buildLastTaskParams();
+    lastTaskParams.forEach((value, key) => {
+      url.searchParams.set(key, value);
+    });
+
+    window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
+  };
+
+  const markTaskActiveInUrl = (taskState) => {
+    const url = new URL(window.location.href);
+    const taskId = String(taskState && taskState.task_id || '').trim();
+    if (!taskId) {
+      return;
+    }
+
+    url.searchParams.set('mtg_task_id', taskId);
+    if (taskState.task_label) {
+      url.searchParams.set('mtg_task_label', String(taskState.task_label));
+    } else {
+      url.searchParams.delete('mtg_task_label');
+    }
+    if (taskState.started_at) {
+      url.searchParams.set('mtg_task_started_at', String(taskState.started_at));
+    }
+    url.searchParams.delete('mtg_task_clear');
     window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
   };
 
@@ -267,11 +351,13 @@
 
   const startTask = (taskId, label) => {
     if (!taskId) return;
-    setTaskState({
+    const nextState = {
       task_id: String(taskId),
       task_label: String(label || ''),
       started_at: new Date().toISOString()
-    });
+    };
+    setTaskState(nextState);
+    markTaskActiveInUrl(nextState);
     track('task_start', {
       task_id: String(taskId),
       task_label: String(label || '')
@@ -521,6 +607,7 @@
 
   const init = () => {
     hydrateParticipantFromUrl();
+    hydrateLastTaskResultFromUrl();
     hydrateTaskStateFromUrl();
     getOrCreateSessionId();
     track('page_view', {
