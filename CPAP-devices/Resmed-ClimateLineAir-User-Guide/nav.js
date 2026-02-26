@@ -150,7 +150,7 @@ function injectNav(currentPageFile) {
       const localBase = `http://localhost:3000/chat-setup.html?guide=climatelineair&family=cpap${setupGuidesQuery}`;
       const hostedBase = `${hostedChatSetupHref}${setupGuidesQuery}`;
       const base = isLocalHost && window.location.port !== '3000' ? localBase : hostedBase;
-      return appendContextToHref(base, false);
+      return appendContextToHref(base, true);
     };
     const chatHref = buildChatHref();
     const isChatCalloutDismissed = (() => {
@@ -561,6 +561,7 @@ function injectNav(currentPageFile) {
         try {
           const activeTask = JSON.parse(sessionStorage.getItem('mtg-telemetry-task-state') || '{}');
           if (activeTask.task_id) {
+            params.delete('mtg_task_clear');
             params.set('mtg_task_id', String(activeTask.task_id));
             if (activeTask.task_label) {
               params.set('mtg_task_label', String(activeTask.task_label));
@@ -568,6 +569,11 @@ function injectNav(currentPageFile) {
             if (activeTask.started_at) {
               params.set('mtg_task_started_at', String(activeTask.started_at));
             }
+          } else {
+            params.delete('mtg_task_id');
+            params.delete('mtg_task_label');
+            params.delete('mtg_task_started_at');
+            params.set('mtg_task_clear', '1');
           }
         } catch {
           // Ignore task read errors
