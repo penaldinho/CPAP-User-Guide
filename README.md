@@ -9,4 +9,4 @@ Interactive training materials and user guide for the AirSense 10 CPAP device.
 - Responsive design
 - Comprehensive technical specifications
 - Troubleshooting guides
-- Device care and maintenance instructions
+- Device care and maintenance instructions 
