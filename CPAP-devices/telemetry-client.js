@@ -253,8 +253,12 @@
 
     const taskId = String(url.searchParams.get('mtg_task_id') || '').trim();
     if (!taskId) {
-      if (isHostedChatHost(url.hostname)) {
-        setTaskState({});
+      const sharedState = getSharedTaskState();
+      if (sharedState && sharedState.task_id) {
+        setTaskSubscribedInTab(true);
+        markTaskActiveInUrl(sharedState);
+        enableResearchModeInUrl();
+      } else {
         setTaskSubscribedInTab(false);
       }
       return;
