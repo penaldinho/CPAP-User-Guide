@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Physical Trial Logger</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 0; background: #f4f6fb; color: #1f2937; }
+    .wrap { max-width: 760px; margin: 24px auto; padding: 0 16px; }
+    .card { background: #fff; border: 1px solid #dbe2ef; border-radius: 10px; padding: 16px; box-shadow: 0 6px 18px rgba(0,0,0,0.06); }
+    h1 { margin: 0 0 10px; font-size: 24px; }
+    p { margin: 0 0 14px; color: #4b5563; }
+    .grid { display: grid; gap: 10px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .full { grid-column: 1 / -1; }
+    label { display: grid; gap: 5px; font-size: 14px; }
+    input, textarea, select { width: 100%; box-sizing: border-box; border: 1px solid #cbd5e1; border-radius: 8px; padding: 10px 11px; font-size: 14px; }
+    textarea { min-height: 90px; resize: vertical; }
+    .btns { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+    button { border: 1px solid #1d4ed8; background: #1d4ed8; color: #fff; border-radius: 8px; padding: 9px 13px; font-weight: 600; cursor: pointer; }
+    button.secondary { background: #fff; color: #1d4ed8; }
+    #status { margin-top: 12px; font-size: 14px; }
+    .ok { color: #065f46; }
+    .err { color: #991b1b; }
+    .meta { font-size: 12px; color: #6b7280; margin-top: 8px; }
+    @media (max-width: 720px) { .grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>Physical Trial Logger</h1>
+      <p>Use this page during paper-manual sessions to log task events directly into the trial database.</p>
+
+      <div class="grid">
+        <label>
+          Participant ID / Name
+          <input id="participant_id" type="text" placeholder="e.g. P01 or Jane Smith" required />
+        </label>
+        <label>
+          Observer ID
+          <input id="observer_id" type="text" placeholder="e.g. OBS-1" />
+        </label>
+        <label>
+          Task ID
+          <input id="task_id" type="text" placeholder="e.g. Task 1" required />
+        </label>
+        <label>
+          Task Label
+          <input id="task_label" type="text" placeholder="e.g. Setting up device" />
+        </label>
+        <label>
+          Manual Page (optional)
+          <input id="manual_page" type="text" placeholder="e.g. 23" />
+        </label>
+        <label>
+          Event Type
+          <select id="event_type">
+            <option value="task_start">task_start</option>
+            <option value="task_end">task_end</option>
+            <option value="page_mark">page_mark</option>
+            <option value="note">note</option>
+          </select>
+        </label>
+        <label class="full">
+          Notes
+          <textarea id="notes" placeholder="Optional notes"></textarea>
+        </label>
+      </div>
+
+      <div class="btns">
+        <button id="btn-start" type="button">Start Task</button>
+        <button id="btn-end" type="button">End Task</button>
+        <button id="btn-page" type="button" class="secondary">Log Page Mark</button>
+        <button id="btn-note" type="button" class="secondary">Log Note</button>
+      </div>
+
+      <div id="status" aria-live="polite"></div>
+      <div class="meta" id="meta"></div>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      const host = window.location.hostname;
+      const isLocalHost = host === 'localhost' || host === '127.0.0.1';
+      const isHostedChat = /(^|\.)chat\.medtechguides\.uk$/i.test(host);
+      const endpoint = (isLocalHost || isHostedChat)
+        ? '/api/physical-trial'
+        : 'https://chat.medtechguides.uk/api/physical-trial';
+      const sessionKey = 'physical-trial-session-id';
+
+      const el = (id) => document.getElementById(id);
+      const participantInput = el('participant_id');
+      const observerInput = el('observer_id');
+      const taskIdInput = el('task_id');
+      const taskLabelInput = el('task_label');
+      const manualPageInput = el('manual_page');
+      const eventTypeSelect = el('event_type');
+      const notesInput = el('notes');
+      const statusEl = el('status');
+      const metaEl = el('meta');
+
+      const makeSessionId = () => `phys_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+      const getSessionId = () => {
+        let id = localStorage.getItem(sessionKey);
+        if (!id) {
+          id = makeSessionId();
+          localStorage.setItem(sessionKey, id);
+        }
+        return id;
+      };
+
+      const setStatus = (text, ok) => {
+        statusEl.textContent = text;
+        statusEl.className = ok ? 'ok' : 'err';
+      };
+
+      const validate = () => {
+        if (!String(participantInput.value || '').trim()) {
+          setStatus('Participant ID / Name is required.', false);
+          participantInput.focus();
+          return false;
+        }
+        if (!String(taskIdInput.value || '').trim()) {
+          setStatus('Task ID is required.', false);
+          taskIdInput.focus();
+          return false;
+        }
+        return true;
+      };
+
+      const submitEvent = async (eventTypeOverride) => {
+        if (!validate()) return;
+
+        const payload = {
+          timestamp: new Date().toISOString(),
+          session_id: getSessionId(),
+          participant_id: String(participantInput.value || '').trim(),
+          observer_id: String(observerInput.value || '').trim(),
+          task_id: String(taskIdInput.value || '').trim(),
+          task_label: String(taskLabelInput.value || '').trim(),
+          event_type: eventTypeOverride || String(eventTypeSelect.value || '').trim(),
+          manual_page: String(manualPageInput.value || '').trim(),
+          notes: String(notesInput.value || '').trim(),
+          source: 'physical_manual'
+        };
+
+        try {
+          const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+
+          if (!response.ok) {
+            let message = 'Failed to log event.';
+            try {
+              const data = await response.json();
+              if (data && data.error) message = data.error;
+            } catch {
+              // ignore parse failure
+            }
+            throw new Error(message);
+          }
+
+          setStatus(`Logged ${payload.event_type} for ${payload.participant_id} (${payload.task_id}).`, true);
+          metaEl.textContent = `Session: ${payload.session_id} • Last event at ${new Date(payload.timestamp).toLocaleString()}`;
+        } catch (error) {
+          setStatus(error.message || 'Failed to log event.', false);
+        }
+      };
+
+      el('btn-start').addEventListener('click', () => submitEvent('task_start'));
+      el('btn-end').addEventListener('click', () => submitEvent('task_end'));
+      el('btn-page').addEventListener('click', () => submitEvent('page_mark'));
+      el('btn-note').addEventListener('click', () => submitEvent('note'));
+
+      metaEl.textContent = `Session: ${getSessionId()}`;
+    })();
+  </script>
+</body>
+</html>

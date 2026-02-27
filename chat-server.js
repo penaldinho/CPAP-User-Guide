@@ -73,6 +73,7 @@ let telemetryLastWriteStatus = {
 const telemetryDir = path.join(__dirname, 'data');
 const telemetryFilePath = path.join(telemetryDir, 'telemetry-events.ndjson');
 const participantTelemetryDir = path.join(telemetryDir, 'participants');
+const physicalTrialFilePath = path.join(telemetryDir, 'physical-trial-events.ndjson');
 
 const excludedHtmlFiles = new Set(['chat.html', 'chat-setup.html', 'search.html']);
 
@@ -93,6 +94,9 @@ const ensureTelemetryStorage = () => {
   }
   if (!fs.existsSync(participantTelemetryDir)) {
     fs.mkdirSync(participantTelemetryDir, { recursive: true });
+  }
+  if (!fs.existsSync(physicalTrialFilePath)) {
+    fs.writeFileSync(physicalTrialFilePath, '');
   }
 };
 
@@ -173,6 +177,34 @@ const telemetrySqlColumns = [
   'referrer'
 ];
 
+const physicalTrialCsvColumns = [
+  'received_at',
+  'timestamp',
+  'session_id',
+  'participant_id',
+  'task_id',
+  'task_label',
+  'event_type',
+  'observer_id',
+  'manual_page',
+  'notes',
+  'source'
+];
+
+const physicalTrialSqlColumns = [
+  'received_at',
+  'timestamp',
+  'session_id',
+  'participant_id',
+  'task_id',
+  'task_label',
+  'event_type',
+  'observer_id',
+  'manual_page',
+  'notes',
+  'source'
+];
+
 const projectTelemetryRecord = (record) => ({
   received_at: record.received_at || '',
   timestamp: record.timestamp || '',
@@ -197,6 +229,20 @@ const projectTelemetryRecord = (record) => ({
   task_action_index: record.task_action_index ?? '',
   duration_ms: record.duration_ms ?? '',
   referrer: record.referrer || ''
+});
+
+const projectPhysicalTrialRecord = (record) => ({
+  received_at: record.received_at || '',
+  timestamp: record.timestamp || '',
+  session_id: record.session_id || '',
+  participant_id: record.participant_id || '',
+  task_id: record.task_id || '',
+  task_label: record.task_label || '',
+  event_type: record.event_type || '',
+  observer_id: record.observer_id || '',
+  manual_page: record.manual_page || '',
+  notes: record.notes || '',
+  source: record.source || 'physical_manual'
 });
 
 const readTelemetryRecordsFromNdjson = (filePath) => {
@@ -330,6 +376,12 @@ const buildTelemetryCsv = (records) => {
   return [header, ...rows].join('\n');
 };
 
+const buildPhysicalTrialCsv = (records) => {
+  const header = physicalTrialCsvColumns.join(',');
+  const rows = records.map((record) => physicalTrialCsvColumns.map((column) => csvEscape(record[column])).join(','));
+  return [header, ...rows].join('\n');
+};
+
 const parseDateSafely = (value) => {
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? null : date;
@@ -375,6 +427,15 @@ const normalizeTelemetryRecordForSql = (record) => {
     response_length: parseIntegerSafely(projected.response_length),
     task_action_index: parseIntegerSafely(projected.task_action_index),
     duration_ms: parseIntegerSafely(projected.duration_ms)
+  };
+};
+
+const normalizePhysicalTrialRecordForSql = (record) => {
+  const projected = projectPhysicalTrialRecord(record);
+  return {
+    ...projected,
+    received_at: parseDateSafely(record.received_at || projected.received_at || new Date().toISOString()),
+    timestamp: parseDateSafely(record.timestamp || projected.timestamp)
   };
 };
 
@@ -454,6 +515,17 @@ const insertTelemetryRecordPostgres = async (record) => {
   }
 };
 
+const insertPhysicalTrialRecordPostgres = async (record) => {
+  const pool = getTelemetryPgPool();
+  const normalized = normalizePhysicalTrialRecordForSql(record);
+
+  const placeholders = physicalTrialSqlColumns.map((_, index) => `$${index + 1}`).join(', ');
+  const queryText = `INSERT INTO physical_trial_events (${physicalTrialSqlColumns.join(', ')}) VALUES (${placeholders})`;
+  const values = physicalTrialSqlColumns.map((column) => normalized[column]);
+
+  await pool.query(queryText, values);
+};
+
 const readTelemetryRecordsPostgres = async (participantId) => {
   const pool = getTelemetryPgPool();
   const baseQuery = `
@@ -471,6 +543,23 @@ const readTelemetryRecordsPostgres = async (participantId) => {
   return result.rows.map(projectTelemetryRecord);
 };
 
+const readPhysicalTrialRecordsPostgres = async (participantId) => {
+  const pool = getTelemetryPgPool();
+  const baseQuery = `
+    SELECT ${physicalTrialSqlColumns.join(', ')}
+    FROM physical_trial_events
+  `;
+
+  const hasParticipantFilter = Boolean(String(participantId || '').trim());
+  const queryText = hasParticipantFilter
+    ? `${baseQuery} WHERE participant_id = $1 ORDER BY received_at ASC`
+    : `${baseQuery} ORDER BY received_at ASC`;
+  const queryValues = hasParticipantFilter ? [String(participantId).trim()] : [];
+
+  const result = await pool.query(queryText, queryValues);
+  return result.rows.map(projectPhysicalTrialRecord);
+};
+
 const writeTelemetryRecordToFiles = (record) => {
   ensureTelemetryStorage();
   fs.appendFileSync(telemetryFilePath, `${JSON.stringify(record)}\n`, 'utf8');
@@ -479,6 +568,11 @@ const writeTelemetryRecordToFiles = (record) => {
   if (participantLogPath) {
     fs.appendFileSync(participantLogPath, `${JSON.stringify(record)}\n`, 'utf8');
   }
+};
+
+const writePhysicalTrialRecordToFiles = (record) => {
+  ensureTelemetryStorage();
+  fs.appendFileSync(physicalTrialFilePath, `${JSON.stringify(record)}\n`, 'utf8');
 };
 
 const storeTelemetryRecord = async (record) => {
@@ -526,6 +620,24 @@ const storeTelemetryRecord = async (record) => {
   };
 };
 
+const storePhysicalTrialRecord = async (record) => {
+  if (telemetryUsePostgres) {
+    try {
+      await insertPhysicalTrialRecordPostgres(record);
+      return;
+    } catch (error) {
+      if (!telemetryFallbackToFile) {
+        throw error;
+      }
+      console.error('Postgres physical trial write failed, falling back to file store:', error.message);
+      writePhysicalTrialRecordToFiles(record);
+      return;
+    }
+  }
+
+  writePhysicalTrialRecordToFiles(record);
+};
+
 const readTelemetryRecordsForExport = async (participantId) => {
   if (telemetryUsePostgres) {
     try {
@@ -559,6 +671,50 @@ const readTelemetryRecordsForExport = async (participantId) => {
     ? getParticipantTelemetryPath(participantId)
     : telemetryFilePath;
   return readTelemetryRecordsFromNdjson(sourcePath);
+};
+
+const readPhysicalTrialRecordsFromNdjson = (filePath) => {
+  if (!filePath || !fs.existsSync(filePath)) return [];
+
+  const raw = fs.readFileSync(filePath, 'utf8');
+  const lines = raw.split(/\r?\n/).filter(Boolean);
+  const records = [];
+
+  for (const line of lines) {
+    try {
+      records.push(projectPhysicalTrialRecord(JSON.parse(line)));
+    } catch {
+      // ignore malformed lines
+    }
+  }
+
+  return records;
+};
+
+const readPhysicalTrialRecordsForExport = async (participantId) => {
+  if (telemetryUsePostgres) {
+    try {
+      const postgresRecords = await readPhysicalTrialRecordsPostgres(participantId);
+      if (postgresRecords.length > 0 || !telemetryFallbackToFile) {
+        return postgresRecords;
+      }
+
+      const fileRecords = readPhysicalTrialRecordsFromNdjson(physicalTrialFilePath);
+      if (fileRecords.length > 0) {
+        console.warn('Physical trial export served from file fallback because postgres returned no records.');
+      }
+      return fileRecords;
+    } catch (error) {
+      if (!telemetryFallbackToFile) {
+        throw error;
+      }
+      console.error('Physical trial export postgres read failed, using file fallback:', error.message);
+      return readPhysicalTrialRecordsFromNdjson(physicalTrialFilePath);
+    }
+  }
+
+  ensureTelemetryStorage();
+  return readPhysicalTrialRecordsFromNdjson(physicalTrialFilePath);
 };
 
 const withTelemetryCors = (res) => {
@@ -1062,6 +1218,49 @@ app.options('/api/telemetry', (req, res) => {
   res.status(204).end();
 });
 
+app.options('/api/physical-trial', (req, res) => {
+  withTelemetryCors(res);
+  res.status(204).end();
+});
+
+app.post('/api/physical-trial', async (req, res) => {
+  withTelemetryCors(res);
+
+  try {
+    const payload = req.body && typeof req.body === 'object' ? req.body : null;
+    const participantId = String(payload && payload.participant_id || '').trim();
+    const taskId = String(payload && payload.task_id || '').trim();
+    const eventType = String(payload && payload.event_type || '').trim();
+
+    if (!payload || !participantId || !taskId || !eventType) {
+      return res.status(400).json({ error: 'participant_id, task_id, and event_type are required' });
+    }
+
+    const allowedEventTypes = new Set(['task_start', 'task_end', 'page_mark', 'note']);
+    if (!allowedEventTypes.has(eventType)) {
+      return res.status(400).json({ error: 'event_type must be one of task_start, task_end, page_mark, note' });
+    }
+
+    ensureTelemetryStorage();
+
+    const record = projectPhysicalTrialRecord({
+      ...payload,
+      participant_id: participantId,
+      task_id: taskId,
+      event_type: eventType,
+      source: 'physical_manual',
+      received_at: new Date().toISOString(),
+      timestamp: payload.timestamp || new Date().toISOString()
+    });
+
+    await storePhysicalTrialRecord(record);
+    res.status(204).end();
+  } catch (error) {
+    console.error('Physical trial write error:', error);
+    res.status(500).json({ error: 'Failed to store physical trial event' });
+  }
+});
+
 app.post('/api/telemetry', async (req, res) => {
   withTelemetryCors(res);
 
@@ -1123,6 +1322,27 @@ app.get('/api/telemetry/export/participant/:participantId.csv', async (req, res)
   } catch (error) {
     console.error('Participant telemetry export error:', error);
     res.status(500).json({ error: 'Failed to export participant telemetry events' });
+  }
+});
+
+app.get('/api/physical-trial/export.csv', async (req, res) => {
+  withTelemetryCors(res);
+
+  try {
+    const participantId = String(req.query.participant_id || '').trim();
+    const records = await readPhysicalTrialRecordsForExport(participantId);
+    const csv = buildPhysicalTrialCsv(records);
+
+    const filename = participantId
+      ? `physical-trial-${sanitizeParticipantId(participantId)}.csv`
+      : 'physical-trial-events.csv';
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.status(200).send(csv);
+  } catch (error) {
+    console.error('Physical trial export error:', error);
+    res.status(500).json({ error: 'Failed to export physical trial events' });
   }
 });
 
