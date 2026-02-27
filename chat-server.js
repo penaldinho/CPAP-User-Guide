@@ -443,10 +443,9 @@ const normalizePhysicalTrialRecordForSql = (record) => {
 const computeTaskActionIndexPostgres = async (client, normalizedRecord) => {
   const eventType = String(normalizedRecord.event_type || '').trim().toLowerCase();
   const taskId = String(normalizedRecord.task_id || '').trim();
-  const sessionId = String(normalizedRecord.session_id || '').trim();
   const participantId = String(normalizedRecord.participant_id || '').trim();
 
-  if (!taskId || !sessionId || !participantId) {
+  if (!taskId || !participantId) {
     return null;
   }
 
@@ -454,21 +453,20 @@ const computeTaskActionIndexPostgres = async (client, normalizedRecord) => {
     return 0;
   }
 
-  const lockKey = `${sessionId}|${participantId}|${taskId}`;
+  const lockKey = `${participantId}|${taskId}`;
   await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [lockKey]);
 
   const lastStartResult = await client.query(
     `
       SELECT id
       FROM telemetry_events
-      WHERE session_id = $1
-        AND participant_id = $2
-        AND task_id = $3
+      WHERE participant_id = $1
+        AND task_id = $2
         AND event_type = 'task_start'
       ORDER BY id DESC
       LIMIT 1
     `,
-    [sessionId, participantId, taskId]
+    [participantId, taskId]
   );
 
   const lastStartId = lastStartResult.rows[0] ? Number(lastStartResult.rows[0].id) : null;
@@ -477,12 +475,11 @@ const computeTaskActionIndexPostgres = async (client, normalizedRecord) => {
     `
       SELECT MAX(task_action_index) AS max_index
       FROM telemetry_events
-      WHERE session_id = $1
-        AND participant_id = $2
-        AND task_id = $3
+      WHERE participant_id = $1
+        AND task_id = $2
         AND ($4::BIGINT IS NULL OR id >= $4::BIGINT)
     `,
-    [sessionId, participantId, taskId, Number.isFinite(lastStartId) ? lastStartId : null]
+    [participantId, taskId, Number.isFinite(lastStartId) ? lastStartId : null]
   );
 
   const maxIndex = parseIntegerSafely(maxIndexResult.rows[0] && maxIndexResult.rows[0].max_index);
