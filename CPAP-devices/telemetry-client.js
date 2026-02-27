@@ -342,6 +342,39 @@
     window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
   };
 
+  const reconcileSharedTaskState = () => {
+    const url = new URL(window.location.href);
+    const shouldClearTask = String(url.searchParams.get('mtg_task_clear') || '').trim() === '1';
+    if (shouldClearTask) {
+      const wasSubscribed = isTaskSubscribedInTab();
+      if (wasSubscribed) {
+        setTaskSubscribedInTab(false);
+        renderResearchPanel(true);
+      }
+      syncParticipantEndButton();
+      return;
+    }
+
+    const sharedState = getSharedTaskState();
+    if (sharedState && sharedState.task_id) {
+      if (!isTaskSubscribedInTab()) {
+        setTaskSubscribedInTab(true);
+      }
+      markTaskActiveInUrl(sharedState);
+      enableResearchModeInUrl();
+      renderResearchPanel();
+      syncParticipantEndButton();
+      return;
+    }
+
+    if (isTaskSubscribedInTab()) {
+      setTaskSubscribedInTab(false);
+      markTaskClearedInUrl();
+      renderResearchPanel(true);
+    }
+    syncParticipantEndButton();
+  };
+
   const buildBasePayload = () => {
     const url = new URL(window.location.href);
     return {
@@ -732,21 +765,18 @@
 
     window.addEventListener('storage', (event) => {
       if (event.key === taskStateKey) {
-        if (isTaskSubscribedInTab()) {
-          const sharedState = getSharedTaskState();
-          if (sharedState.task_id) {
-            markTaskActiveInUrl(sharedState);
-          } else {
-            setTaskSubscribedInTab(false);
-            markTaskClearedInUrl();
-            renderResearchPanel();
-          }
-        }
-        syncParticipantEndButton();
+        reconcileSharedTaskState();
       }
 
       if (event.key === participantKey || event.key === lastTaskResultKey) {
         syncParticipantEndButton();
+      }
+    });
+
+    window.addEventListener('focus', reconcileSharedTaskState);
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        reconcileSharedTaskState();
       }
     });
 
