@@ -5,6 +5,7 @@
   const participantKey = 'mtg-telemetry-participant-id';
   const taskStateKey = 'mtg-telemetry-task-state';
   const lastTaskResultKey = 'mtg-telemetry-last-task-result';
+  const tabTaskSubscribedKey = 'mtg-telemetry-tab-task-subscribed';
 
   const getApiUrl = () => {
     const host = window.location.hostname;
@@ -156,16 +157,33 @@
     return value;
   };
 
-  const getTaskState = () => safeJsonParse(sessionStorage.getItem(taskStateKey) || '{}', {});
+  const isTaskSubscribedInTab = () => sessionStorage.getItem(tabTaskSubscribedKey) === '1';
 
-  const setTaskState = (state) => {
-    sessionStorage.setItem(taskStateKey, JSON.stringify(state || {}));
+  const setTaskSubscribedInTab = (subscribed) => {
+    if (subscribed) {
+      sessionStorage.setItem(tabTaskSubscribedKey, '1');
+      return;
+    }
+    sessionStorage.removeItem(tabTaskSubscribedKey);
   };
 
-  const getLastTaskResult = () => safeJsonParse(sessionStorage.getItem(lastTaskResultKey) || '{}', {});
+  const getSharedTaskState = () => safeJsonParse(localStorage.getItem(taskStateKey) || '{}', {});
+
+  const getTaskState = () => {
+    if (!isTaskSubscribedInTab()) {
+      return {};
+    }
+    return getSharedTaskState();
+  };
+
+  const setTaskState = (state) => {
+    localStorage.setItem(taskStateKey, JSON.stringify(state || {}));
+  };
+
+  const getLastTaskResult = () => safeJsonParse(localStorage.getItem(lastTaskResultKey) || '{}', {});
 
   const setLastTaskResult = (result) => {
-    sessionStorage.setItem(lastTaskResultKey, JSON.stringify(result || {}));
+    localStorage.setItem(lastTaskResultKey, JSON.stringify(result || {}));
   };
 
   const buildLastTaskParams = () => {
@@ -229,6 +247,7 @@
     const shouldClearTask = String(url.searchParams.get('mtg_task_clear') || '').trim() === '1';
     if (shouldClearTask) {
       setTaskState({});
+      setTaskSubscribedInTab(false);
       return;
     }
 
@@ -236,6 +255,7 @@
     if (!taskId) {
       if (isHostedChatHost(url.hostname)) {
         setTaskState({});
+        setTaskSubscribedInTab(false);
       }
       return;
     }
@@ -249,6 +269,7 @@
       task_label: taskLabel,
       started_at: startedAt
     });
+    setTaskSubscribedInTab(true);
   };
 
   const hydrateParticipantFromUrl = () => {
@@ -395,6 +416,7 @@
       task_label: String(label || ''),
       started_at: new Date().toISOString()
     };
+    setTaskSubscribedInTab(true);
     setTaskState(nextState);
     markTaskActiveInUrl(nextState);
     track('task_start', {
@@ -426,6 +448,7 @@
     });
 
     setTaskState({});
+    setTaskSubscribedInTab(false);
     markTaskClearedInUrl();
   };
 
@@ -666,6 +689,9 @@
     hydrateParticipantFromUrl();
     hydrateLastTaskResultFromUrl();
     hydrateTaskStateFromUrl();
+    if (isTaskSubscribedInTab() && !getSharedTaskState().task_id) {
+      setTaskSubscribedInTab(false);
+    }
     getOrCreateSessionId();
     track('page_view', {
       referrer: document.referrer || ''
@@ -702,6 +728,20 @@
 
     window.addEventListener('storage', (event) => {
       if (event.key === taskStateKey) {
+        if (isTaskSubscribedInTab()) {
+          const sharedState = getSharedTaskState();
+          if (sharedState.task_id) {
+            markTaskActiveInUrl(sharedState);
+          } else {
+            setTaskSubscribedInTab(false);
+            markTaskClearedInUrl();
+            renderResearchPanel();
+          }
+        }
+        syncParticipantEndButton();
+      }
+
+      if (event.key === participantKey || event.key === lastTaskResultKey) {
         syncParticipantEndButton();
       }
     });
