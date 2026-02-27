@@ -616,8 +616,17 @@
 
     if (taskStart) {
       taskStart.addEventListener('click', () => {
-        const taskId = taskIdInput ? taskIdInput.value : '';
-        const taskLabel = taskLabelInput ? taskLabelInput.value : '';
+        const participantId = String(participantInput ? participantInput.value : '').trim();
+        const taskId = String(taskIdInput ? taskIdInput.value : '').trim();
+        const taskLabel = String(taskLabelInput ? taskLabelInput.value : '').trim();
+
+        if (!participantId || !taskId) {
+          window.alert('Please set both Participant ID and Task ID before starting a task.');
+          refreshState();
+          return;
+        }
+
+        setParticipantId(participantId);
         startTask(taskId, taskLabel);
         disableResearchModeInUrl();
         panel.remove();
