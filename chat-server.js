@@ -742,6 +742,150 @@ const readPhysicalTrialRecordsForExport = async (participantId) => {
   return readPhysicalTrialRecordsFromNdjson(physicalTrialFilePath);
 };
 
+const readLatestTaskStatePostgres = async (participantId) => {
+  const pool = getTelemetryPgPool();
+  const result = await pool.query(
+    `
+      SELECT
+        event_type,
+        task_id,
+        task_label,
+        task_status,
+        duration_ms,
+        COALESCE("timestamp", received_at) AS event_at
+      FROM telemetry_events
+      WHERE participant_id = $1
+        AND NULLIF(task_id, '') IS NOT NULL
+        AND event_type IN ('task_start', 'task_end')
+      ORDER BY COALESCE("timestamp", received_at) DESC, id DESC
+      LIMIT 1
+    `,
+    [participantId]
+  );
+
+  const row = result.rows[0];
+  if (!row) {
+    return {
+      participant_id: participantId,
+      active_task: null,
+      last_task: null
+    };
+  }
+
+  const eventType = String(row.event_type || '').trim().toLowerCase();
+  if (eventType === 'task_start') {
+    return {
+      participant_id: participantId,
+      active_task: {
+        task_id: String(row.task_id || '').trim(),
+        task_label: String(row.task_label || '').trim(),
+        started_at: row.event_at ? new Date(row.event_at).toISOString() : ''
+      },
+      last_task: null
+    };
+  }
+
+  return {
+    participant_id: participantId,
+    active_task: null,
+    last_task: {
+      task_id: String(row.task_id || '').trim(),
+      task_label: String(row.task_label || '').trim(),
+      task_status: String(row.task_status || '').trim(),
+      duration_ms: parseIntegerSafely(row.duration_ms),
+      ended_at: row.event_at ? new Date(row.event_at).toISOString() : ''
+    }
+  };
+};
+
+const readLatestTaskStateFromNdjson = (participantId) => {
+  const sourcePath = getParticipantTelemetryPath(participantId) || telemetryFilePath;
+  if (!sourcePath || !fs.existsSync(sourcePath)) {
+    return {
+      participant_id: participantId,
+      active_task: null,
+      last_task: null
+    };
+  }
+
+  const raw = fs.readFileSync(sourcePath, 'utf8');
+  const lines = raw.split(/\r?\n/).filter(Boolean);
+
+  for (let i = lines.length - 1; i >= 0; i -= 1) {
+    try {
+      const parsed = projectTelemetryRecord(JSON.parse(lines[i]));
+      const eventType = String(parsed.event_type || '').trim().toLowerCase();
+      const taskId = String(parsed.task_id || '').trim();
+      if (!taskId || (eventType !== 'task_start' && eventType !== 'task_end')) {
+        continue;
+      }
+
+      const eventAt = parsed.timestamp || parsed.received_at || '';
+      if (eventType === 'task_start') {
+        return {
+          participant_id: participantId,
+          active_task: {
+            task_id: taskId,
+            task_label: String(parsed.task_label || '').trim(),
+            started_at: eventAt ? new Date(eventAt).toISOString() : ''
+          },
+          last_task: null
+        };
+      }
+
+      return {
+        participant_id: participantId,
+        active_task: null,
+        last_task: {
+          task_id: taskId,
+          task_label: String(parsed.task_label || '').trim(),
+          task_status: String(parsed.task_status || '').trim(),
+          duration_ms: parseIntegerSafely(parsed.duration_ms),
+          ended_at: eventAt ? new Date(eventAt).toISOString() : ''
+        }
+      };
+    } catch {
+      // ignore malformed row
+    }
+  }
+
+  return {
+    participant_id: participantId,
+    active_task: null,
+    last_task: null
+  };
+};
+
+const readLatestTaskState = async (participantId) => {
+  const normalizedParticipant = String(participantId || '').trim();
+  if (!normalizedParticipant) {
+    return {
+      participant_id: '',
+      active_task: null,
+      last_task: null
+    };
+  }
+
+  if (telemetryUsePostgres) {
+    try {
+      const postgresState = await readLatestTaskStatePostgres(normalizedParticipant);
+      if (postgresState.active_task || postgresState.last_task || !telemetryFallbackToFile) {
+        return postgresState;
+      }
+      return readLatestTaskStateFromNdjson(normalizedParticipant);
+    } catch (error) {
+      if (!telemetryFallbackToFile) {
+        throw error;
+      }
+      console.error('Task state postgres read failed, using file fallback:', error.message);
+      return readLatestTaskStateFromNdjson(normalizedParticipant);
+    }
+  }
+
+  ensureTelemetryStorage();
+  return readLatestTaskStateFromNdjson(normalizedParticipant);
+};
+
 const withTelemetryCors = (res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
@@ -1329,6 +1473,23 @@ app.get('/api/telemetry/export.csv', async (req, res) => {
   } catch (error) {
     console.error('Telemetry export error:', error);
     res.status(500).json({ error: 'Failed to export telemetry events' });
+  }
+});
+
+app.get('/api/telemetry/task-state', async (req, res) => {
+  withTelemetryCors(res);
+
+  try {
+    const participantId = String(req.query.participant_id || '').trim();
+    if (!participantId) {
+      return res.status(400).json({ error: 'participant_id is required' });
+    }
+
+    const state = await readLatestTaskState(participantId);
+    res.status(200).json(state);
+  } catch (error) {
+    console.error('Task state read error:', error);
+    res.status(500).json({ error: 'Failed to read task state' });
   }
 });
 

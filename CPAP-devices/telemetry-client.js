@@ -459,6 +459,108 @@
     scanned: false
   };
 
+  const taskStateSyncState = {
+    inFlight: false,
+    lastPolledAt: 0,
+    intervalId: null
+  };
+
+  const getTaskStateApiUrl = () => getApiUrl().replace(/\/api\/telemetry$/, '/api/telemetry/task-state');
+
+  const reconcileTaskStateFromServer = async (reason) => {
+    const participantId = String(getParticipantId() || '').trim();
+    if (!participantId || taskStateSyncState.inFlight) {
+      return;
+    }
+
+    const now = Date.now();
+    if (reason === 'interval' && now - taskStateSyncState.lastPolledAt < 2500) {
+      return;
+    }
+
+    taskStateSyncState.inFlight = true;
+    taskStateSyncState.lastPolledAt = now;
+
+    try {
+      const endpoint = `${getTaskStateApiUrl()}?participant_id=${encodeURIComponent(participantId)}`;
+      const response = await fetch(endpoint, {
+        method: 'GET',
+        headers: { Accept: 'application/json' },
+        cache: 'no-store',
+        credentials: 'omit'
+      });
+
+      if (!response.ok) {
+        return;
+      }
+
+      const payload = await response.json();
+      const active = payload && payload.active_task && String(payload.active_task.task_id || '').trim()
+        ? payload.active_task
+        : null;
+      const lastTask = payload && payload.last_task ? payload.last_task : null;
+
+      if (lastTask && String(lastTask.task_id || '').trim()) {
+        const incomingEndedAtMs = Date.parse(String(lastTask.ended_at || ''));
+        const existingLastTask = getLastTaskResult();
+        const existingEndedAtMs = Date.parse(String(existingLastTask.ended_at || ''));
+        const shouldReplaceLastTask = !existingLastTask.task_id
+          || (Number.isFinite(incomingEndedAtMs) && (!Number.isFinite(existingEndedAtMs) || incomingEndedAtMs >= existingEndedAtMs));
+
+        if (shouldReplaceLastTask) {
+          setLastTaskResult({
+            task_id: String(lastTask.task_id || '').trim(),
+            task_label: String(lastTask.task_label || '').trim(),
+            task_status: String(lastTask.task_status || '').trim(),
+            duration_ms: Number.isFinite(Number(lastTask.duration_ms)) ? Number(lastTask.duration_ms) : null,
+            ended_at: String(lastTask.ended_at || '').trim()
+          });
+        }
+      }
+
+      if (active) {
+        const serverTask = {
+          task_id: String(active.task_id || '').trim(),
+          task_label: String(active.task_label || '').trim(),
+          started_at: String(active.started_at || '').trim() || new Date().toISOString()
+        };
+
+        const localTask = getSharedTaskState();
+        const localTaskId = String(localTask.task_id || '').trim();
+        const localStartedAt = String(localTask.started_at || '').trim();
+
+        if (localTaskId !== serverTask.task_id || localStartedAt !== serverTask.started_at) {
+          setTaskState(serverTask);
+        }
+
+        if (!isTaskSubscribedInTab()) {
+          setTaskSubscribedInTab(true);
+        }
+
+        markTaskActiveInUrl(serverTask);
+        enableResearchModeInUrl();
+        syncParticipantEndButton();
+        return;
+      }
+
+      const sharedTask = getSharedTaskState();
+      if (String(sharedTask.task_id || '').trim()) {
+        setTaskState({});
+      }
+
+      if (isTaskSubscribedInTab()) {
+        setTaskSubscribedInTab(false);
+        markTaskClearedInUrl();
+        renderResearchPanel(true);
+      }
+      syncParticipantEndButton();
+    } catch {
+      // ignore sync failures
+    } finally {
+      taskStateSyncState.inFlight = false;
+    }
+  };
+
   const parseYouTubeVideoId = (value) => {
     const text = String(value || '').trim();
     if (!text) return '';
@@ -972,6 +1074,16 @@
       referrer: document.referrer || ''
     });
 
+    reconcileTaskStateFromServer('init');
+
+    if (!taskStateSyncState.intervalId) {
+      taskStateSyncState.intervalId = window.setInterval(() => {
+        if (document.visibilityState === 'visible') {
+          reconcileTaskStateFromServer('interval');
+        }
+      }, 3000);
+    }
+
     initVideoTelemetry();
 
     syncParticipantEndButton();
@@ -1014,9 +1126,13 @@
     });
 
     window.addEventListener('focus', reconcileSharedTaskState);
+    window.addEventListener('focus', () => {
+      reconcileTaskStateFromServer('focus');
+    });
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible') {
         reconcileSharedTaskState();
+        reconcileTaskStateFromServer('visible');
       }
     });
 
