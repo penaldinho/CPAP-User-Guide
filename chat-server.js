@@ -84,6 +84,7 @@ app.use(express.json());
 app.use(express.static(baseDir));
 app.use('/CPAP-devices', express.static(path.join(__dirname, 'CPAP-devices')));
 app.use('/images', express.static(path.join(__dirname, 'images')));
+app.use('/research', express.static(path.join(__dirname, 'research')));
 
 const ensureTelemetryStorage = () => {
   if (!fs.existsSync(telemetryDir)) {

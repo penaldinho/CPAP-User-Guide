@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex,nofollow,noarchive" />
+  <title>Post-trial Questionnaire</title>
+  <style>
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:#f4f6fb;color:#1f2937;margin:0}
+    .wrap{max-width:760px;margin:24px auto;padding:0 16px}
+    .card{background:#fff;border:1px solid #dbe2ef;border-radius:10px;padding:16px;box-shadow:0 6px 18px rgba(0,0,0,.06)}
+    .grid{display:grid;gap:10px} label{display:grid;gap:5px;font-size:14px}
+    input,textarea{width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:8px;padding:10px 11px}
+    textarea{min-height:90px;resize:vertical} button{border:1px solid #1d4ed8;background:#1d4ed8;color:#fff;border-radius:8px;padding:9px 13px;font-weight:600;cursor:pointer}
+    .status{margin-top:10px;font-size:14px}
+  </style>
+</head>
+<body>
+  <div class="wrap"><div class="card">
+    <h1>Post-trial Questionnaire</h1>
+    <div class="grid">
+      <label>Participant ID<input id="participant_id" type="text" required /></label>
+      <label>Observer ID<input id="observer_id" type="text" /></label>
+      <label>Post confidence (1-5)<input id="confidence" type="number" min="1" max="5" /></label>
+      <label>Comments<textarea id="notes" placeholder="Any post-trial comments"></textarea></label>
+      <button id="submit" type="button">Submit Post-trial</button>
+    </div>
+    <div class="status" id="status"></div>
+  </div></div>
+  <script>
+    const host = window.location.hostname;
+    const isLocalHost = host === 'localhost' || host === '127.0.0.1';
+    const isHostedChat = /(^|\.)chat\.medtechguides\.uk$/i.test(host);
+    const endpoint = (isLocalHost || isHostedChat)
+      ? '/api/physical-trial'
+      : 'https://chat.medtechguides.uk/api/physical-trial';
+    const statusEl = document.getElementById('status');
+    document.getElementById('submit').addEventListener('click', async () => {
+      const participantId = String(document.getElementById('participant_id').value || '').trim();
+      if (!participantId) { statusEl.textContent = 'Participant ID is required.'; return; }
+      const confidence = String(document.getElementById('confidence').value || '').trim();
+      const notes = String(document.getElementById('notes').value || '').trim();
+      const observerId = String(document.getElementById('observer_id').value || '').trim();
+      const payload = {
+        timestamp: new Date().toISOString(),
+        session_id: `phys_${Date.now().toString(36)}`,
+        participant_id: participantId,
+        observer_id: observerId,
+        task_id: 'post-trial-questionnaire',
+        task_label: 'Post-trial questionnaire',
+        event_type: 'note',
+        notes: `confidence=${confidence || 'n/a'}; ${notes}`,
+        manual_page: 'questionnaire:post'
+      };
+      const response = await fetch(endpoint, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+      statusEl.textContent = response.ok ? 'Submitted.' : 'Failed to submit.';
+    });
+  </script>
+</body>
+</html>
