@@ -477,7 +477,7 @@ const computeTaskActionIndexPostgres = async (client, normalizedRecord) => {
       FROM telemetry_events
       WHERE participant_id = $1
         AND task_id = $2
-        AND ($4::BIGINT IS NULL OR id >= $4::BIGINT)
+        AND ($3::BIGINT IS NULL OR id >= $3::BIGINT)
     `,
     [participantId, taskId, Number.isFinite(lastStartId) ? lastStartId : null]
   );
