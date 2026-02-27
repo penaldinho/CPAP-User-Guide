@@ -246,8 +246,15 @@
     const url = new URL(window.location.href);
     const shouldClearTask = String(url.searchParams.get('mtg_task_clear') || '').trim() === '1';
     if (shouldClearTask) {
-      setTaskState({});
-      setTaskSubscribedInTab(false);
+      const sharedState = getSharedTaskState();
+      if (sharedState && sharedState.task_id) {
+        setTaskSubscribedInTab(true);
+        markTaskActiveInUrl(sharedState);
+        enableResearchModeInUrl();
+      } else {
+        setTaskState({});
+        setTaskSubscribedInTab(false);
+      }
       return;
     }
 
@@ -345,6 +352,19 @@
   const reconcileSharedTaskState = () => {
     const url = new URL(window.location.href);
     const shouldClearTask = String(url.searchParams.get('mtg_task_clear') || '').trim() === '1';
+    const sharedState = getSharedTaskState();
+
+    if (shouldClearTask && sharedState && sharedState.task_id) {
+      if (!isTaskSubscribedInTab()) {
+        setTaskSubscribedInTab(true);
+      }
+      markTaskActiveInUrl(sharedState);
+      enableResearchModeInUrl();
+      renderResearchPanel();
+      syncParticipantEndButton();
+      return;
+    }
+
     if (shouldClearTask) {
       const wasSubscribed = isTaskSubscribedInTab();
       if (wasSubscribed) {
@@ -355,7 +375,6 @@
       return;
     }
 
-    const sharedState = getSharedTaskState();
     if (sharedState && sharedState.task_id) {
       if (!isTaskSubscribedInTab()) {
         setTaskSubscribedInTab(true);
