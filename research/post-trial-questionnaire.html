@@ -11,16 +11,28 @@
     .card{background:#fff;border:1px solid #dbe2ef;border-radius:10px;padding:18px;box-shadow:0 6px 18px rgba(0,0,0,.06)}
     .grid{display:grid;gap:12px}
     fieldset{border:1px solid #dbe2ef;border-radius:8px;padding:12px;margin:0}
-    legend{font-weight:600;padding:0 6px}
+    legend{font-weight:600;padding:0 6px;position:sticky;top:8px;background:#fff;z-index:2}
     .q{display:grid;gap:6px}
     .q label{font-size:14px}
     input[type="text"],textarea{width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:8px;padding:9px 10px}
     textarea{min-height:80px;resize:vertical}
     .inline{display:flex;flex-wrap:wrap;gap:12px}
-    .likert{display:flex;gap:14px;flex-wrap:wrap}
+    .likert{display:grid;grid-template-columns:minmax(120px,1.6fr) repeat(5,minmax(42px,1fr)) minmax(120px,1.6fr);gap:8px;align-items:center}
+    .likert-anchor{font-size:12px;color:#4b5563}
+    .likert-anchor.right{text-align:right}
+    .likert label{display:flex;justify-content:center;align-items:center;gap:4px;font-size:13px}
     button{border:1px solid #1d4ed8;background:#1d4ed8;color:#fff;border-radius:8px;padding:10px 14px;font-weight:600;cursor:pointer}
     .status{margin-top:10px;font-size:14px}
     .hint{font-size:13px;color:#4b5563}
+    .req{color:#b91c1c;font-weight:700;margin-left:4px}
+    .error-hint{min-height:16px;font-size:12px;color:#b91c1c}
+    .q.invalid{padding:8px;border:1px solid #fecaca;border-radius:8px;background:#fef2f2}
+    .progress{position:sticky;top:8px;z-index:3;display:inline-block;background:#eef2ff;border:1px solid #c7d2fe;color:#3730a3;border-radius:999px;padding:6px 10px;font-size:12px;font-weight:600;margin-bottom:8px}
+
+    @media (max-width: 720px) {
+      .likert{display:flex;gap:14px;flex-wrap:wrap}
+      .likert-anchor{display:none}
+    }
   </style>
 </head>
 <body>
@@ -28,67 +40,78 @@
     <h1>Post-trial Questionnaire</h1>
     <p class="hint">Thinking about the instructions you just used for the CPAP device and the tasks you completed, please answer these questions.</p>
     <p class="hint">For statements 1–7: 1 = Strongly disagree, 5 = Strongly agree.</p>
+    <div class="hint" style="margin-bottom:6px;">Fields marked <span class="req">*</span> are required.</div>
+    <div id="progress" class="progress">Section 1 of 3</div>
 
     <div class="grid">
       <fieldset>
         <legend>Session Details</legend>
-        <div class="q">
-          <label>Participant ID<input id="participant_id" type="text" required /></label>
+        <div class="q" id="q-participant">
+          <label>Participant ID<span class="req">*</span><input id="participant_id" type="text" required /></label>
+          <div class="error-hint"></div>
           <label>Observer ID<input id="observer_id" type="text" /></label>
         </div>
       </fieldset>
 
-      <fieldset>
+      <fieldset class="track-section" data-section="1">
         <legend>A. Usability of the instructions</legend>
         <div class="grid">
-          <div class="q">
-            <div>1. The instructions I used were easy to understand.</div>
-            <div class="likert"><label><input type="radio" name="post_q1" value="1" /> 1</label><label><input type="radio" name="post_q1" value="2" /> 2</label><label><input type="radio" name="post_q1" value="3" /> 3</label><label><input type="radio" name="post_q1" value="4" /> 4</label><label><input type="radio" name="post_q1" value="5" /> 5</label></div>
+          <div class="q" id="q-post-q1">
+            <div>1. The instructions I used were easy to understand.<span class="req">*</span></div>
+            <div class="likert"><span class="likert-anchor">Strongly disagree</span><label><input type="radio" name="post_q1" value="1" /> 1</label><label><input type="radio" name="post_q1" value="2" /> 2</label><label><input type="radio" name="post_q1" value="3" /> 3</label><label><input type="radio" name="post_q1" value="4" /> 4</label><label><input type="radio" name="post_q1" value="5" /> 5</label><span class="likert-anchor right">Strongly agree</span></div>
+            <div class="error-hint"></div>
           </div>
-          <div class="q">
-            <div>2. It was easy to find the specific information I needed (for example, cleaning, errors, operating conditions).</div>
-            <div class="likert"><label><input type="radio" name="post_q2" value="1" /> 1</label><label><input type="radio" name="post_q2" value="2" /> 2</label><label><input type="radio" name="post_q2" value="3" /> 3</label><label><input type="radio" name="post_q2" value="4" /> 4</label><label><input type="radio" name="post_q2" value="5" /> 5</label></div>
+          <div class="q" id="q-post-q2">
+            <div>2. It was easy to find the specific information I needed (for example, cleaning, errors, operating conditions).<span class="req">*</span></div>
+            <div class="likert"><span class="likert-anchor">Strongly disagree</span><label><input type="radio" name="post_q2" value="1" /> 1</label><label><input type="radio" name="post_q2" value="2" /> 2</label><label><input type="radio" name="post_q2" value="3" /> 3</label><label><input type="radio" name="post_q2" value="4" /> 4</label><label><input type="radio" name="post_q2" value="5" /> 5</label><span class="likert-anchor right">Strongly agree</span></div>
+            <div class="error-hint"></div>
           </div>
-          <div class="q">
-            <div>3. The instructions helped me know what to do step by step during setup and use.</div>
-            <div class="likert"><label><input type="radio" name="post_q3" value="1" /> 1</label><label><input type="radio" name="post_q3" value="2" /> 2</label><label><input type="radio" name="post_q3" value="3" /> 3</label><label><input type="radio" name="post_q3" value="4" /> 4</label><label><input type="radio" name="post_q3" value="5" /> 5</label></div>
+          <div class="q" id="q-post-q3">
+            <div>3. The instructions helped me know what to do step by step during setup and use.<span class="req">*</span></div>
+            <div class="likert"><span class="likert-anchor">Strongly disagree</span><label><input type="radio" name="post_q3" value="1" /> 1</label><label><input type="radio" name="post_q3" value="2" /> 2</label><label><input type="radio" name="post_q3" value="3" /> 3</label><label><input type="radio" name="post_q3" value="4" /> 4</label><label><input type="radio" name="post_q3" value="5" /> 5</label><span class="likert-anchor right">Strongly agree</span></div>
+            <div class="error-hint"></div>
           </div>
-          <div class="q">
-            <div>4. Overall, I am satisfied with the instructions I used.</div>
-            <div class="likert"><label><input type="radio" name="post_q4" value="1" /> 1</label><label><input type="radio" name="post_q4" value="2" /> 2</label><label><input type="radio" name="post_q4" value="3" /> 3</label><label><input type="radio" name="post_q4" value="4" /> 4</label><label><input type="radio" name="post_q4" value="5" /> 5</label></div>
+          <div class="q" id="q-post-q4">
+            <div>4. Overall, I am satisfied with the instructions I used.<span class="req">*</span></div>
+            <div class="likert"><span class="likert-anchor">Strongly disagree</span><label><input type="radio" name="post_q4" value="1" /> 1</label><label><input type="radio" name="post_q4" value="2" /> 2</label><label><input type="radio" name="post_q4" value="3" /> 3</label><label><input type="radio" name="post_q4" value="4" /> 4</label><label><input type="radio" name="post_q4" value="5" /> 5</label><span class="likert-anchor right">Strongly agree</span></div>
+            <div class="error-hint"></div>
           </div>
         </div>
       </fieldset>
 
-      <fieldset>
+      <fieldset class="track-section" data-section="2">
         <legend>B. Confidence after using the instructions</legend>
         <div class="grid">
-          <div class="q">
-            <div>5. I now feel confident that I could set up this type of device at home using this kind of instructions.</div>
-            <div class="likert"><label><input type="radio" name="post_q5" value="1" /> 1</label><label><input type="radio" name="post_q5" value="2" /> 2</label><label><input type="radio" name="post_q5" value="3" /> 3</label><label><input type="radio" name="post_q5" value="4" /> 4</label><label><input type="radio" name="post_q5" value="5" /> 5</label></div>
+          <div class="q" id="q-post-q5">
+            <div>5. I now feel confident that I could set up this type of device at home using this kind of instructions.<span class="req">*</span></div>
+            <div class="likert"><span class="likert-anchor">Strongly disagree</span><label><input type="radio" name="post_q5" value="1" /> 1</label><label><input type="radio" name="post_q5" value="2" /> 2</label><label><input type="radio" name="post_q5" value="3" /> 3</label><label><input type="radio" name="post_q5" value="4" /> 4</label><label><input type="radio" name="post_q5" value="5" /> 5</label><span class="likert-anchor right">Strongly agree</span></div>
+            <div class="error-hint"></div>
           </div>
-          <div class="q">
-            <div>6. I now feel confident that I could solve a problem for this type of device.</div>
-            <div class="likert"><label><input type="radio" name="post_q6" value="1" /> 1</label><label><input type="radio" name="post_q6" value="2" /> 2</label><label><input type="radio" name="post_q6" value="3" /> 3</label><label><input type="radio" name="post_q6" value="4" /> 4</label><label><input type="radio" name="post_q6" value="5" /> 5</label></div>
+          <div class="q" id="q-post-q6">
+            <div>6. I now feel confident that I could solve a problem for this type of device.<span class="req">*</span></div>
+            <div class="likert"><span class="likert-anchor">Strongly disagree</span><label><input type="radio" name="post_q6" value="1" /> 1</label><label><input type="radio" name="post_q6" value="2" /> 2</label><label><input type="radio" name="post_q6" value="3" /> 3</label><label><input type="radio" name="post_q6" value="4" /> 4</label><label><input type="radio" name="post_q6" value="5" /> 5</label><span class="likert-anchor right">Strongly agree</span></div>
+            <div class="error-hint"></div>
           </div>
         </div>
       </fieldset>
 
-      <fieldset>
+      <fieldset class="track-section" data-section="3">
         <legend>C. Perceived effort and preference</legend>
         <div class="grid">
-          <div class="q">
-            <div>7. Using these instructions required a lot of mental effort.</div>
-            <div class="likert"><label><input type="radio" name="post_q7" value="1" /> 1</label><label><input type="radio" name="post_q7" value="2" /> 2</label><label><input type="radio" name="post_q7" value="3" /> 3</label><label><input type="radio" name="post_q7" value="4" /> 4</label><label><input type="radio" name="post_q7" value="5" /> 5</label></div>
+          <div class="q" id="q-post-q7">
+            <div>7. Using these instructions required a lot of mental effort.<span class="req">*</span></div>
+            <div class="likert"><span class="likert-anchor">Strongly disagree</span><label><input type="radio" name="post_q7" value="1" /> 1</label><label><input type="radio" name="post_q7" value="2" /> 2</label><label><input type="radio" name="post_q7" value="3" /> 3</label><label><input type="radio" name="post_q7" value="4" /> 4</label><label><input type="radio" name="post_q7" value="5" /> 5</label><span class="likert-anchor right">Strongly agree</span></div>
+            <div class="error-hint"></div>
           </div>
-          <div class="q">
-            <div>8. If you had to learn to use a similar medical device at home in the future, which format would you prefer?</div>
+          <div class="q" id="q-format-preference">
+            <div>8. If you had to learn to use a similar medical device at home in the future, which format would you prefer?<span class="req">*</span></div>
             <div class="grid">
               <label><input type="radio" name="format_preference" value="printed_instructions" /> Printed instructions</label>
               <label><input type="radio" name="format_preference" value="online_website_or_pdf" /> Online (website or PDF)</label>
               <label><input type="radio" name="format_preference" value="mix_of_both" /> A mix of both</label>
               <label><input type="radio" name="format_preference" value="no_preference" /> No preference</label>
             </div>
+            <div class="error-hint"></div>
           </div>
         </div>
       </fieldset>
@@ -120,22 +143,96 @@
       return selected ? String(selected.value || '').trim() : '';
     };
 
+    const clearErrors = () => {
+      document.querySelectorAll('.q.invalid').forEach((el) => el.classList.remove('invalid'));
+      document.querySelectorAll('.q .error-hint').forEach((el) => {
+        el.textContent = '';
+      });
+    };
+
+    const setQuestionError = (questionId, message) => {
+      const block = document.getElementById(questionId);
+      if (!block) return;
+      block.classList.add('invalid');
+      const hint = block.querySelector('.error-hint');
+      if (hint) {
+        hint.textContent = message;
+      }
+    };
+
+    const syncProgress = () => {
+      const progress = document.getElementById('progress');
+      if (!progress) return;
+
+      const sections = Array.from(document.querySelectorAll('.track-section'));
+      const thresholdY = 140;
+      let active = 1;
+      sections.forEach((section, index) => {
+        const rect = section.getBoundingClientRect();
+        if (rect.top <= thresholdY) {
+          active = index + 1;
+        }
+      });
+      progress.textContent = `Section ${active} of 3`;
+    };
+
+    const clearPostTrialForm = () => {
+      document.getElementById('participant_id').value = '';
+      document.getElementById('observer_id').value = '';
+      document.getElementById('notes').value = '';
+      document.querySelectorAll('input[type="radio"]').forEach((el) => {
+        el.checked = false;
+      });
+    };
+
+    window.addEventListener('scroll', syncProgress, { passive: true });
+    syncProgress();
+
     document.getElementById('submit').addEventListener('click', async () => {
+      const submitBtn = document.getElementById('submit');
+      if (submitBtn.disabled) return;
+      clearErrors();
+
       const participantId = String(document.getElementById('participant_id').value || '').trim();
       if (!participantId) {
-        statusEl.textContent = 'Participant ID is required.';
+        setQuestionError('q-participant', 'Participant ID is required.');
+        statusEl.textContent = 'Please fix the highlighted fields.';
+        return;
+      }
+
+      const postQ1 = radioValue('post_q1');
+      const postQ2 = radioValue('post_q2');
+      const postQ3 = radioValue('post_q3');
+      const postQ4 = radioValue('post_q4');
+      const postQ5 = radioValue('post_q5');
+      const postQ6 = radioValue('post_q6');
+      const postQ7 = radioValue('post_q7');
+      const formatPreference = radioValue('format_preference');
+
+      let hasErrors = false;
+      if (!postQ1) { setQuestionError('q-post-q1', 'Please select a rating.'); hasErrors = true; }
+      if (!postQ2) { setQuestionError('q-post-q2', 'Please select a rating.'); hasErrors = true; }
+      if (!postQ3) { setQuestionError('q-post-q3', 'Please select a rating.'); hasErrors = true; }
+      if (!postQ4) { setQuestionError('q-post-q4', 'Please select a rating.'); hasErrors = true; }
+      if (!postQ5) { setQuestionError('q-post-q5', 'Please select a rating.'); hasErrors = true; }
+      if (!postQ6) { setQuestionError('q-post-q6', 'Please select a rating.'); hasErrors = true; }
+      if (!postQ7) { setQuestionError('q-post-q7', 'Please select a rating.'); hasErrors = true; }
+      if (!formatPreference) { setQuestionError('q-format-preference', 'Please select one option.'); hasErrors = true; }
+
+      if (hasErrors) {
+        statusEl.textContent = 'Please fix the highlighted fields.';
         return;
       }
 
       const responseData = {
-        post_q1_1_to_5: radioValue('post_q1'),
-        post_q2_1_to_5: radioValue('post_q2'),
-        post_q3_1_to_5: radioValue('post_q3'),
-        post_q4_1_to_5: radioValue('post_q4'),
-        post_q5_1_to_5: radioValue('post_q5'),
-        post_q6_1_to_5: radioValue('post_q6'),
-        post_q7_1_to_5: radioValue('post_q7'),
-        format_preference: radioValue('format_preference'),
+        post_q1_1_to_5: postQ1,
+        post_q2_1_to_5: postQ2,
+        post_q3_1_to_5: postQ3,
+        post_q4_1_to_5: postQ4,
+        post_q5_1_to_5: postQ5,
+        post_q6_1_to_5: postQ6,
+        post_q7_1_to_5: postQ7,
+        format_preference: formatPreference,
         free_text_notes: String(document.getElementById('notes').value || '').trim()
       };
 
@@ -152,14 +249,24 @@
       };
 
       try {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Submitting...';
         const response = await fetch(endpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
         });
-        statusEl.textContent = response.ok ? 'Submitted.' : 'Failed to submit.';
+        if (response.ok) {
+          clearPostTrialForm();
+          statusEl.textContent = 'Submitted.';
+        } else {
+          statusEl.textContent = 'Failed to submit.';
+        }
       } catch {
         statusEl.textContent = 'Failed to submit.';
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Submit Post-trial';
       }
     });
   </script>
