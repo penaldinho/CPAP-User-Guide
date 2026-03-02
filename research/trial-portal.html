@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="robots" content="noindex,nofollow,noarchive" />
-  <title>Physical Manual Task Runner</title>
+  <title>Trial Portal</title>
   <style>
     body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 0; background: #f4f6fb; color: #1f2937; }
     .wrap { max-width: 860px; margin: 24px auto; padding: 0 16px 24px; }
@@ -41,21 +41,26 @@
 <body>
   <div class="wrap">
     <div class="card">
-      <h1>Physical Manual Task Runner</h1>
+      <h1>Trial Portal</h1>
       <p>Participant-facing flow for paper-manual trials. Use this to run scenarios/questions in order and log progression.</p>
 
-      <div class="grid">
-        <label>
+      <div id="setup-screen" class="grid">
+        <label class="full">
           Participant ID / Name
           <input id="participant_id" type="text" placeholder="e.g. P01 or Jane Smith" required />
         </label>
+        <div class="btns full" style="margin-top:0;">
+          <button id="btn-proceed" type="button" class="success">Proceed to trial</button>
+        </div>
       </div>
 
-      <div id="task-card" class="task-card"></div>
+      <div id="trial-screen" style="display:none;">
+        <div class="meta" id="trial-participant"></div>
+        <div id="task-card" class="task-card"></div>
 
-      <div class="btns">
-        <button id="btn-action" type="button" class="success">Start current task</button>
-        <button id="btn-reset" type="button" class="secondary" style="display:none;">Reset to first task</button>
+        <div class="btns">
+          <button id="btn-action" type="button" class="success">Start current task</button>
+        </div>
       </div>
 
       <div id="status" aria-live="polite"></div>
@@ -178,6 +183,8 @@
         })();
 
         return {
+          screen: parsed.screen === 'trial' ? 'trial' : 'setup',
+          participantId: String(parsed.participantId || '').trim(),
           currentTaskIndex: Number.isInteger(parsed.currentTaskIndex) ? Math.max(0, Math.min(taskOrder.length - 1, parsed.currentTaskIndex)) : 0,
           startedTaskId: String(parsed.startedTaskId || '').trim(),
           startedAt: String(parsed.startedAt || '').trim(),
@@ -191,12 +198,19 @@
       };
 
       const statusEl = el('status');
+      const setupScreenEl = el('setup-screen');
+      const trialScreenEl = el('trial-screen');
+      const trialParticipantEl = el('trial-participant');
       const taskCardEl = el('task-card');
       const participantInput = el('participant_id');
+      const proceedBtn = el('btn-proceed');
       const actionBtn = el('btn-action');
-      const resetBtn = el('btn-reset');
 
       let state = getRunnerState();
+
+      if (state.participantId && participantInput) {
+        participantInput.value = state.participantId;
+      }
 
       const setStatus = (text, ok) => {
         statusEl.textContent = text;
@@ -205,6 +219,22 @@
 
       const getCurrentTaskId = () => taskOrder[state.currentTaskIndex] || '';
       const getCurrentTask = () => tasks[getCurrentTaskId()] || null;
+
+      const makeFreshRunnerState = () => ({
+        screen: 'setup',
+        participantId: '',
+        currentTaskIndex: 0,
+        startedTaskId: '',
+        startedAt: '',
+        completedTaskIds: [],
+        shortFormDrafts: {}
+      });
+
+      const startNewSession = () => {
+        const id = makeSessionId();
+        localStorage.setItem(sessionKey, id);
+        return id;
+      };
 
       const formatElapsedDuration = (durationMs) => {
         const totalSeconds = Math.max(0, Math.floor((durationMs || 0) / 1000));
@@ -231,9 +261,9 @@
       };
 
       const validateCommon = () => {
-        if (!String(participantInput.value || '').trim()) {
+        if (!String(state.participantId || '').trim()) {
           setStatus('Participant ID / Name is required.', false);
-          participantInput.focus();
+          if (participantInput) participantInput.focus();
           return false;
         }
         return true;
@@ -245,7 +275,7 @@
         const payload = {
           timestamp: new Date().toISOString(),
           session_id: getSessionId(),
-          participant_id: String(participantInput.value || '').trim(),
+          participant_id: String(state.participantId || '').trim(),
           observer_id: '',
           task_id: taskId,
           task_label: task ? task.title : taskId,
@@ -294,6 +324,19 @@
       };
 
       const renderTask = () => {
+        const isTrialScreen = state.screen === 'trial' && !!state.participantId;
+        setupScreenEl.style.display = isTrialScreen ? 'none' : 'grid';
+        trialScreenEl.style.display = isTrialScreen ? 'block' : 'none';
+
+        if (!isTrialScreen) {
+          if (trialParticipantEl) trialParticipantEl.textContent = '';
+          return;
+        }
+
+        if (trialParticipantEl) {
+          trialParticipantEl.textContent = `Participant: ${state.participantId}`;
+        }
+
         const taskId = getCurrentTaskId();
         const task = getCurrentTask();
         if (!taskId || !task) {
@@ -322,16 +365,14 @@
 
         syncElapsedDisplay();
 
-        if (resetBtn) {
-          resetBtn.style.display = isTrialFinished ? 'inline-block' : 'none';
-        }
-
         if (actionBtn) {
           actionBtn.disabled = false;
 
           if (isTrialFinished) {
-            actionBtn.style.display = 'none';
-            actionBtn.dataset.mode = 'done';
+            actionBtn.style.display = 'inline-block';
+            actionBtn.dataset.mode = 'complete_trial';
+            actionBtn.textContent = 'Complete trial';
+            actionBtn.className = 'success';
           } else {
             actionBtn.style.display = 'inline-block';
 
@@ -377,6 +418,38 @@
           });
         });
       };
+
+      proceedBtn.addEventListener('click', async () => {
+        const participantId = String(participantInput.value || '').trim();
+        if (!participantId) {
+          setStatus('Participant ID / Name is required.', false);
+          participantInput.focus();
+          return;
+        }
+
+        try {
+          startNewSession();
+          state = {
+            screen: 'trial',
+            participantId,
+            currentTaskIndex: 0,
+            startedTaskId: taskOrder[0],
+            startedAt: new Date().toISOString(),
+            completedTaskIds: [],
+            shortFormDrafts: {}
+          };
+
+          setRunnerState(state);
+          renderTask();
+          await submitEvent('task_start', '');
+          setStatus(`Started ${taskOrder[0]} for ${participantId}.`, true);
+        } catch (error) {
+          state = makeFreshRunnerState();
+          setRunnerState(state);
+          renderTask();
+          setStatus(error.message || 'Failed to start trial.', false);
+        }
+      });
 
       actionBtn.addEventListener('click', async () => {
         if (!validateCommon()) return;
@@ -456,22 +529,24 @@
             setStatus('All tasks completed.', true);
             return;
           }
+
+          if (mode === 'complete_trial') {
+            await submitEvent('trial_complete', 'participant_completed_all_tasks');
+            const lastParticipantId = state.participantId;
+            state = makeFreshRunnerState();
+            setRunnerState(state);
+            startNewSession();
+            if (participantInput) {
+              participantInput.value = '';
+              participantInput.focus();
+            }
+            renderTask();
+            setStatus(`Trial complete for ${lastParticipantId}.`, true);
+            return;
+          }
         } catch (error) {
           setStatus(error.message || 'Failed to process action.', false);
         }
-      });
-
-      resetBtn.addEventListener('click', () => {
-        state = {
-          currentTaskIndex: 0,
-          startedTaskId: '',
-          startedAt: '',
-          completedTaskIds: [],
-          shortFormDrafts: {}
-        };
-        setRunnerState(state);
-        renderTask();
-        setStatus('Reset to first task.', true);
       });
 
       getSessionId();
