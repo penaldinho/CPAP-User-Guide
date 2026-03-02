@@ -280,14 +280,14 @@
     return participantTaskOrder[index + 1] || '';
   };
 
-  const getParticipantNextTaskState = () => safeJsonParse(sessionStorage.getItem(participantNextTaskStateKey) || '{}', {});
+  const getParticipantNextTaskState = () => safeJsonParse(localStorage.getItem(participantNextTaskStateKey) || '{}', {});
 
   const setParticipantNextTaskState = (state) => {
-    sessionStorage.setItem(participantNextTaskStateKey, JSON.stringify(state || {}));
+    localStorage.setItem(participantNextTaskStateKey, JSON.stringify(state || {}));
   };
 
   const clearParticipantNextTaskState = () => {
-    sessionStorage.removeItem(participantNextTaskStateKey);
+    localStorage.removeItem(participantNextTaskStateKey);
   };
 
   const getShortFormDrafts = () => safeJsonParse(localStorage.getItem(shortFormDraftsKey) || '{}', {});
@@ -493,6 +493,14 @@
     const url = new URL(window.location.href);
     const shouldClearTask = String(url.searchParams.get('mtg_task_clear') || '').trim() === '1';
     const sharedState = getSharedTaskState();
+    const participantNextState = getParticipantNextTaskState();
+    const hasParticipantTransitionState = Boolean(
+      participantNextState
+      && (
+        String(participantNextState.next_task_id || '').trim()
+        || String(participantNextState.status || '').trim() === 'completed'
+      )
+    );
 
     if (shouldClearTask && sharedState && sharedState.task_id) {
       if (!isTaskSubscribedInTab()) {
@@ -510,7 +518,9 @@
       const wasSubscribed = isTaskSubscribedInTab();
       if (wasSubscribed) {
         setTaskSubscribedInTab(false);
-        renderResearchPanel(true);
+        if (!hasParticipantTransitionState) {
+          renderResearchPanel(true);
+        }
       }
       syncParticipantEndButton();
       syncTaskPromptCard();
@@ -532,7 +542,9 @@
     if (isTaskSubscribedInTab()) {
       setTaskSubscribedInTab(false);
       markTaskClearedInUrl();
-      renderResearchPanel(true);
+      if (!hasParticipantTransitionState) {
+        renderResearchPanel(true);
+      }
     }
     syncParticipantEndButton();
     syncTaskPromptCard();
@@ -693,10 +705,21 @@
         setTaskState({});
       }
 
+      const participantNextState = getParticipantNextTaskState();
+      const hasParticipantTransitionState = Boolean(
+        participantNextState
+        && (
+          String(participantNextState.next_task_id || '').trim()
+          || String(participantNextState.status || '').trim() === 'completed'
+        )
+      );
+
       if (isTaskSubscribedInTab()) {
         setTaskSubscribedInTab(false);
         markTaskClearedInUrl();
-        renderResearchPanel(true);
+        if (!hasParticipantTransitionState) {
+          renderResearchPanel(true);
+        }
       }
       syncParticipantEndButton();
       syncTaskPromptCard();
@@ -2121,7 +2144,7 @@
         syncTaskPromptCard();
       }
 
-      if (event.key === participantKey || event.key === lastTaskResultKey) {
+      if (event.key === participantKey || event.key === lastTaskResultKey || event.key === participantNextTaskStateKey) {
         syncParticipantEndButton();
       }
     });
