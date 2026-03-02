@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex,nofollow,noarchive" />
+  <title>Physical Manual Task Runner</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 0; background: #f4f6fb; color: #1f2937; }
+    .wrap { max-width: 860px; margin: 24px auto; padding: 0 16px 24px; }
+    .card { background: #fff; border: 1px solid #dbe2ef; border-radius: 10px; padding: 16px; box-shadow: 0 6px 18px rgba(0,0,0,0.06); }
+    h1 { margin: 0 0 10px; font-size: 24px; }
+    p { margin: 0 0 14px; color: #4b5563; }
+    .grid { display: grid; gap: 10px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .full { grid-column: 1 / -1; }
+    label { display: grid; gap: 5px; font-size: 14px; }
+    input, textarea { width: 100%; box-sizing: border-box; border: 1px solid #cbd5e1; border-radius: 8px; padding: 10px 11px; font-size: 14px; }
+    textarea { min-height: 80px; resize: vertical; }
+    .task-card { margin-top: 14px; border: 1px solid #34d399; background: #ecfdf5; border-radius: 10px; padding: 14px; }
+    .task-header { display:flex; justify-content:space-between; align-items:center; gap:10px; }
+    .task-pill { font-size: 11px; color: #475569; background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 999px; padding: 2px 8px; }
+    .task-title { font-size: 16px; font-weight: 700; margin-top: 8px; }
+    .task-preamble { margin-top: 8px; font-size: 14px; line-height: 1.4; color: #334155; }
+    .task-steps { margin-top: 8px; font-size: 14px; line-height: 1.4; color: #334155; }
+    .task-steps ul { margin: 0 0 0 18px; padding: 0; display: grid; gap: 6px; }
+    .answer-wrap { margin-top: 12px; display: grid; gap: 8px; }
+    .answer-label { font-size: 13px; font-weight: 600; color: #0f172a; }
+    .btns { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+    button { border: 1px solid #1d4ed8; background: #1d4ed8; color: #fff; border-radius: 8px; padding: 9px 13px; font-weight: 600; cursor: pointer; }
+    button.secondary { background: #fff; color: #1d4ed8; }
+    button.success { border-color: #0f766e; background: #0f766e; }
+    button[disabled] { opacity: 0.55; cursor: not-allowed; }
+    #status { margin-top: 12px; font-size: 14px; }
+    .ok { color: #065f46; }
+    .err { color: #991b1b; }
+    .meta { font-size: 12px; color: #6b7280; margin-top: 8px; }
+    @media (max-width: 720px) { .grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>Physical Manual Task Runner</h1>
+      <p>Participant-facing flow for paper-manual trials. Use this to run scenarios/questions in order and log progression.</p>
+
+      <div class="grid">
+        <label>
+          Participant ID / Name
+          <input id="participant_id" type="text" placeholder="e.g. P01 or Jane Smith" required />
+        </label>
+        <label>
+          Observer ID
+          <input id="observer_id" type="text" placeholder="e.g. OBS-1" />
+        </label>
+      </div>
+
+      <div id="task-card" class="task-card"></div>
+
+      <div class="btns">
+        <button id="btn-start" type="button">Start current task</button>
+        <button id="btn-complete" type="button" class="success" disabled>I have completed this task</button>
+        <button id="btn-next" type="button" class="secondary" disabled>Proceed to next task</button>
+        <button id="btn-reset" type="button" class="secondary">Reset to first task</button>
+      </div>
+
+      <div id="status" aria-live="polite"></div>
+      <div id="meta" class="meta"></div>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      const host = window.location.hostname;
+      const isLocalHost = host === 'localhost' || host === '127.0.0.1';
+      const isHostedChat = /(^|\.)chat\.medtechguides\.uk$/i.test(host);
+      const endpoint = (isLocalHost || isHostedChat)
+        ? '/api/physical-trial'
+        : 'https://chat.medtechguides.uk/api/physical-trial';
+
+      const sessionKey = 'physical-trial-session-id';
+      const runnerStateKey = 'physical-manual-runner-state';
+      const el = (id) => document.getElementById(id);
+
+      const taskOrder = [
+        'scenario_card_1',
+        'scenario_card_2',
+        'scenario_card_3',
+        'short_form_q1',
+        'short_form_q2',
+        'short_form_q3',
+        'short_form_q4'
+      ];
+
+      const tasks = {
+        scenario_card_1: {
+          title: 'Scenario Card 1 – First-Time Setup (Setup)',
+          preamble: 'Assemble and set up the CPAP device and mask ready for first use, stopping before fitting the mask.',
+          steps: ['You may use the instructions at any time.'],
+          kind: 'scenario'
+        },
+        scenario_card_2: {
+          title: 'Scenario Card 2 – Fit and Start Therapy (Routine Use)',
+          preamble: 'Fit the mask to the mannequin, checking and ensuring the mask fit is good, and start therapy.',
+          steps: ['You may use the instructions at any time.'],
+          kind: 'scenario'
+        },
+        scenario_card_3: {
+          title: 'Scenario Card 3 – Comfort Adjustment (Troubleshooting)',
+          preamble: 'You notice dry nose during therapy. Resolve this by adjusting the relevant comfort settings.',
+          steps: ['You may use the instructions at any time.'],
+          kind: 'scenario'
+        },
+        short_form_q1: {
+          title: 'Short-Form Q1 – Cleaning frequency (Routine Use)',
+          preamble: 'You have just finished your first week using CPAP at home and want to make sure your routine keeps the equipment clean and safe.',
+          steps: [
+            '(a) What is the recommended cleaning frequency for the CPAP device and humidifier?',
+            '(b) What is the recommended cleaning frequency for the F&P Vitera mask (excluding headgear)?',
+            '(c) What is the recommended cleaning frequency for the headgear?',
+            '(d) What is the recommended cleaning frequency for ClimateLineAir tubing?'
+          ],
+          parts: [
+            { key: 'a', label: '(a) CPAP device and humidifier frequency' },
+            { key: 'b', label: '(b) F&P Vitera mask (excluding headgear) frequency' },
+            { key: 'c', label: '(c) Headgear frequency' },
+            { key: 'd', label: '(d) ClimateLineAir tubing frequency' }
+          ],
+          kind: 'short_form'
+        },
+        short_form_q2: {
+          title: 'Short-Form Q2 – Error message safety escalation (Error 006)',
+          preamble: 'You switch on your device before bed and see “System fault – refer to user guide – Error 006”. Therapy has not started, so you need to decide the safest next action.',
+          steps: [
+            '(a) What should be done next?',
+            '(b) What should not be done with the device?'
+          ],
+          parts: [
+            { key: 'a', label: '(a) Next action' },
+            { key: 'b', label: '(b) What should not be done' }
+          ],
+          kind: 'short_form'
+        },
+        short_form_q3: {
+          title: 'Short-Form Q3 – Spare F&P Vitera mask storage (Routine Use / Safety)',
+          preamble: 'You receive a spare F&P Vitera mask and need to store it until your current one wears out, while keeping it in good condition for future use.',
+          steps: [
+            '(a) How should a spare F&P Vitera mask be stored?',
+            '(b) What is the recommended storage temperature range (in °C)?'
+          ],
+          parts: [
+            { key: 'a', label: '(a) F&P Vitera mask storage method/conditions' },
+            { key: 'b', label: '(b) Storage temperature range (°C)' }
+          ],
+          kind: 'short_form'
+        },
+        short_form_q4: {
+          title: 'Short-Form Q4 – Tubing length check (Setup)',
+          preamble: 'Your bedroom layout means the machine sits about 7 feet from where your mask connects, so you need to check whether ClimateLineAir Oxy tubing will reach comfortably.',
+          steps: [
+            '(a) Is ClimateLineAir Oxy tubing long enough for 7 feet?',
+            '(b) What is the length of ClimateLineAir Oxy tubing (in feet)?'
+          ],
+          parts: [
+            { key: 'a', label: '(a) Long enough for 7 feet? (yes/no)' },
+            { key: 'b', label: '(b) Tubing length (feet)' }
+          ],
+          kind: 'short_form'
+        }
+      };
+
+      const makeSessionId = () => `phys_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+      const getSessionId = () => {
+        let id = localStorage.getItem(sessionKey);
+        if (!id) {
+          id = makeSessionId();
+          localStorage.setItem(sessionKey, id);
+        }
+        return id;
+      };
+
+      const getRunnerState = () => {
+        const parsed = (() => {
+          try { return JSON.parse(sessionStorage.getItem(runnerStateKey) || '{}'); } catch { return {}; }
+        })();
+
+        return {
+          currentTaskIndex: Number.isInteger(parsed.currentTaskIndex) ? Math.max(0, Math.min(taskOrder.length - 1, parsed.currentTaskIndex)) : 0,
+          startedTaskId: String(parsed.startedTaskId || '').trim(),
+          startedAt: String(parsed.startedAt || '').trim(),
+          completedTaskIds: Array.isArray(parsed.completedTaskIds) ? parsed.completedTaskIds : [],
+          shortFormDrafts: parsed.shortFormDrafts && typeof parsed.shortFormDrafts === 'object' ? parsed.shortFormDrafts : {}
+        };
+      };
+
+      const setRunnerState = (next) => {
+        sessionStorage.setItem(runnerStateKey, JSON.stringify(next || {}));
+      };
+
+      const statusEl = el('status');
+      const metaEl = el('meta');
+      const taskCardEl = el('task-card');
+      const participantInput = el('participant_id');
+      const observerInput = el('observer_id');
+      const startBtn = el('btn-start');
+      const completeBtn = el('btn-complete');
+      const nextBtn = el('btn-next');
+      const resetBtn = el('btn-reset');
+
+      let state = getRunnerState();
+
+      const setStatus = (text, ok) => {
+        statusEl.textContent = text;
+        statusEl.className = ok ? 'ok' : 'err';
+      };
+
+      const getCurrentTaskId = () => taskOrder[state.currentTaskIndex] || '';
+      const getCurrentTask = () => tasks[getCurrentTaskId()] || null;
+
+      const validateCommon = () => {
+        if (!String(participantInput.value || '').trim()) {
+          setStatus('Participant ID / Name is required.', false);
+          participantInput.focus();
+          return false;
+        }
+        return true;
+      };
+
+      const submitEvent = async (eventType, notes) => {
+        const taskId = getCurrentTaskId();
+        const task = getCurrentTask();
+        const payload = {
+          timestamp: new Date().toISOString(),
+          session_id: getSessionId(),
+          participant_id: String(participantInput.value || '').trim(),
+          observer_id: String(observerInput.value || '').trim(),
+          task_id: taskId,
+          task_label: task ? task.title : taskId,
+          event_type: eventType,
+          manual_page: '',
+          notes: String(notes || ''),
+          source: 'physical_manual'
+        };
+
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) {
+          let message = 'Failed to log event.';
+          try {
+            const data = await response.json();
+            if (data && data.error) message = data.error;
+          } catch {}
+          throw new Error(message);
+        }
+
+        metaEl.textContent = `Session: ${payload.session_id} • Last event: ${eventType} at ${new Date(payload.timestamp).toLocaleString()}`;
+      };
+
+      const getShortFormDraftForTask = (taskId) => {
+        const key = String(taskId || '').trim();
+        return key && state.shortFormDrafts[key] && typeof state.shortFormDrafts[key] === 'object'
+          ? state.shortFormDrafts[key]
+          : {};
+      };
+
+      const updateShortFormDraftForTask = (taskId, draft) => {
+        const key = String(taskId || '').trim();
+        if (!key) return;
+        state.shortFormDrafts[key] = draft;
+        setRunnerState(state);
+      };
+
+      const clearShortFormDraftForTask = (taskId) => {
+        const key = String(taskId || '').trim();
+        if (!key || !state.shortFormDrafts[key]) return;
+        delete state.shortFormDrafts[key];
+        setRunnerState(state);
+      };
+
+      const renderTask = () => {
+        const taskId = getCurrentTaskId();
+        const task = getCurrentTask();
+        if (!taskId || !task) {
+          taskCardEl.innerHTML = '<div class="task-title">No task selected.</div>';
+          return;
+        }
+
+        const isStarted = state.startedTaskId === taskId;
+        const isCompleted = state.completedTaskIds.includes(taskId);
+        const isShortForm = task.kind === 'short_form';
+        const draft = getShortFormDraftForTask(taskId);
+
+        taskCardEl.innerHTML = `
+          <div class="task-header">
+            <strong style="font-size:13px;color:#0f172a;">Task in progress</strong>
+            <span class="task-pill">${taskId}</span>
+          </div>
+          <div class="task-title">${task.title}</div>
+          <div class="task-preamble">${task.preamble || ''}</div>
+          <div class="task-steps">${task.steps && task.steps.length ? `<ul>${task.steps.map((step) => `<li>${step}</li>`).join('')}</ul>` : ''}</div>
+          <div id="answer-wrap" class="answer-wrap" style="display:${isShortForm ? 'grid' : 'none'};"></div>
+        `;
+
+        startBtn.disabled = isStarted;
+        completeBtn.disabled = !isStarted;
+        nextBtn.disabled = !isCompleted;
+
+        if (!isShortForm) {
+          return;
+        }
+
+        const answerWrap = document.getElementById('answer-wrap');
+        const parts = Array.isArray(task.parts) ? task.parts : [];
+        answerWrap.innerHTML = parts.map((part) => `
+          <label>
+            <span class="answer-label">${part.label}</span>
+            <textarea data-part-key="${part.key}" placeholder="Type your answer for part ${String(part.key || '').toUpperCase()}…">${draft[part.key] ? String(draft[part.key]) : ''}</textarea>
+          </label>
+        `).join('');
+
+        const inputs = Array.from(answerWrap.querySelectorAll('textarea[data-part-key]'));
+        inputs.forEach((input) => {
+          input.addEventListener('input', () => {
+            const nextDraft = {};
+            inputs.forEach((item) => {
+              const key = String(item.getAttribute('data-part-key') || '').trim();
+              if (!key) return;
+              nextDraft[key] = String(item.value || '');
+            });
+            updateShortFormDraftForTask(taskId, nextDraft);
+          });
+        });
+      };
+
+      startBtn.addEventListener('click', async () => {
+        if (!validateCommon()) return;
+        const taskId = getCurrentTaskId();
+        if (!taskId) return;
+
+        try {
+          await submitEvent('task_start', '');
+          state.startedTaskId = taskId;
+          state.startedAt = new Date().toISOString();
+          state.completedTaskIds = state.completedTaskIds.filter((id) => id !== taskId);
+          setRunnerState(state);
+          renderTask();
+          setStatus(`Started ${taskId}.`, true);
+        } catch (error) {
+          setStatus(error.message || 'Failed to start task.', false);
+        }
+      });
+
+      completeBtn.addEventListener('click', async () => {
+        if (!validateCommon()) return;
+        const taskId = getCurrentTaskId();
+        const task = getCurrentTask();
+        if (!taskId || !task || state.startedTaskId !== taskId) return;
+
+        try {
+          if (task.kind === 'short_form') {
+            const draft = getShortFormDraftForTask(taskId);
+            const parts = Array.isArray(task.parts) ? task.parts : [];
+            const missing = parts.find((part) => !String(draft[part.key] || '').trim());
+            if (missing) {
+              setStatus('Please complete all answer parts before finishing this task.', false);
+              const missingInput = document.querySelector(`textarea[data-part-key="${missing.key}"]`);
+              if (missingInput) missingInput.focus();
+              return;
+            }
+
+            await submitEvent('note', JSON.stringify({
+              short_form_response: draft,
+              task_id: taskId
+            }));
+            clearShortFormDraftForTask(taskId);
+          }
+
+          await submitEvent('task_end', 'participant_completed');
+          state.startedTaskId = '';
+          state.startedAt = '';
+          if (!state.completedTaskIds.includes(taskId)) {
+            state.completedTaskIds.push(taskId);
+          }
+          setRunnerState(state);
+          renderTask();
+          setStatus(`Completed ${taskId}. Click “Proceed to next task”.`, true);
+        } catch (error) {
+          setStatus(error.message || 'Failed to complete task.', false);
+        }
+      });
+
+      nextBtn.addEventListener('click', () => {
+        const taskId = getCurrentTaskId();
+        if (!state.completedTaskIds.includes(taskId)) {
+          setStatus('Complete the current task first.', false);
+          return;
+        }
+
+        if (state.currentTaskIndex < taskOrder.length - 1) {
+          state.currentTaskIndex += 1;
+          state.startedTaskId = '';
+          state.startedAt = '';
+          setRunnerState(state);
+          renderTask();
+          setStatus('Moved to next task.', true);
+          return;
+        }
+
+        setStatus('All tasks completed.', true);
+      });
+
+      resetBtn.addEventListener('click', () => {
+        state = {
+          currentTaskIndex: 0,
+          startedTaskId: '',
+          startedAt: '',
+          completedTaskIds: [],
+          shortFormDrafts: {}
+        };
+        setRunnerState(state);
+        renderTask();
+        setStatus('Reset to first task.', true);
+      });
+
+      metaEl.textContent = `Session: ${getSessionId()}`;
+      renderTask();
+    })();
+  </script>
+</body>
+</html>

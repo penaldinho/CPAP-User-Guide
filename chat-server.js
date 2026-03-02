@@ -151,6 +151,7 @@ const telemetryCsvColumns = [
   'video_percent',
   'task_action_index',
   'duration_ms',
+  'trial_mode',
   'referrer',
   'task_instance_seq',
   'task_instance_started_at',
@@ -191,6 +192,7 @@ const telemetrySqlColumns = [
   'video_percent',
   'task_action_index',
   'duration_ms',
+  'trial_mode',
   'referrer'
 ];
 
@@ -205,7 +207,8 @@ const physicalTrialCsvColumns = [
   'observer_id',
   'manual_page',
   'notes',
-  'source'
+  'source',
+  'trial_mode'
 ];
 
 const physicalTrialSqlColumns = [
@@ -219,7 +222,8 @@ const physicalTrialSqlColumns = [
   'observer_id',
   'manual_page',
   'notes',
-  'source'
+  'source',
+  'trial_mode'
 ];
 
 const projectTelemetryRecord = (record) => ({
@@ -253,6 +257,7 @@ const projectTelemetryRecord = (record) => ({
   video_percent: record.video_percent ?? '',
   task_action_index: record.task_action_index ?? '',
   duration_ms: record.duration_ms ?? '',
+  trial_mode: record.trial_mode || 'digital',
   referrer: record.referrer || ''
 });
 
@@ -267,7 +272,8 @@ const projectPhysicalTrialRecord = (record) => ({
   observer_id: record.observer_id || '',
   manual_page: record.manual_page || '',
   notes: record.notes || '',
-  source: record.source || 'physical_manual'
+  source: record.source || 'physical_manual',
+  trial_mode: record.trial_mode || 'physical'
 });
 
 const readTelemetryRecordsFromNdjson = (filePath) => {
@@ -501,6 +507,7 @@ const normalizeTelemetryRecordForSql = (record) => {
   return {
     ...projected,
     response_parts: responseParts,
+    trial_mode: String(record && record.trial_mode || projected.trial_mode || 'digital').trim().toLowerCase() === 'physical' ? 'physical' : 'digital',
     received_at: parseDateSafely(record.received_at || projected.received_at || new Date().toISOString()),
     timestamp: parseDateSafely(record.timestamp || projected.timestamp),
     result_count: parseIntegerSafely(projected.result_count),
@@ -544,10 +551,27 @@ const getAnswerPartText = (answerParts, key) => {
   return null;
 };
 
+const buildAnswerTextFromParts = (answerParts) => {
+  if (!answerParts || typeof answerParts !== 'object' || Array.isArray(answerParts)) {
+    return '';
+  }
+
+  const ordered = ['a', 'b', 'c', 'd']
+    .map((key) => ({ key, value: getAnswerPartText(answerParts, key) }))
+    .filter((entry) => String(entry.value || '').trim());
+
+  if (!ordered.length) {
+    return '';
+  }
+
+  return ordered.map((entry) => `(${entry.key}) ${entry.value}`).join('\n');
+};
+
 const normalizePhysicalTrialRecordForSql = (record) => {
   const projected = projectPhysicalTrialRecord(record);
   return {
     ...projected,
+    trial_mode: String(record && record.trial_mode || projected.trial_mode || 'physical').trim().toLowerCase() === 'digital' ? 'digital' : 'physical',
     received_at: parseDateSafely(record.received_at || projected.received_at || new Date().toISOString()),
     timestamp: parseDateSafely(record.timestamp || projected.timestamp)
   };
@@ -646,9 +670,10 @@ const insertTelemetryRecordPostgres = async (record) => {
             part_a_answer_text,
             part_b_answer_text,
             part_c_answer_text,
-            part_d_answer_text
+            part_d_answer_text,
+            trial_mode
           )
-          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
         `,
         [
           Number.isFinite(telemetryEventId) ? telemetryEventId : null,
@@ -663,7 +688,8 @@ const insertTelemetryRecordPostgres = async (record) => {
           partAAnswerText,
           partBAnswerText,
           partCAnswerText,
-          partDAnswerText
+          partDAnswerText,
+          normalized.trial_mode || 'digital'
         ]
       );
     }
@@ -696,6 +722,58 @@ const insertQuestionnaireRecordPostgres = async (record) => {
   const response = parseJsonObjectSafely(normalized.notes);
 
   if (eventType !== 'note' || !response) {
+    return;
+  }
+
+  const isShortFormTask = /^short_form_q[1-4]$/i.test(taskId);
+  const shortFormResponse = response && response.short_form_response && typeof response.short_form_response === 'object' && !Array.isArray(response.short_form_response)
+    ? response.short_form_response
+    : null;
+
+  if (isShortFormTask && shortFormResponse) {
+    const partAAnswerText = getAnswerPartText(shortFormResponse, 'a');
+    const partBAnswerText = getAnswerPartText(shortFormResponse, 'b');
+    const partCAnswerText = getAnswerPartText(shortFormResponse, 'c');
+    const partDAnswerText = getAnswerPartText(shortFormResponse, 'd');
+    const answerText = buildAnswerTextFromParts(shortFormResponse);
+
+    await pool.query(
+      `
+        INSERT INTO short_form_results (
+          telemetry_event_id,
+          received_at,
+          timestamp,
+          session_id,
+          participant_id,
+          task_id,
+          task_label,
+          question_id,
+          answer_text,
+          part_a_answer_text,
+          part_b_answer_text,
+          part_c_answer_text,
+          part_d_answer_text,
+          trial_mode
+        )
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+      `,
+      [
+        null,
+        normalized.received_at,
+        normalized.timestamp,
+        normalized.session_id || '',
+        normalized.participant_id || '',
+        taskId,
+        normalized.task_label || taskId,
+        taskId,
+        answerText,
+        partAAnswerText,
+        partBAnswerText,
+        partCAnswerText,
+        partDAnswerText,
+        'physical'
+      ]
+    );
     return;
   }
 

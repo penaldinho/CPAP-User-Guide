@@ -30,7 +30,8 @@ CREATE TABLE IF NOT EXISTS telemetry_events (
   video_percent INTEGER,
   task_action_index INTEGER,
   duration_ms INTEGER,
-  referrer TEXT
+  referrer TEXT,
+  trial_mode TEXT NOT NULL DEFAULT 'digital'
 );
 
 ALTER TABLE telemetry_events
@@ -63,6 +64,16 @@ ALTER TABLE telemetry_events
 ALTER TABLE telemetry_events
   ADD COLUMN IF NOT EXISTS video_percent INTEGER;
 
+ALTER TABLE telemetry_events
+  ADD COLUMN IF NOT EXISTS trial_mode TEXT;
+
+ALTER TABLE telemetry_events
+  ALTER COLUMN trial_mode SET DEFAULT 'digital';
+
+UPDATE telemetry_events
+SET trial_mode = 'digital'
+WHERE trial_mode IS NULL;
+
 CREATE INDEX IF NOT EXISTS idx_telemetry_participant_timestamp
   ON telemetry_events (participant_id, received_at DESC);
 
@@ -86,7 +97,8 @@ CREATE TABLE IF NOT EXISTS short_form_results (
   part_a_answer_text TEXT,
   part_b_answer_text TEXT,
   part_c_answer_text TEXT,
-  part_d_answer_text TEXT
+  part_d_answer_text TEXT,
+  trial_mode TEXT NOT NULL DEFAULT 'digital'
 );
 
 ALTER TABLE short_form_results
@@ -100,6 +112,16 @@ ALTER TABLE short_form_results
 
 ALTER TABLE short_form_results
   ADD COLUMN IF NOT EXISTS part_d_answer_text TEXT;
+
+ALTER TABLE short_form_results
+  ADD COLUMN IF NOT EXISTS trial_mode TEXT;
+
+ALTER TABLE short_form_results
+  ALTER COLUMN trial_mode SET DEFAULT 'digital';
+
+UPDATE short_form_results
+SET trial_mode = 'digital'
+WHERE trial_mode IS NULL;
 
 ALTER TABLE short_form_results
   ALTER COLUMN answer_text DROP NOT NULL;
@@ -122,8 +144,19 @@ CREATE TABLE IF NOT EXISTS physical_trial_events (
   observer_id TEXT,
   manual_page TEXT,
   notes TEXT,
-  source TEXT NOT NULL DEFAULT 'physical_manual'
+  source TEXT NOT NULL DEFAULT 'physical_manual',
+  trial_mode TEXT NOT NULL DEFAULT 'physical'
 );
+
+ALTER TABLE physical_trial_events
+  ADD COLUMN IF NOT EXISTS trial_mode TEXT;
+
+ALTER TABLE physical_trial_events
+  ALTER COLUMN trial_mode SET DEFAULT 'physical';
+
+UPDATE physical_trial_events
+SET trial_mode = 'physical'
+WHERE trial_mode IS NULL;
 
 CREATE INDEX IF NOT EXISTS idx_physical_trial_participant_time
   ON physical_trial_events (participant_id, received_at DESC);
