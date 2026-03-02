@@ -1592,7 +1592,7 @@
     updateTaskCardSafeArea();
   };
 
-  const renderResearchPanel = (forceOpen = false) => {
+  const renderResearchPanel = (forceOpen = false, allowDuringActiveTask = false) => {
     const presetTasks = [
       { id: 'scenario_card_1', label: 'Scenario Card 1 – First-Time Setup (Setup)' },
       { id: 'scenario_card_2', label: 'Scenario Card 2 – Fit and Start Therapy (Routine Use)' },
@@ -1617,7 +1617,7 @@
     ].join('');
 
     const activeTask = getTaskState();
-    if (activeTask.task_id) {
+    if (activeTask.task_id && !allowDuringActiveTask) {
       const existingPanel = document.getElementById('mtg-research-panel');
       if (existingPanel) {
         existingPanel.remove();
@@ -1893,6 +1893,24 @@
     refreshState();
   };
 
+  const toggleResearchPanelHotkey = (event) => {
+    const isRKey = String(event.key || '').toLowerCase() === 'r';
+    const hasModifier = (event.ctrlKey || event.metaKey) && event.altKey;
+    if (!isRKey || !hasModifier) {
+      return;
+    }
+
+    event.preventDefault();
+
+    const existingPanel = document.getElementById('mtg-research-panel');
+    if (existingPanel) {
+      existingPanel.remove();
+      return;
+    }
+
+    renderResearchPanel(true, true);
+  };
+
   const init = () => {
     hydrateParticipantFromUrl();
     hydrateLastTaskResultFromUrl();
@@ -1972,6 +1990,7 @@
     window.addEventListener('focus', () => {
       reconcileTaskStateFromServer('focus');
     });
+    document.addEventListener('keydown', toggleResearchPanelHotkey);
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible') {
         if (!Number.isFinite(visibleSegmentStartedAtMs)) {
