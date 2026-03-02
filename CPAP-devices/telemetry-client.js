@@ -131,6 +131,13 @@
     }
   };
 
+  const escapeHtml = (value) => String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
   const randomId = () => {
     const stamp = Date.now().toString(36);
     const rand = Math.random().toString(36).slice(2, 10);
@@ -362,6 +369,7 @@
       enableResearchModeInUrl();
       renderResearchPanel();
       syncParticipantEndButton();
+      syncTaskPromptCard();
       return;
     }
 
@@ -372,6 +380,7 @@
         renderResearchPanel(true);
       }
       syncParticipantEndButton();
+      syncTaskPromptCard();
       return;
     }
 
@@ -383,6 +392,7 @@
       enableResearchModeInUrl();
       renderResearchPanel();
       syncParticipantEndButton();
+      syncTaskPromptCard();
       return;
     }
 
@@ -392,6 +402,7 @@
       renderResearchPanel(true);
     }
     syncParticipantEndButton();
+    syncTaskPromptCard();
   };
 
   const buildBasePayload = () => {
@@ -540,6 +551,7 @@
         markTaskActiveInUrl(serverTask);
         enableResearchModeInUrl();
         syncParticipantEndButton();
+        syncTaskPromptCard();
         return;
       }
 
@@ -554,6 +566,7 @@
         renderResearchPanel(true);
       }
       syncParticipantEndButton();
+      syncTaskPromptCard();
     } catch {
       // ignore sync failures
     } finally {
@@ -786,6 +799,116 @@
     ...getActiveTaskContext()
   });
 
+  const presetTaskDescriptions = {
+    scenario_card_1: {
+      title: 'Scenario Card 1 – First-Time Setup (Setup)',
+      steps: [
+        'Set up the CPAP machine for first use, stopping at the point where the mask will be fitted.',
+        'You may use the instructions at any time.',
+        'Inform the assessor when the device is correctly set up and ready for mask fitting.'
+      ]
+    },
+    scenario_card_2: {
+      title: 'Scenario Card 2 – Fit and Start Therapy (Routine Use)',
+      steps: [
+        'Fit the mask to the dummy, check that a good fit is achieved, and then start therapy.',
+        'You may use the instructions at any time.',
+        'Inform the assessor when therapy has started and you are satisfied with mask fit.'
+      ]
+    },
+    scenario_card_3: {
+      title: 'Scenario Card 3 – Comfort Adjustment (Troubleshooting)',
+      steps: [
+        'During therapy, you notice a dry nose.',
+        'Adjust relevant settings to address this comfort issue using the instructions.',
+        'Inform the assessor when the issue has been appropriately addressed.'
+      ]
+    },
+    short_form_q1: {
+      title: 'Short-Form Q1 – Cleaning frequency (Routine Use)',
+      steps: [
+        'State the recommended cleaning frequency for the CPAP device and humidifier,',
+        'the mask (including headgear), and the ClimateLineAir tubing.'
+      ]
+    },
+    short_form_q2: {
+      title: 'Short-Form Q2 – Error message safety escalation (Error 006)',
+      steps: [
+        'If the device shows “System fault – refer to user guide – Error 006”,',
+        'state what should be done next.'
+      ]
+    },
+    short_form_q3: {
+      title: 'Short-Form Q3 – Spare mask storage (Routine Use / Safety)',
+      steps: [
+        'State how spare masks should be stored and the recommended storage temperature range.'
+      ]
+    },
+    short_form_q4: {
+      title: 'Short-Form Q4 – Tubing length check (Setup)',
+      steps: [
+        'Given a 7-foot distance and ClimateLineAir Oxy tubing,',
+        'state whether it is long enough and provide its length.'
+      ]
+    }
+  };
+
+  const ensureTaskPromptCard = () => {
+    const existing = document.getElementById('mtg-task-prompt-card');
+    if (existing) return existing;
+
+    const card = document.createElement('aside');
+    card.id = 'mtg-task-prompt-card';
+    card.style.position = 'fixed';
+    card.style.left = '12px';
+    card.style.top = '12px';
+    card.style.width = '420px';
+    card.style.maxWidth = 'calc(100vw - 24px)';
+    card.style.maxHeight = '42vh';
+    card.style.overflow = 'auto';
+    card.style.background = '#ffffff';
+    card.style.border = '1px solid #d7dce5';
+    card.style.borderRadius = '10px';
+    card.style.boxShadow = '0 10px 24px rgba(0,0,0,0.16)';
+    card.style.padding = '12px';
+    card.style.zIndex = '9400';
+    card.style.fontFamily = 'system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif';
+    card.style.color = '#1f2937';
+    card.style.display = 'none';
+
+    document.body.appendChild(card);
+    return card;
+  };
+
+  const syncTaskPromptCard = () => {
+    const taskState = getTaskState();
+    const card = ensureTaskPromptCard();
+    if (!taskState || !taskState.task_id) {
+      card.style.display = 'none';
+      card.innerHTML = '';
+      return;
+    }
+
+    const taskId = String(taskState.task_id || '').trim();
+    const fallbackLabel = String(taskState.task_label || '').trim();
+    const entry = presetTaskDescriptions[taskId] || null;
+    const displayLabel = (entry && entry.title) || fallbackLabel || taskId;
+    const lines = entry && Array.isArray(entry.steps) ? entry.steps : [];
+    const listMarkup = lines.length
+      ? `<ul style="margin:8px 0 0 18px; padding:0; display:grid; gap:6px;">${lines.map((line) => `<li style="line-height:1.35;">${escapeHtml(line)}</li>`).join('')}</ul>`
+      : '<div style="margin-top:8px; color:#4b5563; line-height:1.35;">Follow the task instructions and inform the assessor when complete.</div>';
+
+    card.innerHTML = `
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+        <strong style="font-size:13px; color:#0f172a;">Task in progress</strong>
+        <span style="font-size:11px; color:#475569; background:#f1f5f9; border:1px solid #e2e8f0; border-radius:999px; padding:2px 8px;">${escapeHtml(taskId)}</span>
+      </div>
+      <div style="margin-top:6px; font-size:13px; font-weight:600; line-height:1.3;">${escapeHtml(displayLabel)}</div>
+      ${listMarkup}
+    `;
+    card.style.display = 'block';
+  };
+
   const startTask = (taskId, label) => {
     if (!taskId) return;
     const nextState = {
@@ -796,6 +919,7 @@
     setTaskSubscribedInTab(true);
     setTaskState(nextState);
     markTaskActiveInUrl(nextState);
+    syncTaskPromptCard();
     track('task_start', {
       task_id: String(taskId),
       task_label: String(label || '')
@@ -827,6 +951,7 @@
     setTaskState({});
     setTaskSubscribedInTab(false);
     markTaskClearedInUrl();
+    syncTaskPromptCard();
   };
 
   const ensureParticipantEndButton = () => {
@@ -918,8 +1043,9 @@
     panel.style.position = 'fixed';
     panel.style.right = '12px';
     panel.style.bottom = '12px';
-    panel.style.width = '320px';
+    panel.style.width = '380px';
     panel.style.maxWidth = 'calc(100vw - 24px)';
+    panel.style.overflow = 'hidden';
     panel.style.background = '#ffffff';
     panel.style.border = '1px solid #d7dce5';
     panel.style.borderRadius = '10px';
@@ -938,25 +1064,25 @@
       <div style="display:grid; gap:8px;">
         <label style="display:grid; gap:4px;">
           <span>Participant ID</span>
-          <input id="mtg-participant-input" type="text" placeholder="e.g. P01" style="padding:6px 8px; border:1px solid #cbd5e1; border-radius:6px;" />
+          <input id="mtg-participant-input" type="text" placeholder="e.g. P01" style="width:100%; min-width:0; box-sizing:border-box; padding:6px 8px; border:1px solid #cbd5e1; border-radius:6px;" />
         </label>
         <button id="mtg-participant-save" type="button" style="padding:7px 10px; border:1px solid #cbd5e1; border-radius:6px; background:#f8fafc; cursor:pointer;">Save participant</button>
         <hr style="border:0; border-top:1px solid #e5e7eb; margin:2px 0;" />
         <label style="display:grid; gap:4px;">
           <span>Task ID</span>
-          <select id="mtg-task-id-select" style="padding:6px 8px; border:1px solid #cbd5e1; border-radius:6px;">${taskIdOptions}</select>
+          <select id="mtg-task-id-select" style="width:100%; min-width:0; box-sizing:border-box; padding:6px 8px; border:1px solid #cbd5e1; border-radius:6px;">${taskIdOptions}</select>
         </label>
         <label style="display:grid; gap:4px;">
           <span>Task label</span>
-          <select id="mtg-task-label-select" style="padding:6px 8px; border:1px solid #cbd5e1; border-radius:6px;">${taskLabelOptions}</select>
+          <select id="mtg-task-label-select" style="width:100%; min-width:0; box-sizing:border-box; padding:6px 8px; border:1px solid #cbd5e1; border-radius:6px;">${taskLabelOptions}</select>
         </label>
         <label id="mtg-task-id-custom-wrap" style="display:none; gap:4px;">
           <span>Custom task ID</span>
-          <input id="mtg-task-id-custom" type="text" placeholder="e.g. task_custom_1" style="padding:6px 8px; border:1px solid #cbd5e1; border-radius:6px;" />
+          <input id="mtg-task-id-custom" type="text" placeholder="e.g. task_custom_1" style="width:100%; min-width:0; box-sizing:border-box; padding:6px 8px; border:1px solid #cbd5e1; border-radius:6px;" />
         </label>
         <label id="mtg-task-label-custom-wrap" style="display:none; gap:4px;">
           <span>Custom task label</span>
-          <input id="mtg-task-label-custom" type="text" placeholder="e.g. Additional scenario" style="padding:6px 8px; border:1px solid #cbd5e1; border-radius:6px;" />
+          <input id="mtg-task-label-custom" type="text" placeholder="e.g. Additional scenario" style="width:100%; min-width:0; box-sizing:border-box; padding:6px 8px; border:1px solid #cbd5e1; border-radius:6px;" />
         </label>
         <div style="display:flex; gap:8px;">
           <button id="mtg-task-start" type="button" style="flex:1; padding:7px 10px; border:1px solid #cbd5e1; border-radius:6px; background:#ecfdf3; cursor:pointer;">Start task</button>
@@ -964,7 +1090,7 @@
         </div>
         <div id="mtg-task-timer" style="padding:7px 10px; border:1px solid #e5e7eb; border-radius:6px; background:#f8fafc; font-weight:600;">Task timer: 00:00</div>
         <button id="mtg-export-csv" type="button" style="padding:7px 10px; border:1px solid #cbd5e1; border-radius:6px; background:#fff7ed; cursor:pointer;">Export CSV</button>
-        <div id="mtg-research-state" style="font-size:12px; color:#4b5563;"></div>
+        <div id="mtg-research-state" style="font-size:12px; color:#4b5563; overflow-wrap:anywhere;"></div>
       </div>
     `;
 
@@ -1202,6 +1328,7 @@
     initVideoTelemetry();
 
     syncParticipantEndButton();
+    syncTaskPromptCard();
 
     renderResearchPanel();
 
@@ -1233,6 +1360,7 @@
     window.addEventListener('storage', (event) => {
       if (event.key === taskStateKey) {
         reconcileSharedTaskState();
+        syncTaskPromptCard();
       }
 
       if (event.key === participantKey || event.key === lastTaskResultKey) {
@@ -1248,10 +1376,14 @@
       if (document.visibilityState === 'visible') {
         reconcileSharedTaskState();
         reconcileTaskStateFromServer('visible');
+        syncTaskPromptCard();
       }
     });
 
-    window.setInterval(syncParticipantEndButton, 1000);
+    window.setInterval(() => {
+      syncParticipantEndButton();
+      syncTaskPromptCard();
+    }, 1000);
   };
 
   window.MTGTelemetry = {
