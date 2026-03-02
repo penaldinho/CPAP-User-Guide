@@ -968,6 +968,13 @@
     const taskId = String(taskState.task_id || '').trim();
     const fallbackLabel = String(taskState.task_label || '').trim();
     const isShortFormTask = /^short_form_q[1-4]$/i.test(taskId);
+    if (isShortFormTask) {
+      isTaskPromptExpanded = false;
+      card.style.display = 'none';
+      card.innerHTML = '';
+      return;
+    }
+
     const startedAtMs = Date.parse(String(taskState.started_at || ''));
     const elapsedMs = Number.isFinite(startedAtMs) ? Math.max(0, Date.now() - startedAtMs) : 0;
     const elapsedText = formatElapsedDuration(elapsedMs);
@@ -1074,6 +1081,28 @@
     shortFormWrap.style.width = 'min(720px, calc(100vw - 24px))';
     shortFormWrap.style.boxSizing = 'border-box';
 
+    const shortFormTaskHeader = document.createElement('div');
+    shortFormTaskHeader.id = 'mtg-short-form-task-header';
+    shortFormTaskHeader.style.display = 'flex';
+    shortFormTaskHeader.style.alignItems = 'center';
+    shortFormTaskHeader.style.justifyContent = 'space-between';
+    shortFormTaskHeader.style.gap = '8px';
+    shortFormTaskHeader.style.marginBottom = '6px';
+
+    const shortFormElapsed = document.createElement('div');
+    shortFormElapsed.id = 'mtg-short-form-task-elapsed';
+    shortFormElapsed.style.fontSize = '12px';
+    shortFormElapsed.style.color = '#334155';
+    shortFormElapsed.style.fontWeight = '600';
+    shortFormElapsed.style.marginBottom = '6px';
+
+    const shortFormSteps = document.createElement('div');
+    shortFormSteps.id = 'mtg-short-form-task-steps';
+    shortFormSteps.style.fontSize = '12px';
+    shortFormSteps.style.color = '#334155';
+    shortFormSteps.style.lineHeight = '1.35';
+    shortFormSteps.style.marginBottom = '8px';
+
     const shortFormLabel = document.createElement('div');
     shortFormLabel.id = 'mtg-short-form-answer-label';
     shortFormLabel.style.fontSize = '13px';
@@ -1108,6 +1137,9 @@
     shortFormSubmit.style.cursor = 'pointer';
     shortFormSubmit.textContent = 'Submit answer';
 
+    shortFormWrap.appendChild(shortFormTaskHeader);
+    shortFormWrap.appendChild(shortFormElapsed);
+    shortFormWrap.appendChild(shortFormSteps);
     shortFormWrap.appendChild(shortFormLabel);
     shortFormWrap.appendChild(shortFormPrompt);
     shortFormWrap.appendChild(shortFormFields);
@@ -1211,6 +1243,9 @@
     const isShortFormTask = /^short_form_q[1-4]$/i.test(taskId);
     const endBtn = document.getElementById('mtg-participant-end-task-btn');
     const shortFormWrap = document.getElementById('mtg-short-form-answer-wrap');
+    const shortFormTaskHeader = document.getElementById('mtg-short-form-task-header');
+    const shortFormElapsed = document.getElementById('mtg-short-form-task-elapsed');
+    const shortFormSteps = document.getElementById('mtg-short-form-task-steps');
     const shortFormLabel = document.getElementById('mtg-short-form-answer-label');
     const shortFormPrompt = document.getElementById('mtg-short-form-answer-prompt');
     const shortFormFields = document.getElementById('mtg-short-form-answer-fields');
@@ -1237,10 +1272,44 @@
     if (!isShortFormTask || !taskId) {
       shortFormAutoFocusTaskId = '';
       shortFormRenderedTaskId = '';
+      if (shortFormTaskHeader) {
+        shortFormTaskHeader.innerHTML = '';
+      }
+      if (shortFormElapsed) {
+        shortFormElapsed.textContent = '';
+      }
+      if (shortFormSteps) {
+        shortFormSteps.innerHTML = '';
+      }
       if (shortFormFields) {
         shortFormFields.innerHTML = '';
       }
       return;
+    }
+
+    const definition = getShortFormQuestionDefinition(taskId);
+    const startedAtMs = Date.parse(String(taskState.started_at || ''));
+    const elapsedMs = Number.isFinite(startedAtMs) ? Math.max(0, Date.now() - startedAtMs) : 0;
+    const elapsedText = formatElapsedDuration(elapsedMs);
+
+    if (shortFormTaskHeader) {
+      shortFormTaskHeader.innerHTML = `
+        <strong style="font-size:13px; color:#0f172a;">Task in progress</strong>
+        <span style="font-size:11px; color:#475569; background:#f1f5f9; border:1px solid #e2e8f0; border-radius:999px; padding:2px 8px;">${escapeHtml(taskId)}</span>
+      `;
+    }
+
+    if (shortFormElapsed) {
+      shortFormElapsed.textContent = `Elapsed: ${elapsedText}`;
+    }
+
+    if (shortFormSteps) {
+      const lines = definition && Array.isArray((presetTaskDescriptions[taskId] || {}).steps)
+        ? (presetTaskDescriptions[taskId] || {}).steps
+        : [];
+      shortFormSteps.innerHTML = lines.length
+        ? `<ul style="margin:0 0 0 18px; padding:0; display:grid; gap:6px;">${lines.map((line) => `<li style="line-height:1.35;">${escapeHtml(line)}</li>`).join('')}</ul>`
+        : '';
     }
 
     if (!shortFormFields) {
@@ -1248,7 +1317,6 @@
     }
 
     if (shortFormRenderedTaskId !== taskId) {
-      const definition = getShortFormQuestionDefinition(taskId);
       if (shortFormPrompt) {
         shortFormPrompt.textContent = definition && definition.preamble
           ? definition.preamble
