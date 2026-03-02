@@ -19,6 +19,7 @@
     .task-card { margin-top: 14px; border: 1px solid #34d399; background: #ecfdf5; border-radius: 10px; padding: 14px; }
     .task-header { display:flex; justify-content:space-between; align-items:center; gap:10px; }
     .task-pill { font-size: 11px; color: #475569; background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 999px; padding: 2px 8px; }
+    .task-elapsed { margin-top: 6px; font-size: 12px; color: #334155; font-weight: 600; }
     .task-title { font-size: 16px; font-weight: 700; margin-top: 8px; }
     .task-preamble { margin-top: 8px; font-size: 14px; line-height: 1.4; color: #334155; }
     .task-steps { margin-top: 8px; font-size: 14px; line-height: 1.4; color: #334155; }
@@ -48,23 +49,16 @@
           Participant ID / Name
           <input id="participant_id" type="text" placeholder="e.g. P01 or Jane Smith" required />
         </label>
-        <label>
-          Observer ID
-          <input id="observer_id" type="text" placeholder="e.g. OBS-1" />
-        </label>
       </div>
 
       <div id="task-card" class="task-card"></div>
 
       <div class="btns">
-        <button id="btn-start" type="button">Start current task</button>
-        <button id="btn-complete" type="button" class="success" disabled>I have completed this task</button>
-        <button id="btn-next" type="button" class="secondary" disabled>Proceed to next task</button>
-        <button id="btn-reset" type="button" class="secondary">Reset to first task</button>
+        <button id="btn-action" type="button" class="success">Start current task</button>
+        <button id="btn-reset" type="button" class="secondary" style="display:none;">Reset to first task</button>
       </div>
 
       <div id="status" aria-live="polite"></div>
-      <div id="meta" class="meta"></div>
     </div>
   </div>
 
@@ -197,13 +191,9 @@
       };
 
       const statusEl = el('status');
-      const metaEl = el('meta');
       const taskCardEl = el('task-card');
       const participantInput = el('participant_id');
-      const observerInput = el('observer_id');
-      const startBtn = el('btn-start');
-      const completeBtn = el('btn-complete');
-      const nextBtn = el('btn-next');
+      const actionBtn = el('btn-action');
       const resetBtn = el('btn-reset');
 
       let state = getRunnerState();
@@ -215,6 +205,30 @@
 
       const getCurrentTaskId = () => taskOrder[state.currentTaskIndex] || '';
       const getCurrentTask = () => tasks[getCurrentTaskId()] || null;
+
+      const formatElapsedDuration = (durationMs) => {
+        const totalSeconds = Math.max(0, Math.floor((durationMs || 0) / 1000));
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
+        return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+      };
+
+      const getActiveElapsedMs = () => {
+        const taskId = getCurrentTaskId();
+        const isStarted = state.startedTaskId === taskId;
+        if (!isStarted) {
+          return 0;
+        }
+
+        const startedAtMs = Date.parse(String(state.startedAt || ''));
+        return Number.isFinite(startedAtMs) ? Math.max(0, Date.now() - startedAtMs) : 0;
+      };
+
+      const syncElapsedDisplay = () => {
+        const elapsedEl = document.getElementById('task-elapsed');
+        if (!elapsedEl) return;
+        elapsedEl.textContent = `Elapsed: ${formatElapsedDuration(getActiveElapsedMs())}`;
+      };
 
       const validateCommon = () => {
         if (!String(participantInput.value || '').trim()) {
@@ -232,7 +246,7 @@
           timestamp: new Date().toISOString(),
           session_id: getSessionId(),
           participant_id: String(participantInput.value || '').trim(),
-          observer_id: String(observerInput.value || '').trim(),
+          observer_id: '',
           task_id: taskId,
           task_label: task ? task.title : taskId,
           event_type: eventType,
@@ -256,7 +270,6 @@
           throw new Error(message);
         }
 
-        metaEl.textContent = `Session: ${payload.session_id} • Last event: ${eventType} at ${new Date(payload.timestamp).toLocaleString()}`;
       };
 
       const getShortFormDraftForTask = (taskId) => {
@@ -291,6 +304,8 @@
         const isStarted = state.startedTaskId === taskId;
         const isCompleted = state.completedTaskIds.includes(taskId);
         const isShortForm = task.kind === 'short_form';
+        const isLastTask = state.currentTaskIndex === taskOrder.length - 1;
+        const isTrialFinished = isLastTask && isCompleted && !isStarted;
         const draft = getShortFormDraftForTask(taskId);
 
         taskCardEl.innerHTML = `
@@ -298,15 +313,43 @@
             <strong style="font-size:13px;color:#0f172a;">Task in progress</strong>
             <span class="task-pill">${taskId}</span>
           </div>
+          <div id="task-elapsed" class="task-elapsed">Elapsed: 00:00</div>
           <div class="task-title">${task.title}</div>
           <div class="task-preamble">${task.preamble || ''}</div>
           <div class="task-steps">${task.steps && task.steps.length ? `<ul>${task.steps.map((step) => `<li>${step}</li>`).join('')}</ul>` : ''}</div>
           <div id="answer-wrap" class="answer-wrap" style="display:${isShortForm ? 'grid' : 'none'};"></div>
         `;
 
-        startBtn.disabled = isStarted;
-        completeBtn.disabled = !isStarted;
-        nextBtn.disabled = !isCompleted;
+        syncElapsedDisplay();
+
+        if (resetBtn) {
+          resetBtn.style.display = isTrialFinished ? 'inline-block' : 'none';
+        }
+
+        if (actionBtn) {
+          actionBtn.disabled = false;
+
+          if (isTrialFinished) {
+            actionBtn.style.display = 'none';
+            actionBtn.dataset.mode = 'done';
+          } else {
+            actionBtn.style.display = 'inline-block';
+
+            if (isStarted) {
+              actionBtn.dataset.mode = 'complete';
+              actionBtn.textContent = 'I have completed this task';
+              actionBtn.className = 'success';
+            } else if (isCompleted) {
+              actionBtn.dataset.mode = 'next';
+              actionBtn.textContent = 'Proceed to next task';
+              actionBtn.className = 'secondary';
+            } else {
+              actionBtn.dataset.mode = 'start';
+              actionBtn.textContent = 'Start current task';
+              actionBtn.className = 'success';
+            }
+          }
+        }
 
         if (!isShortForm) {
           return;
@@ -335,81 +378,87 @@
         });
       };
 
-      startBtn.addEventListener('click', async () => {
+      actionBtn.addEventListener('click', async () => {
         if (!validateCommon()) return;
-        const taskId = getCurrentTaskId();
-        if (!taskId) return;
 
-        try {
-          await submitEvent('task_start', '');
-          state.startedTaskId = taskId;
-          state.startedAt = new Date().toISOString();
-          state.completedTaskIds = state.completedTaskIds.filter((id) => id !== taskId);
-          setRunnerState(state);
-          renderTask();
-          setStatus(`Started ${taskId}.`, true);
-        } catch (error) {
-          setStatus(error.message || 'Failed to start task.', false);
-        }
-      });
-
-      completeBtn.addEventListener('click', async () => {
-        if (!validateCommon()) return;
+        const mode = String(actionBtn.dataset.mode || '').trim();
         const taskId = getCurrentTaskId();
         const task = getCurrentTask();
-        if (!taskId || !task || state.startedTaskId !== taskId) return;
+        if (!taskId || !task) return;
 
         try {
-          if (task.kind === 'short_form') {
-            const draft = getShortFormDraftForTask(taskId);
-            const parts = Array.isArray(task.parts) ? task.parts : [];
-            const missing = parts.find((part) => !String(draft[part.key] || '').trim());
-            if (missing) {
-              setStatus('Please complete all answer parts before finishing this task.', false);
-              const missingInput = document.querySelector(`textarea[data-part-key="${missing.key}"]`);
-              if (missingInput) missingInput.focus();
+          if (mode === 'start') {
+            await submitEvent('task_start', '');
+            state.startedTaskId = taskId;
+            state.startedAt = new Date().toISOString();
+            state.completedTaskIds = state.completedTaskIds.filter((id) => id !== taskId);
+            setRunnerState(state);
+            renderTask();
+            setStatus(`Started ${taskId}.`, true);
+            return;
+          }
+
+          if (mode === 'complete') {
+            if (state.startedTaskId !== taskId) {
+              setStatus('This task has not been started yet.', false);
               return;
             }
 
-            await submitEvent('note', JSON.stringify({
-              short_form_response: draft,
-              task_id: taskId
-            }));
-            clearShortFormDraftForTask(taskId);
+            if (task.kind === 'short_form') {
+              const draft = getShortFormDraftForTask(taskId);
+              const parts = Array.isArray(task.parts) ? task.parts : [];
+              const missing = parts.find((part) => !String(draft[part.key] || '').trim());
+              if (missing) {
+                setStatus('Please complete all answer parts before finishing this task.', false);
+                const missingInput = document.querySelector(`textarea[data-part-key="${missing.key}"]`);
+                if (missingInput) missingInput.focus();
+                return;
+              }
+
+              await submitEvent('note', JSON.stringify({
+                short_form_response: draft,
+                task_id: taskId
+              }));
+              clearShortFormDraftForTask(taskId);
+            }
+
+            await submitEvent('task_end', 'participant_completed');
+            state.startedTaskId = '';
+            state.startedAt = '';
+            if (!state.completedTaskIds.includes(taskId)) {
+              state.completedTaskIds.push(taskId);
+            }
+            setRunnerState(state);
+            renderTask();
+            setStatus(`Completed ${taskId}.`, true);
+            return;
           }
 
-          await submitEvent('task_end', 'participant_completed');
-          state.startedTaskId = '';
-          state.startedAt = '';
-          if (!state.completedTaskIds.includes(taskId)) {
-            state.completedTaskIds.push(taskId);
+          if (mode === 'next') {
+            if (!state.completedTaskIds.includes(taskId)) {
+              setStatus('Complete the current task first.', false);
+              return;
+            }
+
+            if (state.currentTaskIndex < taskOrder.length - 1) {
+              state.currentTaskIndex += 1;
+              const nextTaskId = getCurrentTaskId();
+              await submitEvent('task_start', '');
+              state.startedTaskId = nextTaskId;
+              state.startedAt = new Date().toISOString();
+              state.completedTaskIds = state.completedTaskIds.filter((id) => id !== nextTaskId);
+              setRunnerState(state);
+              renderTask();
+              setStatus(`Moved to ${nextTaskId} and started timing.`, true);
+              return;
+            }
+
+            setStatus('All tasks completed.', true);
+            return;
           }
-          setRunnerState(state);
-          renderTask();
-          setStatus(`Completed ${taskId}. Click “Proceed to next task”.`, true);
         } catch (error) {
-          setStatus(error.message || 'Failed to complete task.', false);
+          setStatus(error.message || 'Failed to process action.', false);
         }
-      });
-
-      nextBtn.addEventListener('click', () => {
-        const taskId = getCurrentTaskId();
-        if (!state.completedTaskIds.includes(taskId)) {
-          setStatus('Complete the current task first.', false);
-          return;
-        }
-
-        if (state.currentTaskIndex < taskOrder.length - 1) {
-          state.currentTaskIndex += 1;
-          state.startedTaskId = '';
-          state.startedAt = '';
-          setRunnerState(state);
-          renderTask();
-          setStatus('Moved to next task.', true);
-          return;
-        }
-
-        setStatus('All tasks completed.', true);
       });
 
       resetBtn.addEventListener('click', () => {
@@ -425,8 +474,9 @@
         setStatus('Reset to first task.', true);
       });
 
-      metaEl.textContent = `Session: ${getSessionId()}`;
+      getSessionId();
       renderTask();
+      window.setInterval(syncElapsedDisplay, 1000);
     })();
   </script>
 </body>
