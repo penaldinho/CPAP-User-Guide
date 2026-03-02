@@ -6,6 +6,7 @@
   const taskStateKey = 'mtg-telemetry-task-state';
   const lastTaskResultKey = 'mtg-telemetry-last-task-result';
   const tabTaskSubscribedKey = 'mtg-telemetry-tab-task-subscribed';
+  const shortFormDraftsKey = 'mtg-telemetry-short-form-drafts';
   let shortFormAutoFocusTaskId = '';
   let shortFormRenderedTaskId = '';
   let isShortFormCardExpanded = false;
@@ -247,6 +248,42 @@
 
   const setLastTaskResult = (result) => {
     localStorage.setItem(lastTaskResultKey, JSON.stringify(result || {}));
+  };
+
+  const getShortFormDrafts = () => safeJsonParse(localStorage.getItem(shortFormDraftsKey) || '{}', {});
+
+  const getShortFormDraft = (taskId) => {
+    const key = String(taskId || '').trim();
+    if (!key) return null;
+    const drafts = getShortFormDrafts();
+    const draft = drafts && typeof drafts === 'object' ? drafts[key] : null;
+    return draft && typeof draft === 'object' && !Array.isArray(draft) ? draft : null;
+  };
+
+  const setShortFormDraft = (taskId, draftParts) => {
+    const key = String(taskId || '').trim();
+    if (!key) return;
+
+    const drafts = getShortFormDrafts();
+    const nextDrafts = drafts && typeof drafts === 'object' ? { ...drafts } : {};
+    nextDrafts[key] = draftParts && typeof draftParts === 'object' && !Array.isArray(draftParts)
+      ? draftParts
+      : {};
+    localStorage.setItem(shortFormDraftsKey, JSON.stringify(nextDrafts));
+  };
+
+  const clearShortFormDraft = (taskId) => {
+    const key = String(taskId || '').trim();
+    if (!key) return;
+
+    const drafts = getShortFormDrafts();
+    if (!drafts || typeof drafts !== 'object' || Array.isArray(drafts) || !Object.prototype.hasOwnProperty.call(drafts, key)) {
+      return;
+    }
+
+    const nextDrafts = { ...drafts };
+    delete nextDrafts[key];
+    localStorage.setItem(shortFormDraftsKey, JSON.stringify(nextDrafts));
   };
 
   const buildLastTaskParams = () => {
@@ -1052,8 +1089,12 @@
     const completionInstruction = isShortFormTask
       ? 'Type your answer in the box below, then click Submit answer.'
       : 'When finished, click “I have finished this task”.';
-    const listMarkup = lines.length
-      ? `<ul style="margin:0 0 0 18px; padding:0; display:grid; gap:6px;">${lines.map((line) => `<li style="line-height:1.35;">${escapeHtml(line)}</li>`).join('')}</ul>`
+    const detailLines = lines.filter((line, index) => {
+      if (index !== 0) return true;
+      return String(line || '').trim().toLowerCase() !== scenarioDescription.toLowerCase();
+    });
+    const listMarkup = detailLines.length
+      ? `<ul style="margin:0 0 0 18px; padding:0; display:grid; gap:6px;">${detailLines.map((line) => `<li style="line-height:1.35;">${escapeHtml(line)}</li>`).join('')}</ul>`
       : '<div style="margin-top:8px; color:#4b5563; line-height:1.35;">Follow the task instructions and inform the observer when complete.</div>';
 
     card.innerHTML = `
@@ -1305,6 +1346,8 @@
         response_parts: answerParts
       });
 
+      clearShortFormDraft(taskId);
+
       const currentIndex = shortFormTaskIds.indexOf(taskId);
       const nextTaskId = currentIndex >= 0 && currentIndex < shortFormTaskIds.length - 1
         ? shortFormTaskIds[currentIndex + 1]
@@ -1475,6 +1518,27 @@
           ></textarea>
         </label>
       `).join('');
+
+      const draft = getShortFormDraft(taskId) || {};
+      const draftInputs = Array.from(shortFormFields.querySelectorAll('[data-short-form-part="1"]'));
+      draftInputs.forEach((input) => {
+        const key = String(input.getAttribute('data-part-key') || '').trim();
+        if (!key) return;
+
+        if (Object.prototype.hasOwnProperty.call(draft, key)) {
+          input.value = String(draft[key] || '');
+        }
+
+        input.addEventListener('input', () => {
+          const nextDraft = {};
+          draftInputs.forEach((draftInput) => {
+            const draftKey = String(draftInput.getAttribute('data-part-key') || '').trim();
+            if (!draftKey) return;
+            nextDraft[draftKey] = String(draftInput.value || '');
+          });
+          setShortFormDraft(taskId, nextDraft);
+        });
+      });
 
       shortFormRenderedTaskId = taskId;
     }
