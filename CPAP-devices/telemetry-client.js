@@ -885,13 +885,13 @@
       preamble: 'You have just finished your first week using CPAP at home and want to make sure your routine keeps the equipment clean and safe.',
       steps: [
         '(a) What is the recommended cleaning frequency for the CPAP device and humidifier?',
-        '(b) What is the recommended cleaning frequency for the mask (excluding headgear)?',
+        '(b) What is the recommended cleaning frequency for the F&P Vitera mask (excluding headgear)?',
         '(c) What is the recommended cleaning frequency for the headgear?',
         '(d) What is the recommended cleaning frequency for ClimateLineAir tubing?'
       ],
       parts: [
         { key: 'a', label: '(a) CPAP device and humidifier frequency' },
-        { key: 'b', label: '(b) Mask (excluding headgear) frequency' },
+        { key: 'b', label: '(b) F&P Vitera mask (excluding headgear) frequency' },
         { key: 'c', label: '(c) Headgear frequency' },
         { key: 'd', label: '(d) ClimateLineAir tubing frequency' }
       ]
@@ -909,15 +909,15 @@
       ]
     },
     short_form_q3: {
-      title: 'Short-Form Q3 – Spare mask storage (Routine Use / Safety)',
-      preamble: 'You receive a spare mask and need to store it until your current one wears out, while keeping it in good condition for future use.',
+      title: 'Short-Form Q3 – Spare F&P Vitera mask storage (Routine Use / Safety)',
+      preamble: 'You receive a spare F&P Vitera mask and need to store it until your current one wears out, while keeping it in good condition for future use.',
       steps: [
-        '(a) How should a spare mask be stored?',
-        '(b) What is the recommended storage temperature range?'
+        '(a) How should a spare F&P Vitera mask be stored?',
+        '(b) What is the recommended storage temperature range (in °C)?'
       ],
       parts: [
-        { key: 'a', label: '(a) Storage method/conditions' },
-        { key: 'b', label: '(b) Storage temperature range' }
+        { key: 'a', label: '(a) F&P Vitera mask storage method/conditions' },
+        { key: 'b', label: '(b) Storage temperature range (°C)' }
       ]
     },
     short_form_q4: {
@@ -925,11 +925,11 @@
       preamble: 'Your bedroom layout means the machine sits about 7 feet from where your mask connects, so you need to check whether ClimateLineAir Oxy tubing will reach comfortably.',
       steps: [
         '(a) Is ClimateLineAir Oxy tubing long enough for 7 feet?',
-        '(b) What is the length of ClimateLineAir Oxy tubing?'
+        '(b) What is the length of ClimateLineAir Oxy tubing (in feet)?'
       ],
       parts: [
         { key: 'a', label: '(a) Long enough for 7 feet? (yes/no)' },
-        { key: 'b', label: '(b) Tubing length' }
+        { key: 'b', label: '(b) Tubing length (feet)' }
       ]
     }
   };
