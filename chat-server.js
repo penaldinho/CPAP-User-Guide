@@ -490,8 +490,17 @@ const getTelemetryPgPool = () => {
 
 const normalizeTelemetryRecordForSql = (record) => {
   const projected = projectTelemetryRecord(record);
+  let responseParts = null;
+
+  if (record && record.response_parts && typeof record.response_parts === 'object' && !Array.isArray(record.response_parts)) {
+    responseParts = record.response_parts;
+  } else if (record && typeof record.response_parts === 'string') {
+    responseParts = parseJsonObjectSafely(record.response_parts);
+  }
+
   return {
     ...projected,
+    response_parts: responseParts,
     received_at: parseDateSafely(record.received_at || projected.received_at || new Date().toISOString()),
     timestamp: parseDateSafely(record.timestamp || projected.timestamp),
     result_count: parseIntegerSafely(projected.result_count),
@@ -581,9 +590,12 @@ const insertTelemetryRecordPostgres = async (record) => {
     const eventType = String(normalized.event_type || '').trim().toLowerCase();
     const questionId = String(normalized.question_id || normalized.task_id || '').trim();
     const answerText = String(normalized.response_message || '').trim();
+    const answerParts = normalized.response_parts && typeof normalized.response_parts === 'object' && !Array.isArray(normalized.response_parts)
+      ? normalized.response_parts
+      : null;
     const participantId = String(normalized.participant_id || '').trim();
 
-    if (eventType === 'short_form_answer_submitted' && questionId && answerText && participantId) {
+    if (eventType === 'short_form_answer_submitted' && questionId && participantId && (answerText || answerParts)) {
       await client.query(
         `
           INSERT INTO short_form_results (
@@ -595,9 +607,10 @@ const insertTelemetryRecordPostgres = async (record) => {
             task_id,
             task_label,
             question_id,
-            answer_text
+            answer_text,
+            answer_parts
           )
-          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
         `,
         [
           Number.isFinite(telemetryEventId) ? telemetryEventId : null,
@@ -608,7 +621,8 @@ const insertTelemetryRecordPostgres = async (record) => {
           normalized.task_id,
           normalized.task_label,
           questionId,
-          answerText
+          answerText || '',
+          answerParts ? JSON.stringify(answerParts) : null
         ]
       );
     }

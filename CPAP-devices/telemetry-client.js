@@ -7,6 +7,7 @@
   const lastTaskResultKey = 'mtg-telemetry-last-task-result';
   const tabTaskSubscribedKey = 'mtg-telemetry-tab-task-subscribed';
   let shortFormAutoFocusTaskId = '';
+  let shortFormRenderedTaskId = '';
   let isTaskPromptExpanded = false;
 
   const getApiUrl = () => {
@@ -807,7 +808,7 @@
       steps: [
         'Set up the CPAP machine for first use, stopping at the point where the mask will be fitted.',
         'You may use the instructions at any time.',
-        'Inform the assessor when the device is correctly set up and ready for mask fitting.'
+        'Inform the observer when the device is correctly set up and ready for mask fitting.'
       ]
     },
     scenario_card_2: {
@@ -815,7 +816,7 @@
       steps: [
         'Fit the mask to the dummy, check that a good fit is achieved, and then start therapy.',
         'You may use the instructions at any time.',
-        'Inform the assessor when therapy has started and you are satisfied with mask fit.'
+        'Inform the observer when therapy has started and you are satisfied with mask fit.'
       ]
     },
     scenario_card_3: {
@@ -823,36 +824,76 @@
       steps: [
         'During therapy, you notice a dry nose.',
         'Adjust relevant settings to address this comfort issue using the instructions.',
-        'Inform the assessor when the issue has been appropriately addressed.'
+        'Inform the observer when the issue has been appropriately addressed.'
       ]
     },
     short_form_q1: {
       title: 'Short-Form Q1 – Cleaning frequency (Routine Use)',
+      preamble: 'You have just finished your first week using CPAP at home and want to make sure your routine keeps the equipment clean and safe.',
       steps: [
-        'State the recommended cleaning frequency for the CPAP device and humidifier,',
-        'the mask (including headgear), and the ClimateLineAir tubing.'
+        '(a) What is the recommended cleaning frequency for the CPAP device and humidifier?',
+        '(b) What is the recommended cleaning frequency for the mask (excluding headgear)?',
+        '(c) What is the recommended cleaning frequency for the headgear?',
+        '(d) What is the recommended cleaning frequency for ClimateLineAir tubing?'
+      ],
+      parts: [
+        { key: 'a', label: '(a) CPAP device and humidifier frequency' },
+        { key: 'b', label: '(b) Mask (excluding headgear) frequency' },
+        { key: 'c', label: '(c) Headgear frequency' },
+        { key: 'd', label: '(d) ClimateLineAir tubing frequency' }
       ]
     },
     short_form_q2: {
       title: 'Short-Form Q2 – Error message safety escalation (Error 006)',
+      preamble: 'You switch on your device before bed and see “System fault – refer to user guide – Error 006”. Therapy has not started, so you need to decide the safest next action.',
       steps: [
-        'If the device shows “System fault – refer to user guide – Error 006”,',
-        'state what should be done next.'
+        '(a) What should be done next?',
+        '(b) What should not be done with the device?'
+      ],
+      parts: [
+        { key: 'a', label: '(a) Next action' },
+        { key: 'b', label: '(b) What should not be done' }
       ]
     },
     short_form_q3: {
       title: 'Short-Form Q3 – Spare mask storage (Routine Use / Safety)',
+      preamble: 'You receive a spare mask and need to store it until your current one wears out, while keeping it in good condition for future use.',
       steps: [
-        'State how spare masks should be stored and the recommended storage temperature range.'
+        '(a) How should a spare mask be stored?',
+        '(b) What is the recommended storage temperature range?'
+      ],
+      parts: [
+        { key: 'a', label: '(a) Storage method/conditions' },
+        { key: 'b', label: '(b) Storage temperature range' }
       ]
     },
     short_form_q4: {
       title: 'Short-Form Q4 – Tubing length check (Setup)',
+      preamble: 'Your bedroom layout means the machine sits about 7 feet from where your mask connects, so you need to check whether ClimateLineAir Oxy tubing will reach comfortably.',
       steps: [
-        'Given a 7-foot distance and ClimateLineAir Oxy tubing,',
-        'state whether it is long enough and provide its length.'
+        '(a) Is ClimateLineAir Oxy tubing long enough for 7 feet?',
+        '(b) What is the length of ClimateLineAir Oxy tubing?'
+      ],
+      parts: [
+        { key: 'a', label: '(a) Long enough for 7 feet? (yes/no)' },
+        { key: 'b', label: '(b) Tubing length' }
       ]
     }
+  };
+
+  const getShortFormQuestionDefinition = (taskId) => {
+    const entry = presetTaskDescriptions[String(taskId || '').trim()];
+    if (!entry) return null;
+
+    const parts = Array.isArray(entry.parts) && entry.parts.length
+      ? entry.parts
+      : [{ key: 'a', label: 'Answer' }];
+
+    return {
+      title: String(entry.title || '').trim(),
+      preamble: String(entry.preamble || '').trim(),
+      parts
+    };
   };
 
   const ensureTaskPromptCard = () => {
@@ -1040,19 +1081,18 @@
     shortFormLabel.style.marginBottom = '6px';
     shortFormLabel.textContent = 'Enter your answer:';
 
-    const shortFormInput = document.createElement('textarea');
-    shortFormInput.id = 'mtg-short-form-answer-input';
-    shortFormInput.rows = 3;
-    shortFormInput.placeholder = 'Type your answer here…';
-    shortFormInput.style.width = '100%';
-    shortFormInput.style.boxSizing = 'border-box';
-    shortFormInput.style.padding = '8px 10px';
-    shortFormInput.style.border = '1px solid #cbd5e1';
-    shortFormInput.style.borderRadius = '8px';
-    shortFormInput.style.fontFamily = 'inherit';
-    shortFormInput.style.fontSize = '14px';
-    shortFormInput.style.resize = 'vertical';
-    shortFormInput.style.minHeight = '84px';
+    const shortFormPrompt = document.createElement('div');
+    shortFormPrompt.id = 'mtg-short-form-answer-prompt';
+    shortFormPrompt.style.fontSize = '12px';
+    shortFormPrompt.style.color = '#334155';
+    shortFormPrompt.style.marginBottom = '8px';
+    shortFormPrompt.style.lineHeight = '1.35';
+
+    const shortFormFields = document.createElement('div');
+    shortFormFields.id = 'mtg-short-form-answer-fields';
+    shortFormFields.style.display = 'grid';
+    shortFormFields.style.gap = '8px';
+    shortFormFields.style.marginBottom = '8px';
 
     const shortFormSubmit = document.createElement('button');
     shortFormSubmit.id = 'mtg-short-form-answer-submit';
@@ -1069,7 +1109,8 @@
     shortFormSubmit.textContent = 'Submit answer';
 
     shortFormWrap.appendChild(shortFormLabel);
-    shortFormWrap.appendChild(shortFormInput);
+    shortFormWrap.appendChild(shortFormPrompt);
+    shortFormWrap.appendChild(shortFormFields);
     shortFormWrap.appendChild(shortFormSubmit);
 
     const button = document.createElement('button');
@@ -1095,18 +1136,36 @@
         return;
       }
 
-      const answerText = String(shortFormInput.value || '').trim();
-      if (!answerText) {
-        window.alert('Please enter an answer before submitting.');
-        shortFormInput.focus();
+      const definition = getShortFormQuestionDefinition(taskId);
+      const partInputs = Array.from(shortFormWrap.querySelectorAll('[data-short-form-part="1"]'));
+      const answerParts = {};
+
+      partInputs.forEach((input) => {
+        const key = String(input.getAttribute('data-part-key') || '').trim();
+        if (!key) return;
+        answerParts[key] = String(input.value || '').trim();
+      });
+
+      const missingPart = (definition && definition.parts || []).find((part) => !String(answerParts[part.key] || '').trim());
+      if (missingPart) {
+        const missingInput = shortFormWrap.querySelector(`[data-short-form-part="1"][data-part-key="${missingPart.key}"]`);
+        window.alert('Please complete all parts before submitting.');
+        if (missingInput && typeof missingInput.focus === 'function') {
+          missingInput.focus();
+        }
         return;
       }
+
+      const answerText = (definition && definition.parts || [])
+        .map((part) => `(${part.key}) ${String(answerParts[part.key] || '').trim()}`)
+        .join('\n');
 
       track('short_form_answer_submitted', {
         question_id: taskId,
         task_id: taskId,
         task_label: String(state.task_label || '').trim(),
-        response_message: answerText
+        response_message: answerText,
+        response_parts: answerParts
       });
 
       const currentIndex = shortFormTaskIds.indexOf(taskId);
@@ -1124,7 +1183,7 @@
         renderResearchPanel();
       }
 
-      shortFormInput.value = '';
+      shortFormRenderedTaskId = '';
       syncParticipantEndButton();
     });
 
@@ -1153,12 +1212,14 @@
     const endBtn = document.getElementById('mtg-participant-end-task-btn');
     const shortFormWrap = document.getElementById('mtg-short-form-answer-wrap');
     const shortFormLabel = document.getElementById('mtg-short-form-answer-label');
-    const shortFormInput = document.getElementById('mtg-short-form-answer-input');
+    const shortFormPrompt = document.getElementById('mtg-short-form-answer-prompt');
+    const shortFormFields = document.getElementById('mtg-short-form-answer-fields');
 
     wrap.style.display = taskId ? 'block' : 'none';
 
     if (!taskId) {
       setTaskPromptExpanded(false);
+      shortFormRenderedTaskId = '';
     }
 
     if (shortFormLabel) {
@@ -1175,17 +1236,47 @@
 
     if (!isShortFormTask || !taskId) {
       shortFormAutoFocusTaskId = '';
+      shortFormRenderedTaskId = '';
+      if (shortFormFields) {
+        shortFormFields.innerHTML = '';
+      }
       return;
     }
 
-    if (!shortFormInput) {
+    if (!shortFormFields) {
       return;
+    }
+
+    if (shortFormRenderedTaskId !== taskId) {
+      const definition = getShortFormQuestionDefinition(taskId);
+      if (shortFormPrompt) {
+        shortFormPrompt.textContent = definition && definition.preamble
+          ? definition.preamble
+          : 'Answer all parts below.';
+      }
+
+      const parts = definition && Array.isArray(definition.parts) ? definition.parts : [];
+      shortFormFields.innerHTML = parts.map((part) => `
+        <label style="display:grid; gap:4px;">
+          <span style="font-size:12px; color:#0f172a; font-weight:600;">${escapeHtml(String(part.label || '').trim())}</span>
+          <textarea
+            data-short-form-part="1"
+            data-part-key="${escapeHtml(String(part.key || '').trim())}"
+            rows="2"
+            placeholder="Type your answer for part ${escapeHtml(String(part.key || '').toUpperCase())}…"
+            style="width:100%; box-sizing:border-box; padding:8px 10px; border:1px solid #cbd5e1; border-radius:8px; font-family:inherit; font-size:14px; resize:vertical; min-height:64px;"
+          ></textarea>
+        </label>
+      `).join('');
+
+      shortFormRenderedTaskId = taskId;
     }
 
     const activeElement = document.activeElement;
+    const firstShortFormInput = shortFormWrap ? shortFormWrap.querySelector('[data-short-form-part="1"]') : null;
     const isTypingElsewhere = Boolean(
       activeElement
-      && activeElement !== shortFormInput
+      && (!shortFormWrap || !shortFormWrap.contains(activeElement))
       && activeElement !== document.body
       && activeElement !== document.documentElement
       && (
@@ -1195,8 +1286,8 @@
       )
     );
 
-    if (!isTypingElsewhere && shortFormAutoFocusTaskId !== taskId) {
-      shortFormInput.focus();
+    if (!isTypingElsewhere && firstShortFormInput && shortFormAutoFocusTaskId !== taskId) {
+      firstShortFormInput.focus();
       shortFormAutoFocusTaskId = taskId;
     }
   };
