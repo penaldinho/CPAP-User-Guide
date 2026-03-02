@@ -806,26 +806,26 @@
   const presetTaskDescriptions = {
     scenario_card_1: {
       title: 'Scenario Card 1 – First-Time Setup (Setup)',
+      collapsedDescription: 'Assemble and set up the CPAP device and mask ready for first use, stopping before fitting the mask.',
       steps: [
-        'Set up the CPAP machine for first use, stopping at the point where the mask will be fitted.',
-        'You may use the instructions at any time.',
-        'Inform the observer when the device is correctly set up and ready for mask fitting.'
+        'Assemble and set up the CPAP device and mask ready for first use, stopping before fitting the mask.',
+        'You may use the instructions at any time.'
       ]
     },
     scenario_card_2: {
       title: 'Scenario Card 2 – Fit and Start Therapy (Routine Use)',
+      collapsedDescription: 'Fit the mask to the mannequin, checking and ensuring the mask fit is good, and start therapy.',
       steps: [
-        'Fit the mask to the dummy, check that a good fit is achieved, and then start therapy.',
-        'You may use the instructions at any time.',
-        'Inform the observer when therapy has started and you are satisfied with mask fit.'
+        'Fit the mask to the mannequin, checking and ensuring the mask fit is good, and start therapy.',
+        'You may use the instructions at any time.'
       ]
     },
     scenario_card_3: {
       title: 'Scenario Card 3 – Comfort Adjustment (Troubleshooting)',
+      collapsedDescription: 'You notice dry nose during therapy. Resolve this by adjusting the relevant comfort settings.',
       steps: [
-        'During therapy, you notice a dry nose.',
-        'Adjust relevant settings to address this comfort issue using the instructions.',
-        'Inform the observer when the issue has been appropriately addressed.'
+        'You notice dry nose during therapy. Resolve this by adjusting the relevant comfort settings.',
+        'You may use the instructions at any time.'
       ]
     },
     short_form_q1: {
@@ -989,6 +989,7 @@
     const entry = presetTaskDescriptions[taskId] || null;
     const displayLabel = (entry && entry.title) || fallbackLabel || taskId;
     const lines = entry && Array.isArray(entry.steps) ? entry.steps : [];
+    const collapsedDescription = String((entry && entry.collapsedDescription) || '').trim();
     const isExpanded = isTaskPromptExpanded;
     const promptHint = isExpanded
       ? 'Move cursor away from this card to collapse'
@@ -1007,6 +1008,7 @@
       </div>
       <div style="margin-top:6px; font-size:12px; color:#334155; font-weight:600;">Elapsed: ${escapeHtml(elapsedText)}</div>
       <div style="margin-top:6px; font-size:11px; color:#64748b;">${escapeHtml(promptHint)}</div>
+      <div style="margin-top:6px; display:${!isExpanded && collapsedDescription ? 'block' : 'none'}; color:#334155; line-height:1.35; font-size:12px;">${escapeHtml(collapsedDescription)}</div>
       <div style="margin-top:6px; display:${isExpanded ? 'block' : 'none'};">
         <div style="font-size:13px; font-weight:600; line-height:1.3;">${escapeHtml(displayLabel)}</div>
         ${listMarkup}
