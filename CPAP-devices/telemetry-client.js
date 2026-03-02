@@ -1110,11 +1110,11 @@
       <div style="margin-top:6px; font-size:12px; color:#334155; font-weight:600;">Elapsed: ${escapeHtml(elapsedText)}</div>
       <div style="margin-top:8px; color:#334155; line-height:1.4; font-size:14px; overflow:hidden; display:${scenarioDescription ? '-webkit-box' : 'none'}; -webkit-line-clamp:${isExpanded ? '3' : '2'}; -webkit-box-orient:vertical;">${escapeHtml(scenarioDescription)}</div>
       <div style="margin-top:6px; color:#334155; line-height:1.4; font-size:13px; display:${isExpanded && isScenarioTask && instructionsLine ? 'block' : 'none'};">${escapeHtml(String(instructionsLine || ''))}</div>
+      <div style="margin-top:6px; color:#334155; line-height:1.35; font-size:12px; display:${isExpanded ? 'block' : 'none'};">${escapeHtml(completionInstruction)}</div>
       <div style="margin-top:6px; font-size:11px; color:#64748b;">${escapeHtml(promptHint)}</div>
       <div style="margin-top:8px; display:${isExpanded ? 'block' : 'none'};">
         <div style="font-size:13px; font-weight:600; line-height:1.3; display:${isScenarioTask ? 'none' : 'block'};">${escapeHtml(displayLabel)}</div>
         <div style="margin-top:8px; font-size:12px; color:#334155; line-height:1.35;">${listMarkup}</div>
-        <div style="margin-top:8px; color:#334155; line-height:1.35; font-size:12px;">${escapeHtml(completionInstruction)}</div>
       </div>
     `;
     card.style.bottom = isShortFormTask ? '170px' : '96px';
