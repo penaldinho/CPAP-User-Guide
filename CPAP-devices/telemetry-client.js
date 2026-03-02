@@ -874,10 +874,27 @@
     card.style.borderRadius = '10px';
     card.style.boxShadow = '0 10px 24px rgba(0,0,0,0.16)';
     card.style.padding = '12px';
-    card.style.zIndex = '9400';
+    card.style.zIndex = '9600';
     card.style.fontFamily = 'system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif';
     card.style.color = '#1f2937';
     card.style.display = 'none';
+
+    card.addEventListener('mouseenter', () => {
+      setTaskPromptExpanded(true);
+    });
+    card.addEventListener('mouseleave', () => {
+      setTaskPromptExpanded(false);
+    });
+    card.addEventListener('focusin', () => {
+      setTaskPromptExpanded(true);
+    });
+    card.addEventListener('focusout', () => {
+      window.setTimeout(() => {
+        if (!card.contains(document.activeElement)) {
+          setTaskPromptExpanded(false);
+        }
+      }, 0);
+    });
 
     document.body.appendChild(card);
     return card;
@@ -909,6 +926,7 @@
 
     const taskId = String(taskState.task_id || '').trim();
     const fallbackLabel = String(taskState.task_label || '').trim();
+    const isShortFormTask = /^short_form_q[1-4]$/i.test(taskId);
     const startedAtMs = Date.parse(String(taskState.started_at || ''));
     const elapsedMs = Number.isFinite(startedAtMs) ? Math.max(0, Date.now() - startedAtMs) : 0;
     const elapsedText = formatElapsedDuration(elapsedMs);
@@ -917,11 +935,14 @@
     const lines = entry && Array.isArray(entry.steps) ? entry.steps : [];
     const isExpanded = isTaskPromptExpanded;
     const promptHint = isExpanded
-      ? 'Move away from the action box to collapse'
-      : 'Hover the action box below to expand';
+      ? 'Move cursor away from this card to collapse'
+      : 'Hover this card to expand';
+    const completionInstruction = isShortFormTask
+      ? 'Type your answer in the box below, then click Submit answer.'
+      : 'When finished, click “I have finished this task”.';
     const listMarkup = lines.length
       ? `<ul style="margin:8px 0 0 18px; padding:0; display:grid; gap:6px;">${lines.map((line) => `<li style="line-height:1.35;">${escapeHtml(line)}</li>`).join('')}</ul>`
-      : '<div style="margin-top:8px; color:#4b5563; line-height:1.35;">Follow the task instructions and inform the assessor when complete.</div>';
+      : '<div style="margin-top:8px; color:#4b5563; line-height:1.35;">Follow the task instructions and inform the observer when complete.</div>';
 
     card.innerHTML = `
       <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
@@ -933,8 +954,10 @@
       <div style="margin-top:6px; display:${isExpanded ? 'block' : 'none'};">
         <div style="font-size:13px; font-weight:600; line-height:1.3;">${escapeHtml(displayLabel)}</div>
         ${listMarkup}
+        <div style="margin-top:8px; color:#334155; line-height:1.35; font-size:12px;">${escapeHtml(completionInstruction)}</div>
       </div>
     `;
+    card.style.bottom = isShortFormTask ? '170px' : '96px';
     card.style.maxHeight = isExpanded ? '42vh' : '74px';
     card.style.overflow = isExpanded ? 'auto' : 'hidden';
     card.style.display = 'block';
@@ -1117,23 +1140,6 @@
 
     wrap.appendChild(shortFormWrap);
     wrap.appendChild(button);
-
-    wrap.addEventListener('mouseenter', () => {
-      setTaskPromptExpanded(true);
-    });
-    wrap.addEventListener('mouseleave', () => {
-      setTaskPromptExpanded(false);
-    });
-    wrap.addEventListener('focusin', () => {
-      setTaskPromptExpanded(true);
-    });
-    wrap.addEventListener('focusout', () => {
-      window.setTimeout(() => {
-        if (!wrap.contains(document.activeElement)) {
-          setTaskPromptExpanded(false);
-        }
-      }, 0);
-    });
 
     document.body.appendChild(wrap);
     return wrap;
