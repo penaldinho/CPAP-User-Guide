@@ -1066,6 +1066,7 @@
     const taskId = String(taskState.task_id || '').trim();
     const fallbackLabel = String(taskState.task_label || '').trim();
     const isShortFormTask = /^short_form_q[1-4]$/i.test(taskId);
+    const isScenarioTask = /^scenario_card_\d+$/i.test(taskId);
     if (isShortFormTask) {
       isTaskPromptExpanded = false;
       card.style.display = 'none';
@@ -1089,9 +1090,13 @@
     const completionInstruction = isShortFormTask
       ? 'Type your answer in the box below, then click Submit answer.'
       : 'When finished, click “I have finished this task”.';
+    const instructionsLine = lines.find((line) => /you may use the instructions at any time/i.test(String(line || '')));
     const detailLines = lines.filter((line, index) => {
       if (index !== 0) return true;
       return String(line || '').trim().toLowerCase() !== scenarioDescription.toLowerCase();
+    }).filter((line) => {
+      if (!isScenarioTask) return true;
+      return !/you may use the instructions at any time/i.test(String(line || ''));
     });
     const listMarkup = detailLines.length
       ? `<ul style="margin:0 0 0 18px; padding:0; display:grid; gap:6px;">${detailLines.map((line) => `<li style="line-height:1.35;">${escapeHtml(line)}</li>`).join('')}</ul>`
@@ -1103,10 +1108,11 @@
         <span style="font-size:11px; color:#475569; background:#f1f5f9; border:1px solid #e2e8f0; border-radius:999px; padding:2px 8px;">${escapeHtml(taskId)}</span>
       </div>
       <div style="margin-top:6px; font-size:12px; color:#334155; font-weight:600;">Elapsed: ${escapeHtml(elapsedText)}</div>
-      <div style="margin-top:8px; color:#334155; line-height:1.35; font-size:12px; overflow:hidden; display:${scenarioDescription ? '-webkit-box' : 'none'}; -webkit-line-clamp:${isExpanded ? '3' : '2'}; -webkit-box-orient:vertical;">${escapeHtml(scenarioDescription)}</div>
+      <div style="margin-top:8px; color:#334155; line-height:1.4; font-size:14px; overflow:hidden; display:${scenarioDescription ? '-webkit-box' : 'none'}; -webkit-line-clamp:${isExpanded ? '3' : '2'}; -webkit-box-orient:vertical;">${escapeHtml(scenarioDescription)}</div>
+      <div style="margin-top:6px; color:#334155; line-height:1.4; font-size:13px; display:${isExpanded && isScenarioTask && instructionsLine ? 'block' : 'none'};">${escapeHtml(String(instructionsLine || ''))}</div>
       <div style="margin-top:6px; font-size:11px; color:#64748b;">${escapeHtml(promptHint)}</div>
       <div style="margin-top:8px; display:${isExpanded ? 'block' : 'none'};">
-        <div style="font-size:13px; font-weight:600; line-height:1.3;">${escapeHtml(displayLabel)}</div>
+        <div style="font-size:13px; font-weight:600; line-height:1.3; display:${isScenarioTask ? 'none' : 'block'};">${escapeHtml(displayLabel)}</div>
         <div style="margin-top:8px; font-size:12px; color:#334155; line-height:1.35;">${listMarkup}</div>
         <div style="margin-top:8px; color:#334155; line-height:1.35; font-size:12px;">${escapeHtml(completionInstruction)}</div>
       </div>
