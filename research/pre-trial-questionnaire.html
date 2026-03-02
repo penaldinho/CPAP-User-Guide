@@ -27,7 +27,6 @@
     .req{color:#b91c1c;font-weight:700;margin-left:4px}
     .error-hint{min-height:16px;font-size:12px;color:#b91c1c}
     .q.invalid{padding:8px;border:1px solid #fecaca;border-radius:8px;background:#fef2f2}
-    .progress{position:sticky;top:8px;z-index:3;display:inline-block;background:#eef2ff;border:1px solid #c7d2fe;color:#3730a3;border-radius:999px;padding:6px 10px;font-size:12px;font-weight:600;margin-bottom:8px}
 
     @media (max-width: 720px) {
       .likert{display:flex;gap:14px;flex-wrap:wrap}
@@ -40,7 +39,6 @@
     <h1>Pre-trial Questionnaire</h1>
     <p class="hint">These questions are about you and how confident you feel using new devices. There are no right or wrong answers.</p>
     <div class="hint" style="margin-bottom:6px;">Fields marked <span class="req">*</span> are required.</div>
-    <div id="progress" class="progress">Section 1 of 3</div>
 
     <div class="grid">
       <fieldset>
@@ -52,7 +50,7 @@
         </div>
       </fieldset>
 
-      <fieldset class="track-section" data-section="1">
+      <fieldset>
         <legend>A. About you</legend>
         <div class="grid">
           <div class="q" id="q-age">
@@ -116,7 +114,7 @@
         </div>
       </fieldset>
 
-      <fieldset class="track-section" data-section="2">
+      <fieldset>
         <legend>B. Baseline confidence</legend>
         <p class="hint">Please tick one box for each statement. 1 = Strongly disagree, 5 = Strongly agree.</p>
         <div class="grid">
@@ -150,7 +148,7 @@
         </div>
       </fieldset>
 
-      <fieldset class="track-section" data-section="3">
+      <fieldset>
         <legend>Additional Notes</legend>
         <label>Optional
           <textarea id="notes" placeholder="Any pre-trial comments"></textarea>
@@ -198,21 +196,6 @@
       }
     };
 
-    const syncProgress = () => {
-      const progress = document.getElementById('progress');
-      if (!progress) return;
-
-      const sections = Array.from(document.querySelectorAll('.track-section'));
-      const thresholdY = 140;
-      let active = 1;
-      sections.forEach((section, index) => {
-        const rect = section.getBoundingClientRect();
-        if (rect.top <= thresholdY) {
-          active = index + 1;
-        }
-      });
-      progress.textContent = `Section ${active} of 3`;
-    };
 
     const clearPreTrialForm = () => {
       document.getElementById('participant_id').value = '';
@@ -227,9 +210,6 @@
         el.checked = false;
       });
     };
-
-    window.addEventListener('scroll', syncProgress, { passive: true });
-    syncProgress();
 
     document.getElementById('submit').addEventListener('click', async () => {
       const submitBtn = document.getElementById('submit');
