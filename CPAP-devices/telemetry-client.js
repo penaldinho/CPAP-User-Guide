@@ -7,6 +7,7 @@
   const lastTaskResultKey = 'mtg-telemetry-last-task-result';
   const tabTaskSubscribedKey = 'mtg-telemetry-tab-task-subscribed';
   const shortFormDraftsKey = 'mtg-telemetry-short-form-drafts';
+  const participantNextTaskStateKey = 'mtg-telemetry-participant-next-task';
   let shortFormAutoFocusTaskId = '';
   let shortFormRenderedTaskId = '';
   let isShortFormCardExpanded = false;
@@ -248,6 +249,45 @@
 
   const setLastTaskResult = (result) => {
     localStorage.setItem(lastTaskResultKey, JSON.stringify(result || {}));
+  };
+
+  const participantTaskOrder = [
+    'scenario_card_1',
+    'scenario_card_2',
+    'scenario_card_3',
+    'short_form_q1',
+    'short_form_q2',
+    'short_form_q3',
+    'short_form_q4'
+  ];
+
+  const getTaskDisplayLabel = (taskId) => {
+    const key = String(taskId || '').trim();
+    if (!key) return '';
+    const entry = presetTaskDescriptions[key];
+    if (entry && entry.title) {
+      return String(entry.title).trim();
+    }
+    return key;
+  };
+
+  const getNextTaskIdInSequence = (taskId) => {
+    const key = String(taskId || '').trim();
+    const index = participantTaskOrder.indexOf(key);
+    if (index < 0 || index >= participantTaskOrder.length - 1) {
+      return '';
+    }
+    return participantTaskOrder[index + 1] || '';
+  };
+
+  const getParticipantNextTaskState = () => safeJsonParse(sessionStorage.getItem(participantNextTaskStateKey) || '{}', {});
+
+  const setParticipantNextTaskState = (state) => {
+    sessionStorage.setItem(participantNextTaskStateKey, JSON.stringify(state || {}));
+  };
+
+  const clearParticipantNextTaskState = () => {
+    sessionStorage.removeItem(participantNextTaskStateKey);
   };
 
   const getShortFormDrafts = () => safeJsonParse(localStorage.getItem(shortFormDraftsKey) || '{}', {});
@@ -1146,6 +1186,7 @@
 
   const startTask = (taskId, label) => {
     if (!taskId) return;
+    clearParticipantNextTaskState();
     const nextState = {
       task_id: String(taskId),
       task_label: String(label || ''),
@@ -1386,8 +1427,9 @@
         const nextLabel = presetTaskDescriptions[nextTaskId] ? presetTaskDescriptions[nextTaskId].title : nextTaskId;
         startTask(nextTaskId, nextLabel);
       } else {
-        enableResearchModeInUrl();
-        renderResearchPanel();
+        setParticipantNextTaskState({
+          status: 'completed'
+        });
       }
 
       shortFormRenderedTaskId = '';
@@ -1395,17 +1437,89 @@
     });
 
     button.addEventListener('click', () => {
+      const state = getTaskState();
+      const currentTaskId = String(state.task_id || '').trim();
+      const nextTaskId = getNextTaskIdInSequence(currentTaskId);
+
+      if (nextTaskId) {
+        setParticipantNextTaskState({
+          status: 'next',
+          current_task_id: currentTaskId,
+          next_task_id: nextTaskId,
+          next_task_label: getTaskDisplayLabel(nextTaskId)
+        });
+      } else {
+        setParticipantNextTaskState({
+          status: 'completed'
+        });
+      }
+
       track('task_end_clicked_by_participant', {
-        task_id: getTaskState().task_id || ''
+        task_id: currentTaskId || ''
       });
       endTask('participant_clicked_end');
       syncParticipantEndButton();
-      enableResearchModeInUrl();
-      renderResearchPanel();
     });
+
+    const participantNextWrap = document.createElement('div');
+    participantNextWrap.id = 'mtg-participant-next-task-wrap';
+    participantNextWrap.style.display = 'none';
+    participantNextWrap.style.background = '#ecfdf5';
+    participantNextWrap.style.border = '1px solid #34d399';
+    participantNextWrap.style.borderRadius = '10px';
+    participantNextWrap.style.boxShadow = '0 10px 24px rgba(16, 185, 129, 0.2)';
+    participantNextWrap.style.padding = '10px';
+    participantNextWrap.style.width = 'min(720px, calc(100vw - 24px))';
+    participantNextWrap.style.boxSizing = 'border-box';
+
+    const participantNextTitle = document.createElement('div');
+    participantNextTitle.id = 'mtg-participant-next-task-title';
+    participantNextTitle.style.fontSize = '14px';
+    participantNextTitle.style.fontWeight = '700';
+    participantNextTitle.style.color = '#0f172a';
+    participantNextTitle.style.marginBottom = '6px';
+    participantNextTitle.textContent = 'Task complete';
+
+    const participantNextLabel = document.createElement('div');
+    participantNextLabel.id = 'mtg-participant-next-task-label';
+    participantNextLabel.style.fontSize = '13px';
+    participantNextLabel.style.color = '#334155';
+    participantNextLabel.style.lineHeight = '1.35';
+    participantNextLabel.style.marginBottom = '8px';
+
+    const participantNextButton = document.createElement('button');
+    participantNextButton.id = 'mtg-participant-next-task-btn';
+    participantNextButton.type = 'button';
+    participantNextButton.style.padding = '10px 14px';
+    participantNextButton.style.border = '1px solid #0f766e';
+    participantNextButton.style.background = '#0f766e';
+    participantNextButton.style.color = '#ffffff';
+    participantNextButton.style.borderRadius = '999px';
+    participantNextButton.style.fontSize = '14px';
+    participantNextButton.style.fontWeight = '600';
+    participantNextButton.style.cursor = 'pointer';
+    participantNextButton.textContent = 'Proceed to next task';
+
+    participantNextButton.addEventListener('click', () => {
+      const nextState = getParticipantNextTaskState();
+      const nextTaskId = String(nextState.next_task_id || '').trim();
+      if (!nextTaskId) {
+        return;
+      }
+
+      clearParticipantNextTaskState();
+      disableResearchModeInUrl();
+      startTask(nextTaskId, getTaskDisplayLabel(nextTaskId));
+      syncParticipantEndButton();
+    });
+
+    participantNextWrap.appendChild(participantNextTitle);
+    participantNextWrap.appendChild(participantNextLabel);
+    participantNextWrap.appendChild(participantNextButton);
 
     wrap.appendChild(shortFormWrap);
     wrap.appendChild(button);
+    wrap.appendChild(participantNextWrap);
 
     document.body.appendChild(wrap);
     return wrap;
@@ -1417,6 +1531,9 @@
     const taskId = String(taskState.task_id || '').trim();
     const isShortFormTask = /^short_form_q[1-4]$/i.test(taskId);
     const endBtn = document.getElementById('mtg-participant-end-task-btn');
+    const participantNextWrap = document.getElementById('mtg-participant-next-task-wrap');
+    const participantNextLabel = document.getElementById('mtg-participant-next-task-label');
+    const participantNextButton = document.getElementById('mtg-participant-next-task-btn');
     const shortFormWrap = document.getElementById('mtg-short-form-answer-wrap');
     const shortFormTaskHeader = document.getElementById('mtg-short-form-task-header');
     const shortFormElapsed = document.getElementById('mtg-short-form-task-elapsed');
@@ -1428,7 +1545,11 @@
     const shortFormPrompt = document.getElementById('mtg-short-form-answer-prompt');
     const shortFormFields = document.getElementById('mtg-short-form-answer-fields');
 
-    wrap.style.display = taskId ? 'block' : 'none';
+    const participantNextState = getParticipantNextTaskState();
+    const hasPendingNextTask = !taskId && String(participantNextState.next_task_id || '').trim();
+    const hasCompletedSequence = !taskId && String(participantNextState.status || '').trim() === 'completed';
+
+    wrap.style.display = (taskId || hasPendingNextTask || hasCompletedSequence) ? 'block' : 'none';
 
     if (!taskId) {
       setTaskPromptExpanded(false);
@@ -1445,7 +1566,26 @@
       shortFormWrap.style.display = isShortFormTask && taskId ? 'block' : 'none';
     }
     if (endBtn) {
-      endBtn.style.display = isShortFormTask && taskId ? 'none' : 'inline-block';
+      endBtn.style.display = isShortFormTask && taskId ? 'none' : (taskId ? 'inline-block' : 'none');
+    }
+
+    if (participantNextWrap) {
+      participantNextWrap.style.display = !taskId && (hasPendingNextTask || hasCompletedSequence) ? 'block' : 'none';
+    }
+
+    if (participantNextLabel) {
+      if (hasPendingNextTask) {
+        const nextLabel = String(participantNextState.next_task_label || getTaskDisplayLabel(participantNextState.next_task_id || '')).trim();
+        participantNextLabel.textContent = `Next task: ${nextLabel || String(participantNextState.next_task_id || '').trim()}`;
+      } else if (hasCompletedSequence) {
+        participantNextLabel.textContent = 'All participant tasks are complete. Press Ctrl+Alt+R to open Research Controls.';
+      } else {
+        participantNextLabel.textContent = '';
+      }
+    }
+
+    if (participantNextButton) {
+      participantNextButton.style.display = hasPendingNextTask ? 'inline-block' : 'none';
     }
 
     if (!isShortFormTask || !taskId) {
