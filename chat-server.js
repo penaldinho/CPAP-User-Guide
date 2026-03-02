@@ -513,6 +513,37 @@ const normalizeTelemetryRecordForSql = (record) => {
   };
 };
 
+const getAnswerPartText = (answerParts, key) => {
+  if (!answerParts || typeof answerParts !== 'object' || Array.isArray(answerParts)) {
+    return null;
+  }
+
+  const normalizedKey = String(key || '').trim().toLowerCase();
+  if (!normalizedKey) {
+    return null;
+  }
+
+  const candidateKeys = [
+    normalizedKey,
+    normalizedKey.toUpperCase(),
+    `part_${normalizedKey}`,
+    `part_${normalizedKey}_answer_text`,
+    `part${normalizedKey}`,
+    `part${normalizedKey}_answer_text`
+  ];
+
+  for (const candidate of candidateKeys) {
+    if (Object.prototype.hasOwnProperty.call(answerParts, candidate)) {
+      const value = String(answerParts[candidate] || '').trim();
+      if (value) {
+        return value;
+      }
+    }
+  }
+
+  return null;
+};
+
 const normalizePhysicalTrialRecordForSql = (record) => {
   const projected = projectPhysicalTrialRecord(record);
   return {
@@ -593,6 +624,10 @@ const insertTelemetryRecordPostgres = async (record) => {
     const answerParts = normalized.response_parts && typeof normalized.response_parts === 'object' && !Array.isArray(normalized.response_parts)
       ? normalized.response_parts
       : null;
+    const partAAnswerText = getAnswerPartText(answerParts, 'a');
+    const partBAnswerText = getAnswerPartText(answerParts, 'b');
+    const partCAnswerText = getAnswerPartText(answerParts, 'c');
+    const partDAnswerText = getAnswerPartText(answerParts, 'd');
     const participantId = String(normalized.participant_id || '').trim();
 
     if (eventType === 'short_form_answer_submitted' && questionId && participantId && (answerText || answerParts)) {
@@ -608,9 +643,12 @@ const insertTelemetryRecordPostgres = async (record) => {
             task_label,
             question_id,
             answer_text,
-            answer_parts
+            part_a_answer_text,
+            part_b_answer_text,
+            part_c_answer_text,
+            part_d_answer_text
           )
-          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
         `,
         [
           Number.isFinite(telemetryEventId) ? telemetryEventId : null,
@@ -622,7 +660,10 @@ const insertTelemetryRecordPostgres = async (record) => {
           normalized.task_label,
           questionId,
           answerText || '',
-          answerParts ? JSON.stringify(answerParts) : null
+          partAAnswerText,
+          partBAnswerText,
+          partCAnswerText,
+          partDAnswerText
         ]
       );
     }

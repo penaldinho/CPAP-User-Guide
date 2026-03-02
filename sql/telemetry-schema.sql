@@ -82,12 +82,27 @@ CREATE TABLE IF NOT EXISTS short_form_results (
   task_id TEXT,
   task_label TEXT,
   question_id TEXT NOT NULL,
-  answer_text TEXT NOT NULL,
-  answer_parts JSONB
+  answer_text TEXT,
+  part_a_answer_text TEXT,
+  part_b_answer_text TEXT,
+  part_c_answer_text TEXT,
+  part_d_answer_text TEXT
 );
 
 ALTER TABLE short_form_results
-  ADD COLUMN IF NOT EXISTS answer_parts JSONB;
+  ADD COLUMN IF NOT EXISTS part_a_answer_text TEXT;
+
+ALTER TABLE short_form_results
+  ADD COLUMN IF NOT EXISTS part_b_answer_text TEXT;
+
+ALTER TABLE short_form_results
+  ADD COLUMN IF NOT EXISTS part_c_answer_text TEXT;
+
+ALTER TABLE short_form_results
+  ADD COLUMN IF NOT EXISTS part_d_answer_text TEXT;
+
+ALTER TABLE short_form_results
+  ALTER COLUMN answer_text DROP NOT NULL;
 
 CREATE INDEX IF NOT EXISTS idx_short_form_results_participant_time
   ON short_form_results (participant_id, received_at DESC);
