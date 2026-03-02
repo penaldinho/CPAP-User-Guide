@@ -8,6 +8,7 @@
   const tabTaskSubscribedKey = 'mtg-telemetry-tab-task-subscribed';
   let shortFormAutoFocusTaskId = '';
   let shortFormRenderedTaskId = '';
+  let isShortFormCardExpanded = false;
   let isTaskPromptExpanded = false;
 
   const getApiUrl = () => {
@@ -948,6 +949,13 @@
     syncTaskPromptCard();
   };
 
+  const setShortFormCardExpanded = (expanded) => {
+    const next = Boolean(expanded);
+    if (isShortFormCardExpanded === next) return;
+    isShortFormCardExpanded = next;
+    syncParticipantEndButton();
+  };
+
   const formatElapsedDuration = (durationMs) => {
     const totalSeconds = Math.max(0, Math.floor((durationMs || 0) / 1000));
     const minutes = Math.floor(totalSeconds / 60);
@@ -1080,6 +1088,25 @@
     shortFormWrap.style.padding = '10px';
     shortFormWrap.style.width = 'min(720px, calc(100vw - 24px))';
     shortFormWrap.style.boxSizing = 'border-box';
+    shortFormWrap.style.maxHeight = '160px';
+    shortFormWrap.style.overflow = 'hidden';
+
+    shortFormWrap.addEventListener('mouseenter', () => {
+      setShortFormCardExpanded(true);
+    });
+    shortFormWrap.addEventListener('mouseleave', () => {
+      setShortFormCardExpanded(false);
+    });
+    shortFormWrap.addEventListener('focusin', () => {
+      setShortFormCardExpanded(true);
+    });
+    shortFormWrap.addEventListener('focusout', () => {
+      window.setTimeout(() => {
+        if (!shortFormWrap.contains(document.activeElement)) {
+          setShortFormCardExpanded(false);
+        }
+      }, 0);
+    });
 
     const shortFormTaskHeader = document.createElement('div');
     shortFormTaskHeader.id = 'mtg-short-form-task-header';
@@ -1095,6 +1122,22 @@
     shortFormElapsed.style.color = '#334155';
     shortFormElapsed.style.fontWeight = '600';
     shortFormElapsed.style.marginBottom = '6px';
+
+    const shortFormPreamble = document.createElement('div');
+    shortFormPreamble.id = 'mtg-short-form-task-preamble';
+    shortFormPreamble.style.fontSize = '12px';
+    shortFormPreamble.style.color = '#334155';
+    shortFormPreamble.style.lineHeight = '1.35';
+    shortFormPreamble.style.marginBottom = '8px';
+
+    const shortFormHint = document.createElement('div');
+    shortFormHint.id = 'mtg-short-form-task-hint';
+    shortFormHint.style.fontSize = '11px';
+    shortFormHint.style.color = '#64748b';
+    shortFormHint.style.marginBottom = '8px';
+
+    const shortFormDetails = document.createElement('div');
+    shortFormDetails.id = 'mtg-short-form-details';
 
     const shortFormSteps = document.createElement('div');
     shortFormSteps.id = 'mtg-short-form-task-steps';
@@ -1116,6 +1159,7 @@
     shortFormPrompt.style.color = '#334155';
     shortFormPrompt.style.marginBottom = '8px';
     shortFormPrompt.style.lineHeight = '1.35';
+    shortFormPrompt.textContent = 'Answer all parts below.';
 
     const shortFormFields = document.createElement('div');
     shortFormFields.id = 'mtg-short-form-answer-fields';
@@ -1139,11 +1183,14 @@
 
     shortFormWrap.appendChild(shortFormTaskHeader);
     shortFormWrap.appendChild(shortFormElapsed);
-    shortFormWrap.appendChild(shortFormSteps);
-    shortFormWrap.appendChild(shortFormLabel);
-    shortFormWrap.appendChild(shortFormPrompt);
-    shortFormWrap.appendChild(shortFormFields);
-    shortFormWrap.appendChild(shortFormSubmit);
+    shortFormWrap.appendChild(shortFormPreamble);
+    shortFormWrap.appendChild(shortFormHint);
+    shortFormDetails.appendChild(shortFormSteps);
+    shortFormDetails.appendChild(shortFormLabel);
+    shortFormDetails.appendChild(shortFormPrompt);
+    shortFormDetails.appendChild(shortFormFields);
+    shortFormDetails.appendChild(shortFormSubmit);
+    shortFormWrap.appendChild(shortFormDetails);
 
     const button = document.createElement('button');
     button.id = 'mtg-participant-end-task-btn';
@@ -1245,6 +1292,9 @@
     const shortFormWrap = document.getElementById('mtg-short-form-answer-wrap');
     const shortFormTaskHeader = document.getElementById('mtg-short-form-task-header');
     const shortFormElapsed = document.getElementById('mtg-short-form-task-elapsed');
+    const shortFormPreamble = document.getElementById('mtg-short-form-task-preamble');
+    const shortFormHint = document.getElementById('mtg-short-form-task-hint');
+    const shortFormDetails = document.getElementById('mtg-short-form-details');
     const shortFormSteps = document.getElementById('mtg-short-form-task-steps');
     const shortFormLabel = document.getElementById('mtg-short-form-answer-label');
     const shortFormPrompt = document.getElementById('mtg-short-form-answer-prompt');
@@ -1254,6 +1304,7 @@
 
     if (!taskId) {
       setTaskPromptExpanded(false);
+      isShortFormCardExpanded = false;
       shortFormRenderedTaskId = '';
     }
 
@@ -1272,11 +1323,21 @@
     if (!isShortFormTask || !taskId) {
       shortFormAutoFocusTaskId = '';
       shortFormRenderedTaskId = '';
+      isShortFormCardExpanded = false;
       if (shortFormTaskHeader) {
         shortFormTaskHeader.innerHTML = '';
       }
       if (shortFormElapsed) {
         shortFormElapsed.textContent = '';
+      }
+      if (shortFormPreamble) {
+        shortFormPreamble.textContent = '';
+      }
+      if (shortFormHint) {
+        shortFormHint.textContent = '';
+      }
+      if (shortFormDetails) {
+        shortFormDetails.style.display = 'none';
       }
       if (shortFormSteps) {
         shortFormSteps.innerHTML = '';
@@ -1303,6 +1364,27 @@
       shortFormElapsed.textContent = `Elapsed: ${elapsedText}`;
     }
 
+    if (shortFormPreamble) {
+      shortFormPreamble.textContent = definition && definition.preamble
+        ? definition.preamble
+        : 'Review the scenario and complete the question.';
+    }
+
+    if (shortFormHint) {
+      shortFormHint.textContent = isShortFormCardExpanded
+        ? 'Move cursor away from this card to collapse.'
+        : 'Hover this card to expand and answer.';
+    }
+
+    if (shortFormDetails) {
+      shortFormDetails.style.display = isShortFormCardExpanded ? 'block' : 'none';
+    }
+
+    if (shortFormWrap) {
+      shortFormWrap.style.maxHeight = isShortFormCardExpanded ? '64vh' : '160px';
+      shortFormWrap.style.overflow = isShortFormCardExpanded ? 'auto' : 'hidden';
+    }
+
     if (shortFormSteps) {
       const lines = definition && Array.isArray((presetTaskDescriptions[taskId] || {}).steps)
         ? (presetTaskDescriptions[taskId] || {}).steps
@@ -1318,9 +1400,7 @@
 
     if (shortFormRenderedTaskId !== taskId) {
       if (shortFormPrompt) {
-        shortFormPrompt.textContent = definition && definition.preamble
-          ? definition.preamble
-          : 'Answer all parts below.';
+        shortFormPrompt.textContent = 'Answer all parts below.';
       }
 
       const parts = definition && Array.isArray(definition.parts) ? definition.parts : [];
@@ -1354,7 +1434,7 @@
       )
     );
 
-    if (!isTypingElsewhere && firstShortFormInput && shortFormAutoFocusTaskId !== taskId) {
+    if (isShortFormCardExpanded && !isTypingElsewhere && firstShortFormInput && shortFormAutoFocusTaskId !== taskId) {
       firstShortFormInput.focus();
       shortFormAutoFocusTaskId = taskId;
     }
