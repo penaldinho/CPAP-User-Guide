@@ -573,10 +573,46 @@ const insertTelemetryRecordPostgres = async (record) => {
     normalized.task_action_index = await computeTaskActionIndexPostgres(client, normalized);
 
     const placeholders = telemetrySqlColumns.map((_, index) => `$${index + 1}`).join(', ');
-    const queryText = `INSERT INTO telemetry_events (${telemetrySqlColumns.join(', ')}) VALUES (${placeholders})`;
+    const queryText = `INSERT INTO telemetry_events (${telemetrySqlColumns.join(', ')}) VALUES (${placeholders}) RETURNING id`;
     const values = telemetrySqlColumns.map((column) => normalized[column]);
+    const insertResult = await client.query(queryText, values);
+    const telemetryEventId = insertResult.rows[0] ? Number(insertResult.rows[0].id) : null;
 
-    await client.query(queryText, values);
+    const eventType = String(normalized.event_type || '').trim().toLowerCase();
+    const questionId = String(normalized.question_id || normalized.task_id || '').trim();
+    const answerText = String(normalized.response_message || '').trim();
+    const participantId = String(normalized.participant_id || '').trim();
+
+    if (eventType === 'short_form_answer_submitted' && questionId && answerText && participantId) {
+      await client.query(
+        `
+          INSERT INTO short_form_results (
+            telemetry_event_id,
+            received_at,
+            timestamp,
+            session_id,
+            participant_id,
+            task_id,
+            task_label,
+            question_id,
+            answer_text
+          )
+          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+        `,
+        [
+          Number.isFinite(telemetryEventId) ? telemetryEventId : null,
+          normalized.received_at,
+          normalized.timestamp,
+          normalized.session_id,
+          participantId,
+          normalized.task_id,
+          normalized.task_label,
+          questionId,
+          answerText
+        ]
+      );
+    }
+
     await client.query('COMMIT');
   } catch (error) {
     await client.query('ROLLBACK');

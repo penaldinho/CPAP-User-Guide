@@ -966,6 +966,57 @@
     wrap.style.transform = 'translateX(-50%)';
     wrap.style.zIndex = '9500';
     wrap.style.display = 'none';
+    wrap.style.maxWidth = 'min(720px, calc(100vw - 24px))';
+
+    const shortFormWrap = document.createElement('div');
+    shortFormWrap.id = 'mtg-short-form-answer-wrap';
+    shortFormWrap.style.display = 'none';
+    shortFormWrap.style.background = '#ffffff';
+    shortFormWrap.style.border = '1px solid #d7dce5';
+    shortFormWrap.style.borderRadius = '10px';
+    shortFormWrap.style.boxShadow = '0 10px 24px rgba(0,0,0,0.2)';
+    shortFormWrap.style.padding = '10px';
+    shortFormWrap.style.width = 'min(720px, calc(100vw - 24px))';
+    shortFormWrap.style.boxSizing = 'border-box';
+
+    const shortFormLabel = document.createElement('div');
+    shortFormLabel.id = 'mtg-short-form-answer-label';
+    shortFormLabel.style.fontSize = '13px';
+    shortFormLabel.style.fontWeight = '600';
+    shortFormLabel.style.marginBottom = '6px';
+    shortFormLabel.textContent = 'Enter your answer:';
+
+    const shortFormInput = document.createElement('textarea');
+    shortFormInput.id = 'mtg-short-form-answer-input';
+    shortFormInput.rows = 3;
+    shortFormInput.placeholder = 'Type your answer here…';
+    shortFormInput.style.width = '100%';
+    shortFormInput.style.boxSizing = 'border-box';
+    shortFormInput.style.padding = '8px 10px';
+    shortFormInput.style.border = '1px solid #cbd5e1';
+    shortFormInput.style.borderRadius = '8px';
+    shortFormInput.style.fontFamily = 'inherit';
+    shortFormInput.style.fontSize = '14px';
+    shortFormInput.style.resize = 'vertical';
+    shortFormInput.style.minHeight = '84px';
+
+    const shortFormSubmit = document.createElement('button');
+    shortFormSubmit.id = 'mtg-short-form-answer-submit';
+    shortFormSubmit.type = 'button';
+    shortFormSubmit.style.marginTop = '8px';
+    shortFormSubmit.style.padding = '10px 14px';
+    shortFormSubmit.style.border = '1px solid #1d4ed8';
+    shortFormSubmit.style.background = '#1d4ed8';
+    shortFormSubmit.style.color = '#ffffff';
+    shortFormSubmit.style.borderRadius = '999px';
+    shortFormSubmit.style.fontSize = '14px';
+    shortFormSubmit.style.fontWeight = '600';
+    shortFormSubmit.style.cursor = 'pointer';
+    shortFormSubmit.textContent = 'Submit answer';
+
+    shortFormWrap.appendChild(shortFormLabel);
+    shortFormWrap.appendChild(shortFormInput);
+    shortFormWrap.appendChild(shortFormSubmit);
 
     const button = document.createElement('button');
     button.id = 'mtg-participant-end-task-btn';
@@ -981,6 +1032,48 @@
     button.style.boxShadow = '0 10px 24px rgba(0,0,0,0.2)';
     button.textContent = 'I have finished this task';
 
+    const shortFormTaskIds = ['short_form_q1', 'short_form_q2', 'short_form_q3', 'short_form_q4'];
+
+    shortFormSubmit.addEventListener('click', () => {
+      const state = getTaskState();
+      const taskId = String(state.task_id || '').trim();
+      if (!shortFormTaskIds.includes(taskId)) {
+        return;
+      }
+
+      const answerText = String(shortFormInput.value || '').trim();
+      if (!answerText) {
+        window.alert('Please enter an answer before submitting.');
+        shortFormInput.focus();
+        return;
+      }
+
+      track('short_form_answer_submitted', {
+        question_id: taskId,
+        task_id: taskId,
+        task_label: String(state.task_label || '').trim(),
+        response_message: answerText
+      });
+
+      const currentIndex = shortFormTaskIds.indexOf(taskId);
+      const nextTaskId = currentIndex >= 0 && currentIndex < shortFormTaskIds.length - 1
+        ? shortFormTaskIds[currentIndex + 1]
+        : '';
+
+      endTask('short_form_answer_submitted');
+
+      if (nextTaskId) {
+        const nextLabel = presetTaskDescriptions[nextTaskId] ? presetTaskDescriptions[nextTaskId].title : nextTaskId;
+        startTask(nextTaskId, nextLabel);
+      } else {
+        enableResearchModeInUrl();
+        renderResearchPanel();
+      }
+
+      shortFormInput.value = '';
+      syncParticipantEndButton();
+    });
+
     button.addEventListener('click', () => {
       track('task_end_clicked_by_participant', {
         task_id: getTaskState().task_id || ''
@@ -991,6 +1084,7 @@
       renderResearchPanel();
     });
 
+    wrap.appendChild(shortFormWrap);
     wrap.appendChild(button);
     document.body.appendChild(wrap);
     return wrap;
@@ -999,7 +1093,29 @@
   const syncParticipantEndButton = () => {
     const wrap = ensureParticipantEndButton();
     const taskState = getTaskState();
-    wrap.style.display = taskState.task_id ? 'block' : 'none';
+    const taskId = String(taskState.task_id || '').trim();
+    const isShortFormTask = /^short_form_q[1-4]$/i.test(taskId);
+    const endBtn = document.getElementById('mtg-participant-end-task-btn');
+    const shortFormWrap = document.getElementById('mtg-short-form-answer-wrap');
+    const shortFormLabel = document.getElementById('mtg-short-form-answer-label');
+    const shortFormInput = document.getElementById('mtg-short-form-answer-input');
+
+    wrap.style.display = taskId ? 'block' : 'none';
+
+    if (shortFormLabel) {
+      const questionLabel = presetTaskDescriptions[taskId] ? presetTaskDescriptions[taskId].title : 'Short-form question';
+      shortFormLabel.textContent = `Answer: ${questionLabel}`;
+    }
+
+    if (shortFormWrap) {
+      shortFormWrap.style.display = isShortFormTask && taskId ? 'block' : 'none';
+    }
+    if (endBtn) {
+      endBtn.style.display = isShortFormTask && taskId ? 'none' : 'inline-block';
+    }
+    if (isShortFormTask && shortFormInput && document.activeElement !== shortFormInput) {
+      shortFormInput.focus();
+    }
   };
 
   const renderResearchPanel = (forceOpen = false) => {
