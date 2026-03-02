@@ -986,6 +986,26 @@
     };
   };
 
+  const getShortFormSectionPrompt = (parts) => {
+    if (!Array.isArray(parts) || !parts.length) {
+      return 'Provide your response below.';
+    }
+
+    const keys = parts
+      .map((part) => String(part && part.key || '').trim().toLowerCase())
+      .filter(Boolean);
+
+    if (!keys.length) {
+      return 'Provide your response below.';
+    }
+
+    if (keys.length === 1) {
+      return `Provide your response for section (${keys[0]}) below.`;
+    }
+
+    return `Provide your response for each section (${keys[0]})-(${keys[keys.length - 1]}) below.`;
+  };
+
   const ensureTaskPromptCard = () => {
     const existing = document.getElementById('mtg-task-prompt-card');
     if (existing) return existing;
@@ -1239,7 +1259,8 @@
     shortFormHint.id = 'mtg-short-form-task-hint';
     shortFormHint.style.fontSize = '11px';
     shortFormHint.style.color = '#64748b';
-    shortFormHint.style.marginBottom = '8px';
+    shortFormHint.style.marginTop = '8px';
+    shortFormHint.style.textAlign = 'right';
 
     const shortFormDetails = document.createElement('div');
     shortFormDetails.id = 'mtg-short-form-details';
@@ -1289,13 +1310,13 @@
     shortFormWrap.appendChild(shortFormTaskHeader);
     shortFormWrap.appendChild(shortFormElapsed);
     shortFormWrap.appendChild(shortFormPreamble);
-    shortFormWrap.appendChild(shortFormHint);
     shortFormDetails.appendChild(shortFormSteps);
     shortFormDetails.appendChild(shortFormLabel);
     shortFormDetails.appendChild(shortFormPrompt);
     shortFormDetails.appendChild(shortFormFields);
     shortFormDetails.appendChild(shortFormSubmit);
     shortFormWrap.appendChild(shortFormDetails);
+    shortFormWrap.appendChild(shortFormHint);
 
     const button = document.createElement('button');
     button.id = 'mtg-participant-end-task-btn';
@@ -1507,11 +1528,11 @@
     }
 
     if (shortFormRenderedTaskId !== taskId) {
+      const parts = definition && Array.isArray(definition.parts) ? definition.parts : [];
       if (shortFormPrompt) {
-        shortFormPrompt.textContent = 'Answer all parts below.';
+        shortFormPrompt.textContent = getShortFormSectionPrompt(parts);
       }
 
-      const parts = definition && Array.isArray(definition.parts) ? definition.parts : [];
       shortFormFields.innerHTML = parts.map((part) => `
         <label style="display:grid; gap:4px;">
           <span style="font-size:12px; color:#0f172a; font-weight:600;">${escapeHtml(String(part.label || '').trim())}</span>
