@@ -23,6 +23,7 @@
     .ok { color: #065f46; }
     .err { color: #991b1b; }
     .meta { font-size: 12px; color: #6b7280; margin-top: 8px; }
+    .hidden { display: none; }
     @media (max-width: 720px) { .grid { grid-template-columns: 1fr; } }
   </style>
 </head>
@@ -43,11 +44,39 @@
         </label>
         <label>
           Task ID
-          <input id="task_id" type="text" placeholder="e.g. Task 1" required />
+          <select id="task_id" required>
+            <option value="">Select task ID</option>
+            <option value="scenario_card_1">scenario_card_1</option>
+            <option value="scenario_card_2">scenario_card_2</option>
+            <option value="scenario_card_3">scenario_card_3</option>
+            <option value="short_form_q1">short_form_q1</option>
+            <option value="short_form_q2">short_form_q2</option>
+            <option value="short_form_q3">short_form_q3</option>
+            <option value="short_form_q4">short_form_q4</option>
+            <option value="__custom__">Custom task…</option>
+          </select>
         </label>
         <label>
           Task Label
-          <input id="task_label" type="text" placeholder="e.g. Setting up device" />
+          <select id="task_label">
+            <option value="">Select task label</option>
+            <option value="Scenario Card 1 – First-Time Setup (Setup)">Scenario Card 1 – First-Time Setup (Setup)</option>
+            <option value="Scenario Card 2 – Fit and Start Therapy (Routine Use)">Scenario Card 2 – Fit and Start Therapy (Routine Use)</option>
+            <option value="Scenario Card 3 – Comfort Adjustment (Troubleshooting)">Scenario Card 3 – Comfort Adjustment (Troubleshooting)</option>
+            <option value="Short-Form Q1 – Cleaning frequency (Routine Use)">Short-Form Q1 – Cleaning frequency (Routine Use)</option>
+            <option value="Short-Form Q2 – Error message safety escalation (Error 006)">Short-Form Q2 – Error message safety escalation (Error 006)</option>
+            <option value="Short-Form Q3 – Spare mask storage (Routine Use / Safety)">Short-Form Q3 – Spare mask storage (Routine Use / Safety)</option>
+            <option value="Short-Form Q4 – Tubing length check (Setup)">Short-Form Q4 – Tubing length check (Setup)</option>
+            <option value="__custom__">Custom task…</option>
+          </select>
+        </label>
+        <label class="full hidden" id="custom_task_id_wrap">
+          Custom Task ID
+          <input id="task_id_custom" type="text" placeholder="e.g. task_custom_1" />
+        </label>
+        <label class="full hidden" id="custom_task_label_wrap">
+          Custom Task Label
+          <input id="task_label_custom" type="text" placeholder="e.g. Additional scenario" />
         </label>
         <label>
           Manual Page (optional)
@@ -93,13 +122,29 @@
       const el = (id) => document.getElementById(id);
       const participantInput = el('participant_id');
       const observerInput = el('observer_id');
-      const taskIdInput = el('task_id');
-      const taskLabelInput = el('task_label');
+      const taskIdSelect = el('task_id');
+      const taskLabelSelect = el('task_label');
+      const taskIdCustomInput = el('task_id_custom');
+      const taskLabelCustomInput = el('task_label_custom');
+      const customTaskIdWrap = el('custom_task_id_wrap');
+      const customTaskLabelWrap = el('custom_task_label_wrap');
       const manualPageInput = el('manual_page');
       const eventTypeSelect = el('event_type');
       const notesInput = el('notes');
       const statusEl = el('status');
       const metaEl = el('meta');
+      const CUSTOM_TASK_VALUE = '__custom__';
+      const presetTaskPairs = [
+        ['scenario_card_1', 'Scenario Card 1 – First-Time Setup (Setup)'],
+        ['scenario_card_2', 'Scenario Card 2 – Fit and Start Therapy (Routine Use)'],
+        ['scenario_card_3', 'Scenario Card 3 – Comfort Adjustment (Troubleshooting)'],
+        ['short_form_q1', 'Short-Form Q1 – Cleaning frequency (Routine Use)'],
+        ['short_form_q2', 'Short-Form Q2 – Error message safety escalation (Error 006)'],
+        ['short_form_q3', 'Short-Form Q3 – Spare mask storage (Routine Use / Safety)'],
+        ['short_form_q4', 'Short-Form Q4 – Tubing length check (Setup)']
+      ];
+      const labelById = Object.fromEntries(presetTaskPairs);
+      const idByLabel = Object.fromEntries(presetTaskPairs.map(([id, label]) => [label, id]));
 
       const makeSessionId = () => `phys_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
       const getSessionId = () => {
@@ -116,15 +161,68 @@
         statusEl.className = ok ? 'ok' : 'err';
       };
 
+      const isCustomTask = () => taskIdSelect.value === CUSTOM_TASK_VALUE || taskLabelSelect.value === CUSTOM_TASK_VALUE;
+
+      const syncCustomTaskVisibility = () => {
+        const showCustom = isCustomTask();
+        customTaskIdWrap.classList.toggle('hidden', !showCustom);
+        customTaskLabelWrap.classList.toggle('hidden', !showCustom);
+      };
+
+      const getTaskIdValue = () => {
+        if (isCustomTask()) {
+          return String(taskIdCustomInput.value || '').trim();
+        }
+        return String(taskIdSelect.value || '').trim();
+      };
+
+      const getTaskLabelValue = () => {
+        if (isCustomTask()) {
+          return String(taskLabelCustomInput.value || '').trim();
+        }
+        return String(taskLabelSelect.value || '').trim();
+      };
+
+      const syncFromTaskId = () => {
+        if (taskIdSelect.value === CUSTOM_TASK_VALUE) {
+          taskLabelSelect.value = CUSTOM_TASK_VALUE;
+          syncCustomTaskVisibility();
+          return;
+        }
+        const matchingLabel = labelById[taskIdSelect.value] || '';
+        if (matchingLabel) {
+          taskLabelSelect.value = matchingLabel;
+        }
+        syncCustomTaskVisibility();
+      };
+
+      const syncFromTaskLabel = () => {
+        if (taskLabelSelect.value === CUSTOM_TASK_VALUE) {
+          taskIdSelect.value = CUSTOM_TASK_VALUE;
+          syncCustomTaskVisibility();
+          return;
+        }
+        const matchingId = idByLabel[taskLabelSelect.value] || '';
+        if (matchingId) {
+          taskIdSelect.value = matchingId;
+        }
+        syncCustomTaskVisibility();
+      };
+
       const validate = () => {
         if (!String(participantInput.value || '').trim()) {
           setStatus('Participant ID / Name is required.', false);
           participantInput.focus();
           return false;
         }
-        if (!String(taskIdInput.value || '').trim()) {
+        const selectedTaskId = getTaskIdValue();
+        if (!selectedTaskId) {
           setStatus('Task ID is required.', false);
-          taskIdInput.focus();
+          if (isCustomTask()) {
+            taskIdCustomInput.focus();
+          } else {
+            taskIdSelect.focus();
+          }
           return false;
         }
         return true;
@@ -138,8 +236,8 @@
           session_id: getSessionId(),
           participant_id: String(participantInput.value || '').trim(),
           observer_id: String(observerInput.value || '').trim(),
-          task_id: String(taskIdInput.value || '').trim(),
-          task_label: String(taskLabelInput.value || '').trim(),
+          task_id: getTaskIdValue(),
+          task_label: getTaskLabelValue(),
           event_type: eventTypeOverride || String(eventTypeSelect.value || '').trim(),
           manual_page: String(manualPageInput.value || '').trim(),
           notes: String(notesInput.value || '').trim(),
@@ -176,7 +274,11 @@
       el('btn-page').addEventListener('click', () => submitEvent('page_mark'));
       el('btn-note').addEventListener('click', () => submitEvent('note'));
 
+      taskIdSelect.addEventListener('change', syncFromTaskId);
+      taskLabelSelect.addEventListener('change', syncFromTaskLabel);
+
       metaEl.textContent = `Session: ${getSessionId()}`;
+      syncCustomTaskVisibility();
     })();
   </script>
 </body>

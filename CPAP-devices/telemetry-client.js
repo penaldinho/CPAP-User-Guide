@@ -878,6 +878,29 @@
   };
 
   const renderResearchPanel = (forceOpen = false) => {
+    const presetTasks = [
+      { id: 'scenario_card_1', label: 'Scenario Card 1 – First-Time Setup (Setup)' },
+      { id: 'scenario_card_2', label: 'Scenario Card 2 – Fit and Start Therapy (Routine Use)' },
+      { id: 'scenario_card_3', label: 'Scenario Card 3 – Comfort Adjustment (Troubleshooting)' },
+      { id: 'short_form_q1', label: 'Short-Form Q1 – Cleaning frequency (Routine Use)' },
+      { id: 'short_form_q2', label: 'Short-Form Q2 – Error message safety escalation (Error 006)' },
+      { id: 'short_form_q3', label: 'Short-Form Q3 – Spare mask storage (Routine Use / Safety)' },
+      { id: 'short_form_q4', label: 'Short-Form Q4 – Tubing length check (Setup)' }
+    ];
+    const CUSTOM_TASK_VALUE = '__custom__';
+    const labelById = Object.fromEntries(presetTasks.map((task) => [task.id, task.label]));
+    const idByLabel = Object.fromEntries(presetTasks.map((task) => [task.label, task.id]));
+    const taskIdOptions = [
+      '<option value="">Select task ID</option>',
+      ...presetTasks.map((task) => `<option value="${task.id}">${task.id}</option>`),
+      '<option value="__custom__">Custom task…</option>'
+    ].join('');
+    const taskLabelOptions = [
+      '<option value="">Select task label</option>',
+      ...presetTasks.map((task) => `<option value="${task.label}">${task.label}</option>`),
+      '<option value="__custom__">Custom task…</option>'
+    ].join('');
+
     const activeTask = getTaskState();
     if (activeTask.task_id) {
       const existingPanel = document.getElementById('mtg-research-panel');
@@ -921,11 +944,19 @@
         <hr style="border:0; border-top:1px solid #e5e7eb; margin:2px 0;" />
         <label style="display:grid; gap:4px;">
           <span>Task ID</span>
-          <input id="mtg-task-id-input" type="text" placeholder="e.g. T1" style="padding:6px 8px; border:1px solid #cbd5e1; border-radius:6px;" />
+          <select id="mtg-task-id-select" style="padding:6px 8px; border:1px solid #cbd5e1; border-radius:6px;">${taskIdOptions}</select>
         </label>
         <label style="display:grid; gap:4px;">
           <span>Task label</span>
-          <input id="mtg-task-label-input" type="text" placeholder="e.g. First-time setup" style="padding:6px 8px; border:1px solid #cbd5e1; border-radius:6px;" />
+          <select id="mtg-task-label-select" style="padding:6px 8px; border:1px solid #cbd5e1; border-radius:6px;">${taskLabelOptions}</select>
+        </label>
+        <label id="mtg-task-id-custom-wrap" style="display:none; gap:4px;">
+          <span>Custom task ID</span>
+          <input id="mtg-task-id-custom" type="text" placeholder="e.g. task_custom_1" style="padding:6px 8px; border:1px solid #cbd5e1; border-radius:6px;" />
+        </label>
+        <label id="mtg-task-label-custom-wrap" style="display:none; gap:4px;">
+          <span>Custom task label</span>
+          <input id="mtg-task-label-custom" type="text" placeholder="e.g. Additional scenario" style="padding:6px 8px; border:1px solid #cbd5e1; border-radius:6px;" />
         </label>
         <div style="display:flex; gap:8px;">
           <button id="mtg-task-start" type="button" style="flex:1; padding:7px 10px; border:1px solid #cbd5e1; border-radius:6px; background:#ecfdf3; cursor:pointer;">Start task</button>
@@ -941,8 +972,12 @@
 
     const participantInput = document.getElementById('mtg-participant-input');
     const participantSave = document.getElementById('mtg-participant-save');
-    const taskIdInput = document.getElementById('mtg-task-id-input');
-    const taskLabelInput = document.getElementById('mtg-task-label-input');
+    const taskIdSelect = document.getElementById('mtg-task-id-select');
+    const taskLabelSelect = document.getElementById('mtg-task-label-select');
+    const taskIdCustomWrap = document.getElementById('mtg-task-id-custom-wrap');
+    const taskLabelCustomWrap = document.getElementById('mtg-task-label-custom-wrap');
+    const taskIdCustomInput = document.getElementById('mtg-task-id-custom');
+    const taskLabelCustomInput = document.getElementById('mtg-task-label-custom');
     const taskStart = document.getElementById('mtg-task-start');
     const taskEnd = document.getElementById('mtg-task-end');
     const taskTimer = document.getElementById('mtg-task-timer');
@@ -984,18 +1019,89 @@
       updateTimer();
     };
 
+    const isCustomTaskSelection = () => {
+      return (taskIdSelect && taskIdSelect.value === CUSTOM_TASK_VALUE)
+        || (taskLabelSelect && taskLabelSelect.value === CUSTOM_TASK_VALUE);
+    };
+
+    const syncCustomTaskVisibility = () => {
+      const showCustom = isCustomTaskSelection();
+      if (taskIdCustomWrap) {
+        taskIdCustomWrap.style.display = showCustom ? 'grid' : 'none';
+      }
+      if (taskLabelCustomWrap) {
+        taskLabelCustomWrap.style.display = showCustom ? 'grid' : 'none';
+      }
+    };
+
+    const getSelectedTaskId = () => {
+      if (isCustomTaskSelection()) {
+        return String(taskIdCustomInput ? taskIdCustomInput.value : '').trim();
+      }
+      return String(taskIdSelect ? taskIdSelect.value : '').trim();
+    };
+
+    const getSelectedTaskLabel = () => {
+      if (isCustomTaskSelection()) {
+        return String(taskLabelCustomInput ? taskLabelCustomInput.value : '').trim();
+      }
+      return String(taskLabelSelect ? taskLabelSelect.value : '').trim();
+    };
+
+    const syncFromTaskId = () => {
+      if (!taskIdSelect || !taskLabelSelect) return;
+      if (taskIdSelect.value === CUSTOM_TASK_VALUE) {
+        taskLabelSelect.value = CUSTOM_TASK_VALUE;
+        syncCustomTaskVisibility();
+        return;
+      }
+
+      const matchingLabel = labelById[taskIdSelect.value] || '';
+      if (matchingLabel) {
+        taskLabelSelect.value = matchingLabel;
+      }
+      syncCustomTaskVisibility();
+    };
+
+    const syncFromTaskLabel = () => {
+      if (!taskIdSelect || !taskLabelSelect) return;
+      if (taskLabelSelect.value === CUSTOM_TASK_VALUE) {
+        taskIdSelect.value = CUSTOM_TASK_VALUE;
+        syncCustomTaskVisibility();
+        return;
+      }
+
+      const matchingId = idByLabel[taskLabelSelect.value] || '';
+      if (matchingId) {
+        taskIdSelect.value = matchingId;
+      }
+      syncCustomTaskVisibility();
+    };
+
     const refreshState = () => {
       const participantId = getParticipantId();
       const taskState = getTaskState();
       if (participantInput) {
         participantInput.value = participantId;
       }
-      if (taskIdInput && taskState.task_id) {
-        taskIdInput.value = taskState.task_id;
+
+      if (taskState.task_id) {
+        if (taskIdSelect) {
+          taskIdSelect.value = labelById[taskState.task_id] ? taskState.task_id : CUSTOM_TASK_VALUE;
+        }
+        if (taskLabelSelect) {
+          taskLabelSelect.value = taskState.task_label && idByLabel[taskState.task_label]
+            ? taskState.task_label
+            : (labelById[taskState.task_id] || CUSTOM_TASK_VALUE);
+        }
+        if (taskIdCustomInput) {
+          taskIdCustomInput.value = labelById[taskState.task_id] ? '' : taskState.task_id;
+        }
+        if (taskLabelCustomInput) {
+          taskLabelCustomInput.value = idByLabel[taskState.task_label] ? '' : (taskState.task_label || '');
+        }
       }
-      if (taskLabelInput && taskState.task_label) {
-        taskLabelInput.value = taskState.task_label;
-      }
+      syncCustomTaskVisibility();
 
       const taskSummary = taskState.task_id
         ? `Active task: ${taskState.task_id}${taskState.task_label ? ` (${taskState.task_label})` : ''}`
@@ -1017,8 +1123,8 @@
     if (taskStart) {
       taskStart.addEventListener('click', () => {
         const participantId = String(participantInput ? participantInput.value : '').trim();
-        const taskId = String(taskIdInput ? taskIdInput.value : '').trim();
-        const taskLabel = String(taskLabelInput ? taskLabelInput.value : '').trim();
+        const taskId = getSelectedTaskId();
+        const taskLabel = getSelectedTaskLabel();
 
         if (!participantId || !taskId) {
           window.alert('Please set both Participant ID and Task ID before starting a task.');
@@ -1032,6 +1138,14 @@
         panel.remove();
         refreshState();
       });
+    }
+
+    if (taskIdSelect) {
+      taskIdSelect.addEventListener('change', syncFromTaskId);
+    }
+
+    if (taskLabelSelect) {
+      taskLabelSelect.addEventListener('change', syncFromTaskLabel);
     }
 
     if (taskEnd) {
@@ -1059,6 +1173,7 @@
     }
 
     ensureTimerRunning();
+    syncCustomTaskVisibility();
     refreshState();
   };
 
