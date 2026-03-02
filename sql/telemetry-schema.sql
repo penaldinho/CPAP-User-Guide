@@ -227,6 +227,107 @@ LEFT JOIN instance_start i
   AND i.task_id = s.task_id
   AND i.task_instance_seq = s.task_instance_seq;
 
+CREATE OR REPLACE VIEW telemetry_task_page_dwell_segments AS
+WITH task_bounds AS (
+  SELECT
+    MIN(session_id) AS session_id,
+    participant_id,
+    task_id,
+    task_instance_seq,
+    MIN(event_at) FILTER (WHERE event_type = 'task_start') AS task_started_at,
+    MAX(event_at) FILTER (WHERE event_type = 'task_end') AS task_ended_at
+  FROM telemetry_task_events_enriched
+  GROUP BY participant_id, task_id, task_instance_seq
+),
+page_exit_segments AS (
+  SELECT
+    b.session_id,
+    e.participant_id,
+    e.task_id,
+    e.task_instance_seq,
+    e.page_path,
+    GREATEST(e.event_at - (e.duration_ms * INTERVAL '1 millisecond'), b.task_started_at) AS page_opened_at,
+    LEAST(e.event_at, COALESCE(b.task_ended_at, e.event_at)) AS page_closed_at,
+    'page_exit'::TEXT AS close_reason
+  FROM telemetry_task_events_enriched e
+  INNER JOIN task_bounds b
+    ON b.participant_id = e.participant_id
+    AND b.task_id = e.task_id
+    AND b.task_instance_seq = e.task_instance_seq
+  WHERE e.event_type = 'page_exit'
+    AND e.page_path IS NOT NULL
+    AND e.page_path <> ''
+    AND b.task_started_at IS NOT NULL
+    AND e.duration_ms IS NOT NULL
+    AND e.duration_ms > 0
+),
+last_page_view_at_task_end AS (
+  SELECT
+    b.session_id,
+    b.participant_id,
+    b.task_id,
+    b.task_instance_seq,
+    b.task_ended_at,
+    e.page_path,
+    e.event_at AS page_opened_at,
+    ROW_NUMBER() OVER (
+      PARTITION BY b.participant_id, b.task_id, b.task_instance_seq
+      ORDER BY e.event_at DESC, e.id DESC
+    ) AS rn
+  FROM task_bounds b
+  INNER JOIN telemetry_task_events_enriched e
+    ON e.participant_id = b.participant_id
+    AND e.task_id = b.task_id
+    AND e.task_instance_seq = b.task_instance_seq
+  WHERE b.task_ended_at IS NOT NULL
+    AND e.event_type = 'page_view'
+    AND e.page_path IS NOT NULL
+    AND e.page_path <> ''
+    AND e.event_at <= b.task_ended_at
+),
+trailing_open_page_segments AS (
+  SELECT
+    l.session_id,
+    l.participant_id,
+    l.task_id,
+    l.task_instance_seq,
+    l.page_path,
+    l.page_opened_at,
+    l.task_ended_at AS page_closed_at,
+    'task_end'::TEXT AS close_reason
+  FROM last_page_view_at_task_end l
+  WHERE l.rn = 1
+    AND NOT EXISTS (
+      SELECT 1
+      FROM telemetry_task_events_enriched e
+      WHERE e.participant_id = l.participant_id
+        AND e.task_id = l.task_id
+        AND e.task_instance_seq = l.task_instance_seq
+        AND e.event_type = 'page_exit'
+        AND e.page_path = l.page_path
+        AND e.event_at >= l.page_opened_at
+        AND e.event_at <= l.task_ended_at
+    )
+),
+all_segments AS (
+  SELECT * FROM page_exit_segments
+  UNION ALL
+  SELECT * FROM trailing_open_page_segments
+)
+SELECT
+  session_id,
+  participant_id,
+  task_id,
+  task_instance_seq,
+  page_path,
+  page_opened_at,
+  page_closed_at,
+  close_reason,
+  GREATEST(0, (EXTRACT(EPOCH FROM (page_closed_at - page_opened_at)) * 1000)::BIGINT) AS page_time_spent_ms
+FROM all_segments
+WHERE page_closed_at IS NOT NULL
+  AND page_opened_at IS NOT NULL;
+
 CREATE OR REPLACE VIEW telemetry_task_instances AS
 WITH task_bounds AS (
   SELECT
@@ -242,76 +343,13 @@ WITH task_bounds AS (
   FROM telemetry_task_events_enriched
   GROUP BY participant_id, task_id, task_instance_seq
 ),
-page_views AS (
-  SELECT
-    b.session_id,
-    e.participant_id,
-    e.task_id,
-    e.task_instance_seq,
-    e.id AS page_view_id,
-    e.page_path,
-    e.event_at AS page_opened_at,
-    b.task_ended_at
-  FROM telemetry_task_events_enriched e
-  INNER JOIN task_bounds b
-    ON b.participant_id = e.participant_id
-    AND b.task_id = e.task_id
-    AND b.task_instance_seq = e.task_instance_seq
-  WHERE e.event_type = 'page_view'
-    AND e.page_path IS NOT NULL
-    AND e.page_path <> ''
-    AND (b.task_ended_at IS NULL OR e.event_at <= b.task_ended_at)
-),
-page_exit_candidates AS (
-  SELECT
-    pv.page_view_id,
-    pe.id AS page_exit_id,
-    pe.event_at AS page_exit_at,
-    ROW_NUMBER() OVER (
-      PARTITION BY pv.page_view_id
-      ORDER BY pe.event_at ASC, pe.id ASC
-    ) AS rn
-  FROM page_views pv
-  INNER JOIN telemetry_task_events_enriched pe
-    ON pe.participant_id = pv.participant_id
-    AND pe.task_id = pv.task_id
-    AND pe.task_instance_seq = pv.task_instance_seq
-    AND pe.event_type = 'page_exit'
-    AND pe.page_path = pv.page_path
-    AND pe.event_at >= pv.page_opened_at
-    AND (pv.task_ended_at IS NULL OR pe.event_at <= pv.task_ended_at)
-),
-first_page_exits AS (
-  SELECT
-    page_view_id,
-    page_exit_id,
-    page_exit_at
-  FROM page_exit_candidates
-  WHERE rn = 1
-),
-page_spans AS (
-  SELECT
-    pv.participant_id,
-    pv.task_id,
-    pv.task_instance_seq,
-    CASE
-      WHEN COALESCE(fpe.page_exit_at, pv.task_ended_at) IS NULL THEN NULL
-      ELSE GREATEST(
-        0,
-        (EXTRACT(EPOCH FROM (COALESCE(fpe.page_exit_at, pv.task_ended_at) - pv.page_opened_at)) * 1000)::BIGINT
-      )
-    END AS page_time_spent_ms
-  FROM page_views pv
-  LEFT JOIN first_page_exits fpe
-    ON fpe.page_view_id = pv.page_view_id
-),
 task_page_totals AS (
   SELECT
     participant_id,
     task_id,
     task_instance_seq,
     SUM(page_time_spent_ms)::BIGINT AS task_total_page_dwell_ms
-  FROM page_spans
+  FROM telemetry_task_page_dwell_segments
   GROUP BY participant_id, task_id, task_instance_seq
 )
 SELECT
@@ -339,54 +377,16 @@ LEFT JOIN task_page_totals t
   AND t.task_instance_seq = b.task_instance_seq;
 
 CREATE OR REPLACE VIEW telemetry_task_page_metrics AS
-WITH task_bounds AS (
+WITH page_dwell AS (
   SELECT
-    MIN(session_id) AS session_id,
-    participant_id,
-    task_id,
-    task_instance_seq,
-    MIN(event_at) FILTER (WHERE event_type = 'task_start') AS task_started_at,
-    MAX(event_at) FILTER (WHERE event_type = 'task_end') AS task_ended_at
-  FROM telemetry_task_events_enriched
-  GROUP BY participant_id, task_id, task_instance_seq
-),
-page_exit_overlap AS (
-  SELECT
-    b.session_id,
-    e.participant_id,
-    e.task_id,
-    e.task_instance_seq,
-    e.page_path,
-    CASE
-      WHEN b.task_started_at IS NULL OR e.duration_ms IS NULL OR e.duration_ms <= 0 THEN 0
-      ELSE GREATEST(
-        0,
-        (EXTRACT(EPOCH FROM (
-          LEAST(e.event_at, COALESCE(b.task_ended_at, e.event_at))
-          -
-          GREATEST(e.event_at - (e.duration_ms * INTERVAL '1 millisecond'), b.task_started_at)
-        )) * 1000)::BIGINT
-      )
-    END AS dwell_ms_within_task
-  FROM telemetry_task_events_enriched e
-  INNER JOIN task_bounds b
-    ON b.participant_id = e.participant_id
-    AND b.task_id = e.task_id
-    AND b.task_instance_seq = e.task_instance_seq
-  WHERE e.event_type = 'page_exit'
-    AND e.page_path IS NOT NULL
-    AND e.page_path <> ''
-),
-page_dwell AS (
-  SELECT
-    MIN(session_id) AS session_id,
+    session_id,
     participant_id,
     task_id,
     task_instance_seq,
     page_path,
-    SUM(dwell_ms_within_task)::BIGINT AS page_dwell_ms,
-    COUNT(*) AS page_exit_count
-  FROM page_exit_overlap
+    SUM(page_time_spent_ms)::BIGINT AS page_dwell_ms,
+    COUNT(*) FILTER (WHERE close_reason = 'page_exit') AS page_exit_count
+  FROM telemetry_task_page_dwell_segments
   GROUP BY participant_id, task_id, task_instance_seq, page_path
 ),
 page_views AS (
@@ -420,81 +420,6 @@ FULL OUTER JOIN page_views v
   AND v.page_path = d.page_path;
 
 CREATE OR REPLACE VIEW telemetry_task_page_spans AS
-WITH task_bounds AS (
-  SELECT
-    participant_id,
-    task_id,
-    task_instance_seq,
-    task_started_at,
-    task_ended_at
-  FROM telemetry_task_instances
-  WHERE task_started_at IS NOT NULL
-),
-page_views AS (
-  SELECT
-    e.id AS page_view_id,
-    e.session_id,
-    e.participant_id,
-    e.task_id,
-    e.task_instance_seq,
-    e.page_path,
-    e.event_at AS page_opened_at,
-    b.task_ended_at
-  FROM telemetry_task_events_enriched e
-  INNER JOIN task_bounds b
-    ON b.participant_id = e.participant_id
-    AND b.task_id = e.task_id
-    AND b.task_instance_seq = e.task_instance_seq
-  WHERE e.event_type = 'page_view'
-    AND e.page_path IS NOT NULL
-    AND e.page_path <> ''
-    AND (b.task_ended_at IS NULL OR e.event_at <= b.task_ended_at)
-),
-page_exit_candidates AS (
-  SELECT
-    pv.page_view_id,
-    pe.id AS page_exit_id,
-    pe.event_at AS page_exit_at,
-    ROW_NUMBER() OVER (
-      PARTITION BY pv.page_view_id
-      ORDER BY pe.event_at ASC, pe.id ASC
-    ) AS rn
-  FROM page_views pv
-  INNER JOIN telemetry_task_events_enriched pe
-    ON pe.participant_id = pv.participant_id
-    AND pe.task_id = pv.task_id
-    AND pe.task_instance_seq = pv.task_instance_seq
-    AND pe.event_type = 'page_exit'
-    AND pe.page_path = pv.page_path
-    AND pe.event_at >= pv.page_opened_at
-    AND (pv.task_ended_at IS NULL OR pe.event_at <= pv.task_ended_at)
-),
-first_page_exits AS (
-  SELECT
-    page_view_id,
-    page_exit_id,
-    page_exit_at
-  FROM page_exit_candidates
-  WHERE rn = 1
-),
-page_spans AS (
-  SELECT
-    pv.session_id,
-    pv.participant_id,
-    pv.task_id,
-    pv.task_instance_seq,
-    pv.page_path,
-    pv.page_opened_at,
-    COALESCE(fpe.page_exit_at, pv.task_ended_at) AS page_closed_at,
-    CASE
-      WHEN fpe.page_exit_id IS NOT NULL THEN 'page_exit'
-      WHEN pv.task_ended_at IS NOT NULL THEN 'task_end'
-      ELSE NULL
-    END AS close_reason
-  FROM page_views pv
-  LEFT JOIN first_page_exits fpe
-    ON fpe.page_view_id = pv.page_view_id
-)
 SELECT
   session_id,
   participant_id,
@@ -504,11 +429,8 @@ SELECT
   page_opened_at,
   page_closed_at,
   close_reason,
-  CASE
-    WHEN page_closed_at IS NULL THEN NULL
-    ELSE GREATEST(0, (EXTRACT(EPOCH FROM (page_closed_at - page_opened_at)) * 1000)::BIGINT)
-  END AS page_time_spent_ms
-FROM page_spans;
+  page_time_spent_ms
+FROM telemetry_task_page_dwell_segments;
 
 CREATE OR REPLACE VIEW telemetry_task_page_time_per_task AS
 SELECT
