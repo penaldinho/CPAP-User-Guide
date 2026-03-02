@@ -10,6 +10,7 @@
   let shortFormRenderedTaskId = '';
   let isShortFormCardExpanded = false;
   let isTaskPromptExpanded = false;
+  let baseBodyPaddingBottomPx = null;
 
   const getApiUrl = () => {
     const host = window.location.hostname;
@@ -141,6 +142,57 @@
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+
+  const ensureBaseBodyPaddingBottom = () => {
+    if (baseBodyPaddingBottomPx !== null) return;
+    if (!document.body) {
+      baseBodyPaddingBottomPx = 0;
+      return;
+    }
+
+    const computed = window.getComputedStyle(document.body);
+    const parsed = Number.parseFloat(String(computed.paddingBottom || '0'));
+    baseBodyPaddingBottomPx = Number.isFinite(parsed) ? parsed : 0;
+  };
+
+  const isElementVisibleForLayout = (element) => {
+    if (!element) return false;
+    const style = window.getComputedStyle(element);
+    if (style.display === 'none' || style.visibility === 'hidden') {
+      return false;
+    }
+
+    const rect = element.getBoundingClientRect();
+    return rect.width > 0 && rect.height > 0;
+  };
+
+  const updateTaskCardSafeArea = () => {
+    if (!document.body) return;
+    ensureBaseBodyPaddingBottom();
+
+    const candidates = [
+      document.getElementById('mtg-task-prompt-card'),
+      document.getElementById('mtg-participant-end-task-wrap')
+    ];
+
+    let coveredHeight = 0;
+    candidates.forEach((element) => {
+      if (!isElementVisibleForLayout(element)) {
+        return;
+      }
+
+      const rect = element.getBoundingClientRect();
+      const overlapFromBottom = window.innerHeight - rect.top;
+      if (overlapFromBottom > coveredHeight) {
+        coveredHeight = overlapFromBottom;
+      }
+    });
+
+    const additionalGap = coveredHeight > 0 ? 12 : 0;
+    const safeAreaPx = Math.max(0, Math.ceil(coveredHeight + additionalGap));
+    const nextPaddingBottom = Math.max(0, Math.ceil((baseBodyPaddingBottomPx || 0) + safeAreaPx));
+    document.body.style.paddingBottom = `${nextPaddingBottom}px`;
+  };
 
   const randomId = () => {
     const stamp = Date.now().toString(36);
@@ -970,6 +1022,7 @@
       isTaskPromptExpanded = false;
       card.style.display = 'none';
       card.innerHTML = '';
+      updateTaskCardSafeArea();
       return;
     }
 
@@ -980,6 +1033,7 @@
       isTaskPromptExpanded = false;
       card.style.display = 'none';
       card.innerHTML = '';
+      updateTaskCardSafeArea();
       return;
     }
 
@@ -1019,6 +1073,7 @@
     card.style.maxHeight = isExpanded ? '42vh' : '74px';
     card.style.overflow = isExpanded ? 'auto' : 'hidden';
     card.style.display = 'block';
+    updateTaskCardSafeArea();
   };
 
   const startTask = (taskId, label) => {
@@ -1347,6 +1402,7 @@
       if (shortFormFields) {
         shortFormFields.innerHTML = '';
       }
+      updateTaskCardSafeArea();
       return;
     }
 
@@ -1440,6 +1496,8 @@
       firstShortFormInput.focus();
       shortFormAutoFocusTaskId = taskId;
     }
+
+    updateTaskCardSafeArea();
   };
 
   const renderResearchPanel = (forceOpen = false) => {
@@ -1839,6 +1897,10 @@
       if (document.visibilityState === 'hidden') {
         emitVisibleSegmentExit();
       }
+    });
+
+    window.addEventListener('resize', () => {
+      updateTaskCardSafeArea();
     });
 
     window.setInterval(() => {
