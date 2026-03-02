@@ -1441,6 +1441,19 @@
     track('page_view', {
       referrer: document.referrer || ''
     });
+    let visibleSegmentStartedAtMs = document.visibilityState === 'visible' ? Date.now() : null;
+
+    const emitVisibleSegmentExit = () => {
+      if (!Number.isFinite(visibleSegmentStartedAtMs)) {
+        return;
+      }
+
+      const durationMs = Math.max(0, Date.now() - visibleSegmentStartedAtMs);
+      track('page_exit', {
+        duration_ms: durationMs
+      });
+      visibleSegmentStartedAtMs = null;
+    };
 
     reconcileTaskStateFromServer('init');
 
@@ -1477,11 +1490,8 @@
       });
     });
 
-    const pageEnteredAt = Date.now();
     window.addEventListener('pagehide', () => {
-      track('page_exit', {
-        duration_ms: Math.max(0, Date.now() - pageEnteredAt)
-      });
+      emitVisibleSegmentExit();
     });
 
     window.addEventListener('storage', (event) => {
@@ -1501,9 +1511,20 @@
     });
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible') {
+        if (!Number.isFinite(visibleSegmentStartedAtMs)) {
+          visibleSegmentStartedAtMs = Date.now();
+          track('page_view', {
+            referrer: ''
+          });
+        }
         reconcileSharedTaskState();
         reconcileTaskStateFromServer('visible');
         syncTaskPromptCard();
+        return;
+      }
+
+      if (document.visibilityState === 'hidden') {
+        emitVisibleSegmentExit();
       }
     });
 
