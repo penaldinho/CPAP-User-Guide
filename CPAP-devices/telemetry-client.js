@@ -880,6 +880,13 @@
     return card;
   };
 
+  const formatElapsedDuration = (durationMs) => {
+    const totalSeconds = Math.max(0, Math.floor((durationMs || 0) / 1000));
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+  };
+
   const syncTaskPromptCard = () => {
     const taskState = getTaskState();
     const card = ensureTaskPromptCard();
@@ -891,6 +898,9 @@
 
     const taskId = String(taskState.task_id || '').trim();
     const fallbackLabel = String(taskState.task_label || '').trim();
+    const startedAtMs = Date.parse(String(taskState.started_at || ''));
+    const elapsedMs = Number.isFinite(startedAtMs) ? Math.max(0, Date.now() - startedAtMs) : 0;
+    const elapsedText = formatElapsedDuration(elapsedMs);
     const entry = presetTaskDescriptions[taskId] || null;
     const displayLabel = (entry && entry.title) || fallbackLabel || taskId;
     const lines = entry && Array.isArray(entry.steps) ? entry.steps : [];
@@ -903,6 +913,7 @@
         <strong style="font-size:13px; color:#0f172a;">Task in progress</strong>
         <span style="font-size:11px; color:#475569; background:#f1f5f9; border:1px solid #e2e8f0; border-radius:999px; padding:2px 8px;">${escapeHtml(taskId)}</span>
       </div>
+      <div style="margin-top:6px; font-size:12px; color:#334155; font-weight:600;">Elapsed: ${escapeHtml(elapsedText)}</div>
       <div style="margin-top:6px; font-size:13px; font-weight:600; line-height:1.3;">${escapeHtml(displayLabel)}</div>
       ${listMarkup}
     `;
