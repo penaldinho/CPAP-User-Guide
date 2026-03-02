@@ -1045,6 +1045,7 @@
     const lines = entry && Array.isArray(entry.steps) ? entry.steps : [];
     const collapsedDescription = String((entry && entry.collapsedDescription) || '').trim();
     const isExpanded = isTaskPromptExpanded;
+    const showCollapsedDescription = !isExpanded && Boolean(collapsedDescription);
     const promptHint = isExpanded
       ? 'Move cursor away from this card to collapse'
       : 'Hover this card to expand';
@@ -1062,7 +1063,7 @@
       </div>
       <div style="margin-top:6px; font-size:12px; color:#334155; font-weight:600;">Elapsed: ${escapeHtml(elapsedText)}</div>
       <div style="margin-top:6px; font-size:11px; color:#64748b;">${escapeHtml(promptHint)}</div>
-      <div style="margin-top:6px; display:${!isExpanded && collapsedDescription ? 'block' : 'none'}; color:#334155; line-height:1.35; font-size:12px;">${escapeHtml(collapsedDescription)}</div>
+      <div style="margin-top:6px; display:${showCollapsedDescription ? 'block' : 'none'}; color:#334155; line-height:1.35; font-size:12px; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;">${escapeHtml(collapsedDescription)}</div>
       <div style="margin-top:6px; display:${isExpanded ? 'block' : 'none'};">
         <div style="font-size:13px; font-weight:600; line-height:1.3;">${escapeHtml(displayLabel)}</div>
         ${listMarkup}
@@ -1070,7 +1071,7 @@
       </div>
     `;
     card.style.bottom = isShortFormTask ? '170px' : '96px';
-    card.style.maxHeight = isExpanded ? '42vh' : '74px';
+    card.style.maxHeight = isExpanded ? '42vh' : (showCollapsedDescription ? '116px' : '74px');
     card.style.overflow = isExpanded ? 'auto' : 'hidden';
     card.style.display = 'block';
     updateTaskCardSafeArea();
