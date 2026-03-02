@@ -1100,7 +1100,7 @@
     });
     const listMarkup = detailLines.length
       ? `<ul style="margin:0 0 0 18px; padding:0; display:grid; gap:6px;">${detailLines.map((line) => `<li style="line-height:1.35;">${escapeHtml(line)}</li>`).join('')}</ul>`
-      : '<div style="margin-top:8px; color:#4b5563; line-height:1.35;">Follow the task instructions and inform the observer when complete.</div>';
+      : '';
 
     card.innerHTML = `
       <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
