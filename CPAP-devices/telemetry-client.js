@@ -963,10 +963,10 @@
     card.style.maxWidth = 'calc(100vw - 24px)';
     card.style.maxHeight = '42vh';
     card.style.overflow = 'hidden';
-    card.style.background = '#ffffff';
-    card.style.border = '1px solid #d7dce5';
+    card.style.background = '#ecfdf5';
+    card.style.border = '1px solid #34d399';
     card.style.borderRadius = '10px';
-    card.style.boxShadow = '0 10px 24px rgba(0,0,0,0.16)';
+    card.style.boxShadow = '0 10px 24px rgba(16, 185, 129, 0.18)';
     card.style.padding = '12px';
     card.style.zIndex = '9600';
     card.style.fontFamily = 'system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif';
@@ -1139,10 +1139,10 @@
     const shortFormWrap = document.createElement('div');
     shortFormWrap.id = 'mtg-short-form-answer-wrap';
     shortFormWrap.style.display = 'none';
-    shortFormWrap.style.background = '#ffffff';
-    shortFormWrap.style.border = '1px solid #d7dce5';
+    shortFormWrap.style.background = '#ecfdf5';
+    shortFormWrap.style.border = '1px solid #34d399';
     shortFormWrap.style.borderRadius = '10px';
-    shortFormWrap.style.boxShadow = '0 10px 24px rgba(0,0,0,0.2)';
+    shortFormWrap.style.boxShadow = '0 10px 24px rgba(16, 185, 129, 0.2)';
     shortFormWrap.style.padding = '10px';
     shortFormWrap.style.width = 'min(720px, calc(100vw - 24px))';
     shortFormWrap.style.boxSizing = 'border-box';
