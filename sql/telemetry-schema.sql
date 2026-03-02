@@ -96,6 +96,56 @@ CREATE INDEX IF NOT EXISTS idx_physical_trial_task_time
 CREATE INDEX IF NOT EXISTS idx_physical_trial_event_type_time
   ON physical_trial_events (event_type, received_at DESC);
 
+CREATE TABLE IF NOT EXISTS pre_trial_questionnaire (
+  id BIGSERIAL PRIMARY KEY,
+  received_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  timestamp TIMESTAMPTZ,
+  session_id TEXT,
+  participant_id TEXT NOT NULL,
+  observer_id TEXT,
+  age_years INTEGER,
+  gender TEXT,
+  education TEXT,
+  tech_comfort INTEGER,
+  baseline_q6 INTEGER,
+  baseline_q7 INTEGER,
+  baseline_q8 INTEGER,
+  device_experience_none BOOLEAN,
+  device_experience_blood_pressure_monitor BOOLEAN,
+  device_experience_blood_glucose_monitor BOOLEAN,
+  device_experience_inhaler_nebuliser BOOLEAN,
+  device_experience_sleep_fitness_tracker BOOLEAN,
+  device_experience_other BOOLEAN,
+  device_experience_other_text TEXT,
+  free_text_notes TEXT,
+  raw_response JSONB
+);
+
+CREATE INDEX IF NOT EXISTS idx_pre_trial_questionnaire_participant_time
+  ON pre_trial_questionnaire (participant_id, received_at DESC);
+
+CREATE TABLE IF NOT EXISTS post_trial_questionnaire (
+  id BIGSERIAL PRIMARY KEY,
+  received_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  timestamp TIMESTAMPTZ,
+  session_id TEXT,
+  participant_id TEXT NOT NULL,
+  observer_id TEXT,
+  post_q1 INTEGER,
+  post_q2 INTEGER,
+  post_q3 INTEGER,
+  post_q4 INTEGER,
+  post_q5 INTEGER,
+  post_q6 INTEGER,
+  post_q7 INTEGER,
+  format_preference TEXT,
+  free_text_notes TEXT,
+  raw_response JSONB
+);
+
+CREATE INDEX IF NOT EXISTS idx_post_trial_questionnaire_participant_time
+  ON post_trial_questionnaire (participant_id, received_at DESC);
+
 CREATE OR REPLACE VIEW telemetry_task_events_enriched AS
 WITH ordered AS (
   SELECT

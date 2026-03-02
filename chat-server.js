@@ -421,6 +421,52 @@ const parseIntegerSafely = (value) => {
   return Number.isNaN(parsed) ? null : parsed;
 };
 
+const parseJsonObjectSafely = (value) => {
+  if (!value || typeof value !== 'string') {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(value);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+};
+
+const parseLikertSafely = (value) => {
+  const parsed = parseIntegerSafely(value);
+  if (!Number.isFinite(parsed) || parsed < 1 || parsed > 5) {
+    return null;
+  }
+  return parsed;
+};
+
+const parseBoundedIntegerSafely = (value, min, max) => {
+  const parsed = parseIntegerSafely(value);
+  if (!Number.isFinite(parsed)) {
+    return null;
+  }
+  if (Number.isFinite(min) && parsed < min) {
+    return null;
+  }
+  if (Number.isFinite(max) && parsed > max) {
+    return null;
+  }
+  return parsed;
+};
+
+const includesChoice = (values, expected) => {
+  if (!Array.isArray(values)) {
+    return false;
+  }
+  const normalizedExpected = String(expected || '').trim().toLowerCase();
+  return values.some((value) => String(value || '').trim().toLowerCase() === normalizedExpected);
+};
+
 const getTelemetryPgPool = () => {
   if (!telemetryUsePostgres) return null;
   if (telemetryPgPool) return telemetryPgPool;
@@ -551,6 +597,122 @@ const insertPhysicalTrialRecordPostgres = async (record) => {
   await pool.query(queryText, values);
 };
 
+const insertQuestionnaireRecordPostgres = async (record) => {
+  const pool = getTelemetryPgPool();
+  const normalized = normalizePhysicalTrialRecordForSql(record);
+  const taskId = String(normalized.task_id || '').trim();
+  const eventType = String(normalized.event_type || '').trim().toLowerCase();
+  const response = parseJsonObjectSafely(normalized.notes);
+
+  if (eventType !== 'note' || !response) {
+    return;
+  }
+
+  if (taskId === 'pre-trial-questionnaire') {
+    const deviceExperience = Array.isArray(response.device_experience) ? response.device_experience : [];
+    const queryText = `
+      INSERT INTO pre_trial_questionnaire (
+        received_at,
+        timestamp,
+        session_id,
+        participant_id,
+        observer_id,
+        age_years,
+        gender,
+        education,
+        tech_comfort,
+        baseline_q6,
+        baseline_q7,
+        baseline_q8,
+        device_experience_none,
+        device_experience_blood_pressure_monitor,
+        device_experience_blood_glucose_monitor,
+        device_experience_inhaler_nebuliser,
+        device_experience_sleep_fitness_tracker,
+        device_experience_other,
+        device_experience_other_text,
+        free_text_notes,
+        raw_response
+      )
+      VALUES (
+        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21
+      )
+    `;
+
+    const values = [
+      normalized.received_at,
+      normalized.timestamp,
+      normalized.session_id || '',
+      normalized.participant_id || '',
+      normalized.observer_id || '',
+      parseBoundedIntegerSafely(response.age_years, 0, 120),
+      String(response.gender || '').trim(),
+      String(response.education || '').trim(),
+      parseLikertSafely(response.tech_comfort_1_to_5),
+      parseLikertSafely(response.baseline_q6_1_to_5),
+      parseLikertSafely(response.baseline_q7_1_to_5),
+      parseLikertSafely(response.baseline_q8_1_to_5),
+      includesChoice(deviceExperience, 'none'),
+      includesChoice(deviceExperience, 'blood_pressure_monitor'),
+      includesChoice(deviceExperience, 'blood_glucose_monitor'),
+      includesChoice(deviceExperience, 'inhaler_nebuliser'),
+      includesChoice(deviceExperience, 'sleep_fitness_tracker'),
+      includesChoice(deviceExperience, 'other'),
+      String(response.device_experience_other || '').trim(),
+      String(response.free_text_notes || '').trim(),
+      JSON.stringify(response)
+    ];
+
+    await pool.query(queryText, values);
+    return;
+  }
+
+  if (taskId === 'post-trial-questionnaire') {
+    const queryText = `
+      INSERT INTO post_trial_questionnaire (
+        received_at,
+        timestamp,
+        session_id,
+        participant_id,
+        observer_id,
+        post_q1,
+        post_q2,
+        post_q3,
+        post_q4,
+        post_q5,
+        post_q6,
+        post_q7,
+        format_preference,
+        free_text_notes,
+        raw_response
+      )
+      VALUES (
+        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15
+      )
+    `;
+
+    const values = [
+      normalized.received_at,
+      normalized.timestamp,
+      normalized.session_id || '',
+      normalized.participant_id || '',
+      normalized.observer_id || '',
+      parseLikertSafely(response.post_q1_1_to_5),
+      parseLikertSafely(response.post_q2_1_to_5),
+      parseLikertSafely(response.post_q3_1_to_5),
+      parseLikertSafely(response.post_q4_1_to_5),
+      parseLikertSafely(response.post_q5_1_to_5),
+      parseLikertSafely(response.post_q6_1_to_5),
+      parseLikertSafely(response.post_q7_1_to_5),
+      String(response.format_preference || '').trim(),
+      String(response.free_text_notes || '').trim(),
+      JSON.stringify(response)
+    ];
+
+    await pool.query(queryText, values);
+  }
+};
+
 const readTelemetryRecordsPostgres = async (participantId) => {
   const pool = getTelemetryPgPool();
   const baseQuery = `
@@ -661,6 +823,21 @@ const storePhysicalTrialRecord = async (record) => {
   }
 
   writePhysicalTrialRecordToFiles(record);
+};
+
+const storeQuestionnaireRecord = async (record) => {
+  if (!telemetryUsePostgres) {
+    return;
+  }
+
+  try {
+    await insertQuestionnaireRecordPostgres(record);
+  } catch (error) {
+    if (!telemetryFallbackToFile) {
+      throw error;
+    }
+    console.error('Postgres questionnaire write failed:', error.message);
+  }
 };
 
 const readTelemetryRecordsForExport = async (participantId) => {
@@ -1423,6 +1600,7 @@ app.post('/api/physical-trial', async (req, res) => {
     });
 
     await storePhysicalTrialRecord(record);
+    await storeQuestionnaireRecord(record);
     res.status(204).end();
   } catch (error) {
     console.error('Physical trial write error:', error);

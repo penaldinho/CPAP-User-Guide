@@ -7,26 +7,104 @@
   <title>Post-trial Questionnaire</title>
   <style>
     body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:#f4f6fb;color:#1f2937;margin:0}
-    .wrap{max-width:760px;margin:24px auto;padding:0 16px}
-    .card{background:#fff;border:1px solid #dbe2ef;border-radius:10px;padding:16px;box-shadow:0 6px 18px rgba(0,0,0,.06)}
-    .grid{display:grid;gap:10px} label{display:grid;gap:5px;font-size:14px}
-    input,textarea{width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:8px;padding:10px 11px}
-    textarea{min-height:90px;resize:vertical} button{border:1px solid #1d4ed8;background:#1d4ed8;color:#fff;border-radius:8px;padding:9px 13px;font-weight:600;cursor:pointer}
+    .wrap{max-width:860px;margin:24px auto;padding:0 16px}
+    .card{background:#fff;border:1px solid #dbe2ef;border-radius:10px;padding:18px;box-shadow:0 6px 18px rgba(0,0,0,.06)}
+    .grid{display:grid;gap:12px}
+    fieldset{border:1px solid #dbe2ef;border-radius:8px;padding:12px;margin:0}
+    legend{font-weight:600;padding:0 6px}
+    .q{display:grid;gap:6px}
+    .q label{font-size:14px}
+    input[type="text"],textarea{width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:8px;padding:9px 10px}
+    textarea{min-height:80px;resize:vertical}
+    .inline{display:flex;flex-wrap:wrap;gap:12px}
+    .likert{display:flex;gap:14px;flex-wrap:wrap}
+    button{border:1px solid #1d4ed8;background:#1d4ed8;color:#fff;border-radius:8px;padding:10px 14px;font-weight:600;cursor:pointer}
     .status{margin-top:10px;font-size:14px}
+    .hint{font-size:13px;color:#4b5563}
   </style>
 </head>
 <body>
   <div class="wrap"><div class="card">
     <h1>Post-trial Questionnaire</h1>
+    <p class="hint">Thinking about the instructions you just used for the CPAP device and the tasks you completed, please answer these questions.</p>
+    <p class="hint">For statements 1–7: 1 = Strongly disagree, 5 = Strongly agree.</p>
+
     <div class="grid">
-      <label>Participant ID<input id="participant_id" type="text" required /></label>
-      <label>Observer ID<input id="observer_id" type="text" /></label>
-      <label>Post confidence (1-5)<input id="confidence" type="number" min="1" max="5" /></label>
-      <label>Comments<textarea id="notes" placeholder="Any post-trial comments"></textarea></label>
+      <fieldset>
+        <legend>Session Details</legend>
+        <div class="q">
+          <label>Participant ID<input id="participant_id" type="text" required /></label>
+          <label>Observer ID<input id="observer_id" type="text" /></label>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>A. Usability of the instructions</legend>
+        <div class="grid">
+          <div class="q">
+            <div>1. The instructions I used were easy to understand.</div>
+            <div class="likert"><label><input type="radio" name="post_q1" value="1" /> 1</label><label><input type="radio" name="post_q1" value="2" /> 2</label><label><input type="radio" name="post_q1" value="3" /> 3</label><label><input type="radio" name="post_q1" value="4" /> 4</label><label><input type="radio" name="post_q1" value="5" /> 5</label></div>
+          </div>
+          <div class="q">
+            <div>2. It was easy to find the specific information I needed (for example, cleaning, errors, operating conditions).</div>
+            <div class="likert"><label><input type="radio" name="post_q2" value="1" /> 1</label><label><input type="radio" name="post_q2" value="2" /> 2</label><label><input type="radio" name="post_q2" value="3" /> 3</label><label><input type="radio" name="post_q2" value="4" /> 4</label><label><input type="radio" name="post_q2" value="5" /> 5</label></div>
+          </div>
+          <div class="q">
+            <div>3. The instructions helped me know what to do step by step during setup and use.</div>
+            <div class="likert"><label><input type="radio" name="post_q3" value="1" /> 1</label><label><input type="radio" name="post_q3" value="2" /> 2</label><label><input type="radio" name="post_q3" value="3" /> 3</label><label><input type="radio" name="post_q3" value="4" /> 4</label><label><input type="radio" name="post_q3" value="5" /> 5</label></div>
+          </div>
+          <div class="q">
+            <div>4. Overall, I am satisfied with the instructions I used.</div>
+            <div class="likert"><label><input type="radio" name="post_q4" value="1" /> 1</label><label><input type="radio" name="post_q4" value="2" /> 2</label><label><input type="radio" name="post_q4" value="3" /> 3</label><label><input type="radio" name="post_q4" value="4" /> 4</label><label><input type="radio" name="post_q4" value="5" /> 5</label></div>
+          </div>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>B. Confidence after using the instructions</legend>
+        <div class="grid">
+          <div class="q">
+            <div>5. I now feel confident that I could set up this type of device at home using this kind of instructions.</div>
+            <div class="likert"><label><input type="radio" name="post_q5" value="1" /> 1</label><label><input type="radio" name="post_q5" value="2" /> 2</label><label><input type="radio" name="post_q5" value="3" /> 3</label><label><input type="radio" name="post_q5" value="4" /> 4</label><label><input type="radio" name="post_q5" value="5" /> 5</label></div>
+          </div>
+          <div class="q">
+            <div>6. I now feel confident that I could solve a problem for this type of device.</div>
+            <div class="likert"><label><input type="radio" name="post_q6" value="1" /> 1</label><label><input type="radio" name="post_q6" value="2" /> 2</label><label><input type="radio" name="post_q6" value="3" /> 3</label><label><input type="radio" name="post_q6" value="4" /> 4</label><label><input type="radio" name="post_q6" value="5" /> 5</label></div>
+          </div>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>C. Perceived effort and preference</legend>
+        <div class="grid">
+          <div class="q">
+            <div>7. Using these instructions required a lot of mental effort.</div>
+            <div class="likert"><label><input type="radio" name="post_q7" value="1" /> 1</label><label><input type="radio" name="post_q7" value="2" /> 2</label><label><input type="radio" name="post_q7" value="3" /> 3</label><label><input type="radio" name="post_q7" value="4" /> 4</label><label><input type="radio" name="post_q7" value="5" /> 5</label></div>
+          </div>
+          <div class="q">
+            <div>8. If you had to learn to use a similar medical device at home in the future, which format would you prefer?</div>
+            <div class="grid">
+              <label><input type="radio" name="format_preference" value="printed_instructions" /> Printed instructions</label>
+              <label><input type="radio" name="format_preference" value="online_website_or_pdf" /> Online (website or PDF)</label>
+              <label><input type="radio" name="format_preference" value="mix_of_both" /> A mix of both</label>
+              <label><input type="radio" name="format_preference" value="no_preference" /> No preference</label>
+            </div>
+          </div>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Additional Notes</legend>
+        <label>Optional
+          <textarea id="notes" placeholder="Any post-trial comments"></textarea>
+        </label>
+      </fieldset>
+
       <button id="submit" type="button">Submit Post-trial</button>
+      <div class="status" id="status"></div>
     </div>
-    <div class="status" id="status"></div>
   </div></div>
+
   <script>
     const host = window.location.hostname;
     const isLocalHost = host === 'localhost' || host === '127.0.0.1';
@@ -34,26 +112,55 @@
     const endpoint = (isLocalHost || isHostedChat)
       ? '/api/physical-trial'
       : 'https://chat.medtechguides.uk/api/physical-trial';
+
     const statusEl = document.getElementById('status');
+
+    const radioValue = (name) => {
+      const selected = document.querySelector(`input[name="${name}"]:checked`);
+      return selected ? String(selected.value || '').trim() : '';
+    };
+
     document.getElementById('submit').addEventListener('click', async () => {
       const participantId = String(document.getElementById('participant_id').value || '').trim();
-      if (!participantId) { statusEl.textContent = 'Participant ID is required.'; return; }
-      const confidence = String(document.getElementById('confidence').value || '').trim();
-      const notes = String(document.getElementById('notes').value || '').trim();
-      const observerId = String(document.getElementById('observer_id').value || '').trim();
+      if (!participantId) {
+        statusEl.textContent = 'Participant ID is required.';
+        return;
+      }
+
+      const responseData = {
+        post_q1_1_to_5: radioValue('post_q1'),
+        post_q2_1_to_5: radioValue('post_q2'),
+        post_q3_1_to_5: radioValue('post_q3'),
+        post_q4_1_to_5: radioValue('post_q4'),
+        post_q5_1_to_5: radioValue('post_q5'),
+        post_q6_1_to_5: radioValue('post_q6'),
+        post_q7_1_to_5: radioValue('post_q7'),
+        format_preference: radioValue('format_preference'),
+        free_text_notes: String(document.getElementById('notes').value || '').trim()
+      };
+
       const payload = {
         timestamp: new Date().toISOString(),
         session_id: `phys_${Date.now().toString(36)}`,
         participant_id: participantId,
-        observer_id: observerId,
+        observer_id: String(document.getElementById('observer_id').value || '').trim(),
         task_id: 'post-trial-questionnaire',
         task_label: 'Post-trial questionnaire',
         event_type: 'note',
-        notes: `confidence=${confidence || 'n/a'}; ${notes}`,
+        notes: JSON.stringify(responseData),
         manual_page: 'questionnaire:post'
       };
-      const response = await fetch(endpoint, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload) });
-      statusEl.textContent = response.ok ? 'Submitted.' : 'Failed to submit.';
+
+      try {
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        statusEl.textContent = response.ok ? 'Submitted.' : 'Failed to submit.';
+      } catch {
+        statusEl.textContent = 'Failed to submit.';
+      }
     });
   </script>
 </body>

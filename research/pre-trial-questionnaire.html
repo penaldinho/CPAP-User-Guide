@@ -7,26 +7,130 @@
   <title>Pre-trial Questionnaire</title>
   <style>
     body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:#f4f6fb;color:#1f2937;margin:0}
-    .wrap{max-width:760px;margin:24px auto;padding:0 16px}
-    .card{background:#fff;border:1px solid #dbe2ef;border-radius:10px;padding:16px;box-shadow:0 6px 18px rgba(0,0,0,.06)}
-    .grid{display:grid;gap:10px} label{display:grid;gap:5px;font-size:14px}
-    input,textarea{width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:8px;padding:10px 11px}
-    textarea{min-height:90px;resize:vertical} button{border:1px solid #1d4ed8;background:#1d4ed8;color:#fff;border-radius:8px;padding:9px 13px;font-weight:600;cursor:pointer}
+    .wrap{max-width:860px;margin:24px auto;padding:0 16px}
+    .card{background:#fff;border:1px solid #dbe2ef;border-radius:10px;padding:18px;box-shadow:0 6px 18px rgba(0,0,0,.06)}
+    .grid{display:grid;gap:12px}
+    fieldset{border:1px solid #dbe2ef;border-radius:8px;padding:12px;margin:0}
+    legend{font-weight:600;padding:0 6px}
+    .q{display:grid;gap:6px}
+    .q label{font-size:14px}
+    input[type="text"],input[type="number"],textarea{width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:8px;padding:9px 10px}
+    textarea{min-height:80px;resize:vertical}
+    .inline{display:flex;flex-wrap:wrap;gap:12px}
+    .likert{display:flex;gap:14px;flex-wrap:wrap}
+    button{border:1px solid #1d4ed8;background:#1d4ed8;color:#fff;border-radius:8px;padding:10px 14px;font-weight:600;cursor:pointer}
     .status{margin-top:10px;font-size:14px}
+    .hint{font-size:13px;color:#4b5563}
   </style>
 </head>
 <body>
   <div class="wrap"><div class="card">
     <h1>Pre-trial Questionnaire</h1>
+    <p class="hint">These questions are about you and how confident you feel using new devices. There are no right or wrong answers.</p>
+
     <div class="grid">
-      <label>Participant ID<input id="participant_id" type="text" required /></label>
-      <label>Observer ID<input id="observer_id" type="text" /></label>
-      <label>Baseline confidence (1-5)<input id="confidence" type="number" min="1" max="5" /></label>
-      <label>Notes<textarea id="notes" placeholder="Any pre-trial comments"></textarea></label>
+      <fieldset>
+        <legend>Session Details</legend>
+        <div class="q">
+          <label>Participant ID<input id="participant_id" type="text" required /></label>
+          <label>Observer ID<input id="observer_id" type="text" /></label>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>A. About you</legend>
+        <div class="grid">
+          <div class="q">
+            <label>1. Age (years)
+              <input id="age_years" type="number" min="0" max="120" />
+            </label>
+          </div>
+
+          <div class="q">
+            <div>2. Gender</div>
+            <div class="inline">
+              <label><input type="radio" name="gender" value="woman" /> Woman</label>
+              <label><input type="radio" name="gender" value="man" /> Man</label>
+              <label><input type="radio" name="gender" value="non_binary_other" /> Non binary / other</label>
+              <label><input type="radio" name="gender" value="prefer_not_say" /> Prefer not to say</label>
+            </div>
+          </div>
+
+          <div class="q">
+            <div>3. Highest level of education completed</div>
+            <div class="grid">
+              <label><input type="radio" name="education" value="secondary_or_below" /> Secondary school or below</label>
+              <label><input type="radio" name="education" value="further_education" /> Further education (college/apprenticeship)</label>
+              <label><input type="radio" name="education" value="university_degree" /> University degree</label>
+              <label><input type="radio" name="education" value="postgraduate_degree" /> Postgraduate degree</label>
+            </div>
+          </div>
+
+          <div class="q">
+            <div>4. Experience with home medical or monitoring devices (tick all that apply)</div>
+            <div class="grid">
+              <label><input type="checkbox" name="device_experience" value="none" /> None</label>
+              <label><input type="checkbox" name="device_experience" value="blood_pressure_monitor" /> Blood pressure monitor</label>
+              <label><input type="checkbox" name="device_experience" value="blood_glucose_monitor" /> Blood glucose monitor</label>
+              <label><input type="checkbox" name="device_experience" value="inhaler_nebuliser" /> Inhaler / nebuliser</label>
+              <label><input type="checkbox" name="device_experience" value="sleep_fitness_tracker" /> Sleep or fitness tracker</label>
+              <label><input type="checkbox" name="device_experience" value="other" /> Other</label>
+            </div>
+            <label>Other (if selected)
+              <input id="device_experience_other" type="text" />
+            </label>
+          </div>
+
+          <div class="q">
+            <div>5. Comfort with technology (websites, apps, online forms) — 1 = Not at all comfortable, 5 = Extremely comfortable</div>
+            <div class="likert">
+              <label><input type="radio" name="tech_comfort" value="1" /> 1</label>
+              <label><input type="radio" name="tech_comfort" value="2" /> 2</label>
+              <label><input type="radio" name="tech_comfort" value="3" /> 3</label>
+              <label><input type="radio" name="tech_comfort" value="4" /> 4</label>
+              <label><input type="radio" name="tech_comfort" value="5" /> 5</label>
+            </div>
+          </div>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>B. Baseline confidence</legend>
+        <p class="hint">Please tick one box for each statement. 1 = Strongly disagree, 5 = Strongly agree.</p>
+        <div class="grid">
+          <div class="q">
+            <div>6. I feel confident I could set up an unfamiliar medical device at home using available guidance (for example, written, online, or video materials).</div>
+            <div class="likert">
+              <label><input type="radio" name="baseline_q6" value="1" /> 1</label><label><input type="radio" name="baseline_q6" value="2" /> 2</label><label><input type="radio" name="baseline_q6" value="3" /> 3</label><label><input type="radio" name="baseline_q6" value="4" /> 4</label><label><input type="radio" name="baseline_q6" value="5" /> 5</label>
+            </div>
+          </div>
+          <div class="q">
+            <div>7. I usually find it easy to follow step by step instructions for new equipment.</div>
+            <div class="likert">
+              <label><input type="radio" name="baseline_q7" value="1" /> 1</label><label><input type="radio" name="baseline_q7" value="2" /> 2</label><label><input type="radio" name="baseline_q7" value="3" /> 3</label><label><input type="radio" name="baseline_q7" value="4" /> 4</label><label><input type="radio" name="baseline_q7" value="5" /> 5</label>
+            </div>
+          </div>
+          <div class="q">
+            <div>8. I would feel confident trying to solve a problem with a home medical device (for example, resolving an error message).</div>
+            <div class="likert">
+              <label><input type="radio" name="baseline_q8" value="1" /> 1</label><label><input type="radio" name="baseline_q8" value="2" /> 2</label><label><input type="radio" name="baseline_q8" value="3" /> 3</label><label><input type="radio" name="baseline_q8" value="4" /> 4</label><label><input type="radio" name="baseline_q8" value="5" /> 5</label>
+            </div>
+          </div>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Additional Notes</legend>
+        <label>Optional
+          <textarea id="notes" placeholder="Any pre-trial comments"></textarea>
+        </label>
+      </fieldset>
+
       <button id="submit" type="button">Submit Pre-trial</button>
+      <div class="status" id="status"></div>
     </div>
-    <div class="status" id="status"></div>
   </div></div>
+
   <script>
     const host = window.location.hostname;
     const isLocalHost = host === 'localhost' || host === '127.0.0.1';
@@ -34,26 +138,60 @@
     const endpoint = (isLocalHost || isHostedChat)
       ? '/api/physical-trial'
       : 'https://chat.medtechguides.uk/api/physical-trial';
+
     const statusEl = document.getElementById('status');
+
+    const radioValue = (name) => {
+      const selected = document.querySelector(`input[name="${name}"]:checked`);
+      return selected ? String(selected.value || '').trim() : '';
+    };
+
+    const checkboxValues = (name) => Array.from(document.querySelectorAll(`input[name="${name}"]:checked`))
+      .map((el) => String(el.value || '').trim())
+      .filter(Boolean);
+
     document.getElementById('submit').addEventListener('click', async () => {
       const participantId = String(document.getElementById('participant_id').value || '').trim();
-      if (!participantId) { statusEl.textContent = 'Participant ID is required.'; return; }
-      const confidence = String(document.getElementById('confidence').value || '').trim();
-      const notes = String(document.getElementById('notes').value || '').trim();
-      const observerId = String(document.getElementById('observer_id').value || '').trim();
+      if (!participantId) {
+        statusEl.textContent = 'Participant ID is required.';
+        return;
+      }
+
+      const responseData = {
+        age_years: String(document.getElementById('age_years').value || '').trim(),
+        gender: radioValue('gender'),
+        education: radioValue('education'),
+        device_experience: checkboxValues('device_experience'),
+        device_experience_other: String(document.getElementById('device_experience_other').value || '').trim(),
+        tech_comfort_1_to_5: radioValue('tech_comfort'),
+        baseline_q6_1_to_5: radioValue('baseline_q6'),
+        baseline_q7_1_to_5: radioValue('baseline_q7'),
+        baseline_q8_1_to_5: radioValue('baseline_q8'),
+        free_text_notes: String(document.getElementById('notes').value || '').trim()
+      };
+
       const payload = {
         timestamp: new Date().toISOString(),
         session_id: `phys_${Date.now().toString(36)}`,
         participant_id: participantId,
-        observer_id: observerId,
+        observer_id: String(document.getElementById('observer_id').value || '').trim(),
         task_id: 'pre-trial-questionnaire',
         task_label: 'Pre-trial questionnaire',
         event_type: 'note',
-        notes: `confidence=${confidence || 'n/a'}; ${notes}`,
+        notes: JSON.stringify(responseData),
         manual_page: 'questionnaire:pre'
       };
-      const response = await fetch(endpoint, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload) });
-      statusEl.textContent = response.ok ? 'Submitted.' : 'Failed to submit.';
+
+      try {
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        statusEl.textContent = response.ok ? 'Submitted.' : 'Failed to submit.';
+      } catch {
+        statusEl.textContent = 'Failed to submit.';
+      }
     });
   </script>
 </body>
