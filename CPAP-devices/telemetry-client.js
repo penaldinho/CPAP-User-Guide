@@ -6,6 +6,8 @@
   const taskStateKey = 'mtg-telemetry-task-state';
   const lastTaskResultKey = 'mtg-telemetry-last-task-result';
   const tabTaskSubscribedKey = 'mtg-telemetry-tab-task-subscribed';
+  let shortFormAutoFocusTaskId = '';
+  let isTaskPromptExpanded = false;
 
   const getApiUrl = () => {
     const host = window.location.hostname;
@@ -860,12 +862,13 @@
     const card = document.createElement('aside');
     card.id = 'mtg-task-prompt-card';
     card.style.position = 'fixed';
-    card.style.left = '12px';
-    card.style.top = '12px';
-    card.style.width = '420px';
+    card.style.left = '50%';
+    card.style.bottom = '96px';
+    card.style.transform = 'translateX(-50%)';
+    card.style.width = 'min(720px, calc(100vw - 24px))';
     card.style.maxWidth = 'calc(100vw - 24px)';
     card.style.maxHeight = '42vh';
-    card.style.overflow = 'auto';
+    card.style.overflow = 'hidden';
     card.style.background = '#ffffff';
     card.style.border = '1px solid #d7dce5';
     card.style.borderRadius = '10px';
@@ -880,6 +883,13 @@
     return card;
   };
 
+  const setTaskPromptExpanded = (expanded) => {
+    const next = Boolean(expanded);
+    if (isTaskPromptExpanded === next) return;
+    isTaskPromptExpanded = next;
+    syncTaskPromptCard();
+  };
+
   const formatElapsedDuration = (durationMs) => {
     const totalSeconds = Math.max(0, Math.floor((durationMs || 0) / 1000));
     const minutes = Math.floor(totalSeconds / 60);
@@ -891,6 +901,7 @@
     const taskState = getTaskState();
     const card = ensureTaskPromptCard();
     if (!taskState || !taskState.task_id) {
+      isTaskPromptExpanded = false;
       card.style.display = 'none';
       card.innerHTML = '';
       return;
@@ -904,6 +915,10 @@
     const entry = presetTaskDescriptions[taskId] || null;
     const displayLabel = (entry && entry.title) || fallbackLabel || taskId;
     const lines = entry && Array.isArray(entry.steps) ? entry.steps : [];
+    const isExpanded = isTaskPromptExpanded;
+    const promptHint = isExpanded
+      ? 'Move away from the action box to collapse'
+      : 'Hover the action box below to expand';
     const listMarkup = lines.length
       ? `<ul style="margin:8px 0 0 18px; padding:0; display:grid; gap:6px;">${lines.map((line) => `<li style="line-height:1.35;">${escapeHtml(line)}</li>`).join('')}</ul>`
       : '<div style="margin-top:8px; color:#4b5563; line-height:1.35;">Follow the task instructions and inform the assessor when complete.</div>';
@@ -914,9 +929,14 @@
         <span style="font-size:11px; color:#475569; background:#f1f5f9; border:1px solid #e2e8f0; border-radius:999px; padding:2px 8px;">${escapeHtml(taskId)}</span>
       </div>
       <div style="margin-top:6px; font-size:12px; color:#334155; font-weight:600;">Elapsed: ${escapeHtml(elapsedText)}</div>
-      <div style="margin-top:6px; font-size:13px; font-weight:600; line-height:1.3;">${escapeHtml(displayLabel)}</div>
-      ${listMarkup}
+      <div style="margin-top:6px; font-size:11px; color:#64748b;">${escapeHtml(promptHint)}</div>
+      <div style="margin-top:6px; display:${isExpanded ? 'block' : 'none'};">
+        <div style="font-size:13px; font-weight:600; line-height:1.3;">${escapeHtml(displayLabel)}</div>
+        ${listMarkup}
+      </div>
     `;
+    card.style.maxHeight = isExpanded ? '42vh' : '74px';
+    card.style.overflow = isExpanded ? 'auto' : 'hidden';
     card.style.display = 'block';
   };
 
@@ -1097,6 +1117,24 @@
 
     wrap.appendChild(shortFormWrap);
     wrap.appendChild(button);
+
+    wrap.addEventListener('mouseenter', () => {
+      setTaskPromptExpanded(true);
+    });
+    wrap.addEventListener('mouseleave', () => {
+      setTaskPromptExpanded(false);
+    });
+    wrap.addEventListener('focusin', () => {
+      setTaskPromptExpanded(true);
+    });
+    wrap.addEventListener('focusout', () => {
+      window.setTimeout(() => {
+        if (!wrap.contains(document.activeElement)) {
+          setTaskPromptExpanded(false);
+        }
+      }, 0);
+    });
+
     document.body.appendChild(wrap);
     return wrap;
   };
@@ -1113,6 +1151,10 @@
 
     wrap.style.display = taskId ? 'block' : 'none';
 
+    if (!taskId) {
+      setTaskPromptExpanded(false);
+    }
+
     if (shortFormLabel) {
       const questionLabel = presetTaskDescriptions[taskId] ? presetTaskDescriptions[taskId].title : 'Short-form question';
       shortFormLabel.textContent = `Answer: ${questionLabel}`;
@@ -1124,8 +1166,32 @@
     if (endBtn) {
       endBtn.style.display = isShortFormTask && taskId ? 'none' : 'inline-block';
     }
-    if (isShortFormTask && shortFormInput && document.activeElement !== shortFormInput) {
+
+    if (!isShortFormTask || !taskId) {
+      shortFormAutoFocusTaskId = '';
+      return;
+    }
+
+    if (!shortFormInput) {
+      return;
+    }
+
+    const activeElement = document.activeElement;
+    const isTypingElsewhere = Boolean(
+      activeElement
+      && activeElement !== shortFormInput
+      && activeElement !== document.body
+      && activeElement !== document.documentElement
+      && (
+        ['INPUT', 'TEXTAREA', 'SELECT'].includes(activeElement.tagName)
+        || activeElement.isContentEditable
+        || (activeElement.closest && activeElement.closest('[contenteditable="true"], [role="textbox"]'))
+      )
+    );
+
+    if (!isTypingElsewhere && shortFormAutoFocusTaskId !== taskId) {
       shortFormInput.focus();
+      shortFormAutoFocusTaskId = taskId;
     }
   };
 
