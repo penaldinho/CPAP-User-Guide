@@ -1044,8 +1044,8 @@
     const displayLabel = (entry && entry.title) || fallbackLabel || taskId;
     const lines = entry && Array.isArray(entry.steps) ? entry.steps : [];
     const collapsedDescription = String((entry && entry.collapsedDescription) || '').trim();
+    const scenarioDescription = collapsedDescription || (lines.length ? String(lines[0] || '').trim() : '');
     const isExpanded = isTaskPromptExpanded;
-    const showCollapsedDescription = !isExpanded && Boolean(collapsedDescription);
     const promptHint = isExpanded
       ? 'Move cursor away from this card to collapse'
       : 'Hover this card to expand';
@@ -1053,7 +1053,7 @@
       ? 'Type your answer in the box below, then click Submit answer.'
       : 'When finished, click “I have finished this task”.';
     const listMarkup = lines.length
-      ? `<ul style="margin:8px 0 0 18px; padding:0; display:grid; gap:6px;">${lines.map((line) => `<li style="line-height:1.35;">${escapeHtml(line)}</li>`).join('')}</ul>`
+      ? `<ul style="margin:0 0 0 18px; padding:0; display:grid; gap:6px;">${lines.map((line) => `<li style="line-height:1.35;">${escapeHtml(line)}</li>`).join('')}</ul>`
       : '<div style="margin-top:8px; color:#4b5563; line-height:1.35;">Follow the task instructions and inform the observer when complete.</div>';
 
     card.innerHTML = `
@@ -1062,16 +1062,16 @@
         <span style="font-size:11px; color:#475569; background:#f1f5f9; border:1px solid #e2e8f0; border-radius:999px; padding:2px 8px;">${escapeHtml(taskId)}</span>
       </div>
       <div style="margin-top:6px; font-size:12px; color:#334155; font-weight:600;">Elapsed: ${escapeHtml(elapsedText)}</div>
+      <div style="margin-top:8px; color:#334155; line-height:1.35; font-size:12px; overflow:hidden; display:${scenarioDescription ? '-webkit-box' : 'none'}; -webkit-line-clamp:${isExpanded ? '3' : '2'}; -webkit-box-orient:vertical;">${escapeHtml(scenarioDescription)}</div>
       <div style="margin-top:6px; font-size:11px; color:#64748b;">${escapeHtml(promptHint)}</div>
-      <div style="margin-top:6px; display:${showCollapsedDescription ? 'block' : 'none'}; color:#334155; line-height:1.35; font-size:12px; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;">${escapeHtml(collapsedDescription)}</div>
-      <div style="margin-top:6px; display:${isExpanded ? 'block' : 'none'};">
+      <div style="margin-top:8px; display:${isExpanded ? 'block' : 'none'};">
         <div style="font-size:13px; font-weight:600; line-height:1.3;">${escapeHtml(displayLabel)}</div>
-        ${listMarkup}
+        <div style="margin-top:8px; font-size:12px; color:#334155; line-height:1.35;">${listMarkup}</div>
         <div style="margin-top:8px; color:#334155; line-height:1.35; font-size:12px;">${escapeHtml(completionInstruction)}</div>
       </div>
     `;
     card.style.bottom = isShortFormTask ? '170px' : '96px';
-    card.style.maxHeight = isExpanded ? '42vh' : (showCollapsedDescription ? '116px' : '74px');
+    card.style.maxHeight = isExpanded ? '42vh' : (scenarioDescription ? '138px' : '86px');
     card.style.overflow = isExpanded ? 'auto' : 'hidden';
     card.style.display = 'block';
     updateTaskCardSafeArea();
