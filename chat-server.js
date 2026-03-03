@@ -529,6 +529,27 @@ const parseBoundedIntegerSafely = (value, min, max) => {
   return parsed;
 };
 
+const parseBooleanSafely = (value) => {
+  if (value === true || value === false) {
+    return value;
+  }
+
+  const normalized = String(value || '').trim().toLowerCase();
+  if (!normalized) {
+    return null;
+  }
+
+  if (['true', '1', 'yes', 'y'].includes(normalized)) {
+    return true;
+  }
+
+  if (['false', '0', 'no', 'n'].includes(normalized)) {
+    return false;
+  }
+
+  return null;
+};
+
 const includesChoice = (values, expected) => {
   if (!Array.isArray(values)) {
     return false;
@@ -884,6 +905,7 @@ const insertQuestionnaireRecordPostgres = async (record) => {
         baseline_q6,
         baseline_q7,
         baseline_q8,
+        consent_to_participate,
         device_experience_none,
         device_experience_blood_pressure_monitor,
         device_experience_blood_glucose_monitor,
@@ -895,7 +917,7 @@ const insertQuestionnaireRecordPostgres = async (record) => {
         raw_response
       )
       VALUES (
-        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21
+        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22
       )
     `;
 
@@ -912,6 +934,7 @@ const insertQuestionnaireRecordPostgres = async (record) => {
       parseLikertSafely(response.baseline_q6_1_to_5),
       parseLikertSafely(response.baseline_q7_1_to_5),
       parseLikertSafely(response.baseline_q8_1_to_5),
+      parseBooleanSafely(response.consent_to_participate),
       includesChoice(deviceExperience, 'none'),
       includesChoice(deviceExperience, 'blood_pressure_monitor'),
       includesChoice(deviceExperience, 'blood_glucose_monitor'),

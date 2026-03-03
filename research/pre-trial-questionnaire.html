@@ -62,8 +62,8 @@
           <div class="q" id="q-gender">
             <div>2. Gender<span class="req">*</span></div>
             <div class="inline">
-              <label><input type="radio" name="gender" value="woman" /> Woman</label>
-              <label><input type="radio" name="gender" value="man" /> Man</label>
+              <label><input type="radio" name="gender" value="female" /> Female</label>
+              <label><input type="radio" name="gender" value="male" /> Male</label>
               <label><input type="radio" name="gender" value="non_binary_other" /> Non binary / other</label>
               <label><input type="radio" name="gender" value="prefer_not_say" /> Prefer not to say</label>
             </div>
@@ -148,6 +148,18 @@
       </fieldset>
 
       <fieldset>
+        <legend>C. Consent</legend>
+        <div class="q" id="q-consent">
+          <label>
+            <input id="consent_participation" type="checkbox" />
+            I consent to taking part in this study.<span class="req">*</span>
+          </label>
+          <div class="hint">No directly identifiable personal data (such as name, address, or contact details) will be collected in this questionnaire.</div>
+          <div class="error-hint"></div>
+        </div>
+      </fieldset>
+
+      <fieldset>
         <legend>Additional Notes</legend>
         <label>Optional
           <textarea id="notes" placeholder="Any pre-trial comments"></textarea>
@@ -201,6 +213,7 @@
       document.getElementById('age_years').value = '';
       document.getElementById('device_experience_other').value = '';
       document.getElementById('notes').value = '';
+      document.getElementById('consent_participation').checked = false;
       document.querySelectorAll('input[type="radio"]').forEach((el) => {
         el.checked = false;
       });
@@ -230,6 +243,7 @@
       const baselineQ6 = radioValue('baseline_q6');
       const baselineQ7 = radioValue('baseline_q7');
       const baselineQ8 = radioValue('baseline_q8');
+      const consentParticipation = Boolean(document.getElementById('consent_participation').checked);
 
       let hasErrors = false;
       if (!ageYears) { setQuestionError('q-age', 'Please provide your age.'); hasErrors = true; }
@@ -256,6 +270,11 @@
         hasErrors = true;
       }
 
+      if (!consentParticipation) {
+        setQuestionError('q-consent', 'You must provide consent before submitting.');
+        hasErrors = true;
+      }
+
       if (hasErrors) {
         statusEl.textContent = 'Please fix the highlighted fields.';
         return;
@@ -271,6 +290,7 @@
         baseline_q6_1_to_5: baselineQ6,
         baseline_q7_1_to_5: baselineQ7,
         baseline_q8_1_to_5: baselineQ8,
+        consent_to_participate: consentParticipation,
         free_text_notes: String(document.getElementById('notes').value || '').trim()
       };
 
@@ -288,14 +308,18 @@
       try {
         submitBtn.disabled = true;
         submitBtn.textContent = 'Submitting...';
+        const submittedAtIso = payload.timestamp;
         const response = await fetch(endpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
         });
         if (response.ok) {
-          clearPreTrialForm();
-          statusEl.textContent = 'Submitted.';
+          const confirmationUrl = new URL('questionnaire-submitted.html', window.location.href);
+          confirmationUrl.searchParams.set('type', 'pre-trial');
+          confirmationUrl.searchParams.set('participant', participantId);
+          confirmationUrl.searchParams.set('submittedAt', submittedAtIso);
+          window.location.href = confirmationUrl.toString();
         } else {
           statusEl.textContent = 'Failed to submit.';
         }

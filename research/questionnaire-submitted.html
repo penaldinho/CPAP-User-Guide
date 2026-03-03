@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex,nofollow,noarchive" />
+  <title>Questionnaire Submitted</title>
+  <style>
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:#f4f6fb;color:#1f2937;margin:0}
+    .wrap{max-width:760px;margin:48px auto;padding:0 16px}
+    .card{background:#fff;border:1px solid #dbe2ef;border-radius:10px;padding:22px;box-shadow:0 6px 18px rgba(0,0,0,.06)}
+    h1{margin:0 0 10px}
+    p{margin:8px 0}
+    .meta{margin-top:12px;padding:12px;border-radius:8px;background:#f8fafc;border:1px solid #e2e8f0}
+    .actions{margin-top:18px;display:flex;flex-wrap:wrap;gap:10px}
+    a.button{display:inline-block;border:1px solid #1d4ed8;background:#1d4ed8;color:#fff;border-radius:8px;padding:10px 14px;font-weight:600;text-decoration:none}
+    a.link{display:inline-block;border:1px solid #94a3b8;background:#fff;color:#1f2937;border-radius:8px;padding:10px 14px;font-weight:600;text-decoration:none}
+  </style>
+</head>
+<body>
+  <div class="wrap"><div class="card">
+    <h1>Thank you</h1>
+    <p>Your answers have been recorded.</p>
+    <p id="typeText">Questionnaire submitted.</p>
+    <div class="meta">
+      <p><strong>Submitted at:</strong> <span id="submittedAt">-</span></p>
+      <p><strong>Participant ID:</strong> <span id="participantId">-</span></p>
+    </div>
+    <div class="actions">
+      <a class="button" href="trial-portal.html">Return to trial portal</a>
+      <a class="link" id="againLink" href="pre-trial-questionnaire.html">Submit another questionnaire</a>
+    </div>
+  </div></div>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const submittedAtParam = String(params.get('submittedAt') || '').trim();
+    const participant = String(params.get('participant') || '').trim();
+    const type = String(params.get('type') || '').trim();
+
+    const typeText = document.getElementById('typeText');
+    const submittedAtEl = document.getElementById('submittedAt');
+    const participantIdEl = document.getElementById('participantId');
+    const againLink = document.getElementById('againLink');
+
+    if (type === 'post-trial') {
+      typeText.textContent = 'Post-trial questionnaire submitted.';
+      againLink.href = 'post-trial-questionnaire.html';
+      againLink.textContent = 'Submit another post-trial questionnaire';
+    } else {
+      typeText.textContent = 'Pre-trial questionnaire submitted.';
+      againLink.href = 'pre-trial-questionnaire.html';
+      againLink.textContent = 'Submit another pre-trial questionnaire';
+    }
+
+    if (participant) {
+      participantIdEl.textContent = participant;
+    }
+
+    if (submittedAtParam) {
+      const submittedDate = new Date(submittedAtParam);
+      if (!Number.isNaN(submittedDate.getTime())) {
+        submittedAtEl.textContent = submittedDate.toLocaleString();
+      } else {
+        submittedAtEl.textContent = submittedAtParam;
+      }
+    }
+  </script>
+</body>
+</html>

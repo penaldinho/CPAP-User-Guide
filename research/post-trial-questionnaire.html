@@ -228,14 +228,18 @@
       try {
         submitBtn.disabled = true;
         submitBtn.textContent = 'Submitting...';
+        const submittedAtIso = payload.timestamp;
         const response = await fetch(endpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
         });
         if (response.ok) {
-          clearPostTrialForm();
-          statusEl.textContent = 'Submitted.';
+          const confirmationUrl = new URL('questionnaire-submitted.html', window.location.href);
+          confirmationUrl.searchParams.set('type', 'post-trial');
+          confirmationUrl.searchParams.set('participant', participantId);
+          confirmationUrl.searchParams.set('submittedAt', submittedAtIso);
+          window.location.href = confirmationUrl.toString();
         } else {
           statusEl.textContent = 'Failed to submit.';
         }

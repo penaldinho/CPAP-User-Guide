@@ -225,6 +225,7 @@ CREATE TABLE IF NOT EXISTS pre_trial_questionnaire (
   baseline_q6 INTEGER,
   baseline_q7 INTEGER,
   baseline_q8 INTEGER,
+  consent_to_participate BOOLEAN,
   device_experience_none BOOLEAN,
   device_experience_blood_pressure_monitor BOOLEAN,
   device_experience_blood_glucose_monitor BOOLEAN,
@@ -235,6 +236,9 @@ CREATE TABLE IF NOT EXISTS pre_trial_questionnaire (
   free_text_notes TEXT,
   raw_response JSONB
 );
+
+ALTER TABLE pre_trial_questionnaire
+  ADD COLUMN IF NOT EXISTS consent_to_participate BOOLEAN;
 
 CREATE INDEX IF NOT EXISTS idx_pre_trial_questionnaire_participant_time
   ON pre_trial_questionnaire (participant_id, received_at DESC);
