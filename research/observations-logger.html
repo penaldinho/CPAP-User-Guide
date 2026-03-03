@@ -112,6 +112,23 @@
           Notes
           <textarea id="notes" placeholder="Observer notes"></textarea>
         </label>
+
+        <div class="row-action full">
+          <label style="margin:0;">
+            Error Severity
+            <select id="error_severity">
+              <option value="">Select severity</option>
+              <option value="minor">Minor</option>
+              <option value="major">Major</option>
+            </select>
+          </label>
+          <button id="btn-error" type="button" class="secondary">Submit Error</button>
+        </div>
+
+        <label class="full">
+          Error Description
+          <textarea id="error_text" placeholder="Describe the observed error"></textarea>
+        </label>
       </div>
 
       <div style="margin-top:10px;">
@@ -144,8 +161,10 @@
       const customTaskLabelWrap = el('custom_task_label_wrap');
       const manualPageInput = el('manual_page');
       const scenarioScoreSelect = el('scenario_score');
+      const errorSeveritySelect = el('error_severity');
       const taskTimerEl = el('task_timer');
       const notesInput = el('notes');
+      const errorTextInput = el('error_text');
       const statusEl = el('status');
       const metaEl = el('meta');
       const CUSTOM_TASK_VALUE = '__custom__';
@@ -293,7 +312,9 @@
         const taskId = getTaskIdValue();
         const manualPage = String(manualPageInput.value || '').trim();
         const notes = String(notesInput.value || '').trim();
+        const errorText = String(errorTextInput.value || '').trim();
         const scenarioScoreRaw = String(scenarioScoreSelect.value || '').trim();
+        const errorSeverityRaw = String(errorSeveritySelect.value || '').trim().toLowerCase();
 
         if (actionType === 'page_mark' && !manualPage) {
           setStatus('Enter a manual page before logging a page mark.', false);
@@ -320,6 +341,20 @@
           return false;
         }
 
+        if (actionType === 'error') {
+          if (!['minor', 'major'].includes(errorSeverityRaw)) {
+            setStatus('Select error severity (minor or major).', false);
+            errorSeveritySelect.focus();
+            return false;
+          }
+
+          if (!errorText) {
+            setStatus('Enter an error description before submitting.', false);
+            errorTextInput.focus();
+            return false;
+          }
+        }
+
         const active = getActiveTaskState();
         const currentKey = getCurrentTaskKey();
         const startedAtMs = Date.parse(String(active.started_at || ''));
@@ -336,6 +371,8 @@
           manual_page: manualPage,
           scenario_score: actionType === 'scenario_score' ? Number.parseInt(scenarioScoreRaw, 10) : null,
           task_length_ms: taskLengthMs,
+          error_severity: actionType === 'error' ? errorSeverityRaw : null,
+          error_text: actionType === 'error' ? errorText : '',
           notes,
           action_type: actionType,
           source: 'observations_logger',
@@ -432,11 +469,21 @@
         }
       };
 
+      const logErrorAndClear = async () => {
+        const ok = await submitObservation('error');
+        if (ok) {
+          errorSeveritySelect.value = '';
+          errorTextInput.value = '';
+          errorTextInput.focus();
+        }
+      };
+
       el('btn-start').addEventListener('click', startTask);
       el('btn-end').addEventListener('click', endTask);
       el('btn-page').addEventListener('click', logPageMarkAndClear);
       el('btn-score').addEventListener('click', () => submitObservation('scenario_score'));
       el('btn-note').addEventListener('click', logNoteAndClear);
+      el('btn-error').addEventListener('click', logErrorAndClear);
 
       taskIdSelect.addEventListener('change', syncFromTaskId);
       taskLabelSelect.addEventListener('change', syncFromTaskLabel);

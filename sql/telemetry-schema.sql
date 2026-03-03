@@ -186,6 +186,8 @@ CREATE TABLE IF NOT EXISTS observer_notes (
   manual_page TEXT,
   scenario_score INTEGER,
   task_length_ms INTEGER,
+  error_severity TEXT,
+  error_text TEXT,
   notes TEXT,
   action_type TEXT NOT NULL,
   source TEXT NOT NULL DEFAULT 'observations_logger',
@@ -198,6 +200,12 @@ ALTER TABLE observer_notes
 
 ALTER TABLE observer_notes
   ADD COLUMN IF NOT EXISTS task_length_ms INTEGER;
+
+ALTER TABLE observer_notes
+  ADD COLUMN IF NOT EXISTS error_severity TEXT;
+
+ALTER TABLE observer_notes
+  ADD COLUMN IF NOT EXISTS error_text TEXT;
 
 ALTER TABLE observer_notes
   ALTER COLUMN trial_mode SET DEFAULT 'physical';

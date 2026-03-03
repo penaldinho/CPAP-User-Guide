@@ -242,6 +242,8 @@ const observerNotesSqlColumns = [
   'manual_page',
   'scenario_score',
   'task_length_ms',
+  'error_severity',
+  'error_text',
   'notes',
   'action_type',
   'source',
@@ -309,6 +311,8 @@ const projectObserverNoteRecord = (record) => ({
   manual_page: record.manual_page || '',
   scenario_score: Number.isFinite(parseIntegerSafely(record.scenario_score)) ? parseIntegerSafely(record.scenario_score) : null,
   task_length_ms: Number.isFinite(parseIntegerSafely(record.task_length_ms)) ? parseIntegerSafely(record.task_length_ms) : null,
+  error_severity: record.error_severity || '',
+  error_text: record.error_text || '',
   notes: record.notes || '',
   action_type: record.action_type || '',
   source: record.source || 'observations_logger',
@@ -669,6 +673,10 @@ const normalizeObserverNoteRecordForSql = (record) => {
   return {
     ...projected,
     action_type: actionType,
+    error_severity: ['minor', 'major'].includes(String(projected.error_severity || '').trim().toLowerCase())
+      ? String(projected.error_severity || '').trim().toLowerCase()
+      : null,
+    error_text: String(projected.error_text || '').trim(),
     source: String(projected.source || 'observations_logger').trim() || 'observations_logger',
     trial_mode: String(projected.trial_mode || 'physical').trim().toLowerCase() === 'digital' ? 'digital' : 'physical',
     scenario_score: parseIntegerSafely(projected.scenario_score),
@@ -2094,6 +2102,8 @@ app.post('/api/observer-notes', async (req, res) => {
     const actionType = String(payload && payload.action_type || '').trim().toLowerCase();
     const manualPage = String(payload && payload.manual_page || '').trim();
     const notes = String(payload && payload.notes || '').trim();
+    const errorSeverity = String(payload && payload.error_severity || '').trim().toLowerCase();
+    const errorText = String(payload && payload.error_text || '').trim();
     const scenarioScore = parseIntegerSafely(payload && payload.scenario_score);
     const taskLengthMs = parseIntegerSafely(payload && payload.task_length_ms);
 
@@ -2101,9 +2111,9 @@ app.post('/api/observer-notes', async (req, res) => {
       return res.status(400).json({ error: 'participant_id, task_id, and action_type are required' });
     }
 
-    const allowedActionTypes = new Set(['task_start', 'task_end', 'page_mark', 'scenario_score', 'note']);
+    const allowedActionTypes = new Set(['task_start', 'task_end', 'page_mark', 'scenario_score', 'note', 'error']);
     if (!allowedActionTypes.has(actionType)) {
-      return res.status(400).json({ error: 'action_type must be one of task_start, task_end, page_mark, scenario_score, note' });
+      return res.status(400).json({ error: 'action_type must be one of task_start, task_end, page_mark, scenario_score, note, error' });
     }
 
     if (actionType === 'page_mark' && !manualPage) {
@@ -2123,6 +2133,16 @@ app.post('/api/observer-notes', async (req, res) => {
       return res.status(400).json({ error: 'notes is required for note action_type' });
     }
 
+    if (actionType === 'error') {
+      if (!['minor', 'major'].includes(errorSeverity)) {
+        return res.status(400).json({ error: 'error_severity is required for error action_type and must be minor or major' });
+      }
+
+      if (!errorText) {
+        return res.status(400).json({ error: 'error_text is required for error action_type' });
+      }
+    }
+
     if (actionType === 'task_end' && (taskLengthMs === null || taskLengthMs < 0)) {
       return res.status(400).json({ error: 'task_length_ms is required for task_end and must be >= 0' });
     }
@@ -2134,6 +2154,8 @@ app.post('/api/observer-notes', async (req, res) => {
       participant_id: participantId,
       task_id: taskId,
       action_type: actionType,
+      error_severity: actionType === 'error' ? errorSeverity : null,
+      error_text: actionType === 'error' ? errorText : '',
       scenario_score: actionType === 'scenario_score' ? scenarioScore : null,
       task_length_ms: actionType === 'task_end' ? taskLengthMs : null,
       source: 'observations_logger',
