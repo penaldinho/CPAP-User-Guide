@@ -42,7 +42,7 @@
   <div class="wrap">
     <div class="card">
       <h1>Trial Portal</h1>
-      <p>Participant-facing flow for paper-manual trials. Use this to run scenarios/questions in order and log progression.</p>
+      <p>Guide participants through each scenario and question step by step while progress is logged automatically.</p>
 
       <div id="setup-screen" class="grid">
         <label class="full">
@@ -189,6 +189,7 @@
           startedTaskId: String(parsed.startedTaskId || '').trim(),
           startedAt: String(parsed.startedAt || '').trim(),
           completedTaskIds: Array.isArray(parsed.completedTaskIds) ? parsed.completedTaskIds : [],
+          completedElapsedMsByTask: parsed.completedElapsedMsByTask && typeof parsed.completedElapsedMsByTask === 'object' ? parsed.completedElapsedMsByTask : {},
           shortFormDrafts: parsed.shortFormDrafts && typeof parsed.shortFormDrafts === 'object' ? parsed.shortFormDrafts : {}
         };
       };
@@ -227,6 +228,7 @@
         startedTaskId: '',
         startedAt: '',
         completedTaskIds: [],
+        completedElapsedMsByTask: {},
         shortFormDrafts: {}
       });
 
@@ -246,12 +248,13 @@
       const getActiveElapsedMs = () => {
         const taskId = getCurrentTaskId();
         const isStarted = state.startedTaskId === taskId;
-        if (!isStarted) {
-          return 0;
+        if (isStarted) {
+          const startedAtMs = Date.parse(String(state.startedAt || ''));
+          return Number.isFinite(startedAtMs) ? Math.max(0, Date.now() - startedAtMs) : 0;
         }
 
-        const startedAtMs = Date.parse(String(state.startedAt || ''));
-        return Number.isFinite(startedAtMs) ? Math.max(0, Date.now() - startedAtMs) : 0;
+        const completedDuration = Number(state.completedElapsedMsByTask[taskId]);
+        return Number.isFinite(completedDuration) && completedDuration > 0 ? completedDuration : 0;
       };
 
       const syncElapsedDisplay = () => {
@@ -436,6 +439,7 @@
             startedTaskId: taskOrder[0],
             startedAt: new Date().toISOString(),
             completedTaskIds: [],
+            completedElapsedMsByTask: {},
             shortFormDrafts: {}
           };
 
@@ -465,6 +469,7 @@
             state.startedTaskId = taskId;
             state.startedAt = new Date().toISOString();
             state.completedTaskIds = state.completedTaskIds.filter((id) => id !== taskId);
+            delete state.completedElapsedMsByTask[taskId];
             setRunnerState(state);
             renderTask();
             setStatus(`Started ${taskId}.`, true);
@@ -495,9 +500,11 @@
               clearShortFormDraftForTask(taskId);
             }
 
+            const elapsedAtCompletionMs = getActiveElapsedMs();
             await submitEvent('task_end', 'participant_completed');
             state.startedTaskId = '';
             state.startedAt = '';
+            state.completedElapsedMsByTask[taskId] = elapsedAtCompletionMs;
             if (!state.completedTaskIds.includes(taskId)) {
               state.completedTaskIds.push(taskId);
             }
@@ -520,6 +527,7 @@
               state.startedTaskId = nextTaskId;
               state.startedAt = new Date().toISOString();
               state.completedTaskIds = state.completedTaskIds.filter((id) => id !== nextTaskId);
+               delete state.completedElapsedMsByTask[nextTaskId];
               setRunnerState(state);
               renderTask();
               setStatus(`Moved to ${nextTaskId} and started timing.`, true);
@@ -531,7 +539,7 @@
           }
 
           if (mode === 'complete_trial') {
-            await submitEvent('trial_complete', 'participant_completed_all_tasks');
+            await submitEvent('task_end', 'participant_completed_all_tasks');
             const lastParticipantId = state.participantId;
             state = makeFreshRunnerState();
             setRunnerState(state);
