@@ -210,6 +210,7 @@ const physicalTrialCsvColumns = [
   'event_type',
   'observer_id',
   'manual_page',
+  'duration_ms',
   'notes',
   'source',
   'trial_mode'
@@ -225,6 +226,7 @@ const physicalTrialSqlColumns = [
   'event_type',
   'observer_id',
   'manual_page',
+  'duration_ms',
   'notes',
   'source',
   'trial_mode'
@@ -291,6 +293,7 @@ const projectPhysicalTrialRecord = (record) => ({
   event_type: record.event_type || '',
   observer_id: record.observer_id || '',
   manual_page: record.manual_page || '',
+  duration_ms: Number.isFinite(parseIntegerSafely(record.duration_ms)) ? parseIntegerSafely(record.duration_ms) : null,
   notes: record.notes || '',
   source: record.source || 'physical_manual',
   trial_mode: record.trial_mode || 'physical'
@@ -608,6 +611,7 @@ const normalizePhysicalTrialRecordForSql = (record) => {
   return {
     ...projected,
     trial_mode: String(record && record.trial_mode || projected.trial_mode || 'physical').trim().toLowerCase() === 'digital' ? 'digital' : 'physical',
+    duration_ms: parseIntegerSafely(projected.duration_ms),
     received_at: parseDateSafely(record.received_at || projected.received_at || new Date().toISOString()),
     timestamp: parseDateSafely(record.timestamp || projected.timestamp)
   };
@@ -1836,6 +1840,7 @@ app.post('/api/physical-trial', async (req, res) => {
     const participantId = String(payload && payload.participant_id || '').trim();
     const taskId = String(payload && payload.task_id || '').trim();
     const eventType = String(payload && payload.event_type || '').trim();
+    const durationMs = parseIntegerSafely(payload && payload.duration_ms);
 
     if (!payload || !participantId || !taskId || !eventType) {
       return res.status(400).json({ error: 'participant_id, task_id, and event_type are required' });
@@ -1853,6 +1858,7 @@ app.post('/api/physical-trial', async (req, res) => {
       participant_id: participantId,
       task_id: taskId,
       event_type: eventType,
+      duration_ms: Number.isFinite(durationMs) && durationMs >= 0 ? durationMs : null,
       source: 'physical_manual',
       received_at: new Date().toISOString(),
       timestamp: payload.timestamp || new Date().toISOString()

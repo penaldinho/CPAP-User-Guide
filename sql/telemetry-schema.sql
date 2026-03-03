@@ -143,6 +143,7 @@ CREATE TABLE IF NOT EXISTS physical_trial_events (
   event_type TEXT NOT NULL,
   observer_id TEXT,
   manual_page TEXT,
+  duration_ms INTEGER,
   notes TEXT,
   source TEXT NOT NULL DEFAULT 'physical_manual',
   trial_mode TEXT NOT NULL DEFAULT 'physical'
@@ -150,6 +151,9 @@ CREATE TABLE IF NOT EXISTS physical_trial_events (
 
 ALTER TABLE physical_trial_events
   ADD COLUMN IF NOT EXISTS trial_mode TEXT;
+
+ALTER TABLE physical_trial_events
+  ADD COLUMN IF NOT EXISTS duration_ms INTEGER;
 
 ALTER TABLE physical_trial_events
   ALTER COLUMN trial_mode SET DEFAULT 'physical';

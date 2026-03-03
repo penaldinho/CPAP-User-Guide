@@ -71,6 +71,7 @@
 
         <div class="btns">
           <button id="btn-action" type="button" class="success">Start current task</button>
+          <button id="btn-next" type="button" class="secondary" style="display:none;">Proceed to next task</button>
         </div>
       </div>
 
@@ -223,6 +224,7 @@
       const participantInput = el('participant_id');
       const proceedBtn = el('btn-proceed');
       const actionBtn = el('btn-action');
+      const nextBtn = el('btn-next');
 
       let state = getRunnerState();
 
@@ -323,7 +325,7 @@
             clearShortFormDraftForTask(taskId);
           }
 
-          await submitEvent('task_end', 'time_cap_reached');
+          await submitEvent('task_end', 'time_cap_reached', capMs);
           state.startedTaskId = '';
           state.startedAt = '';
           state.completedElapsedMsByTask[taskId] = capMs;
@@ -352,7 +354,7 @@
         return true;
       };
 
-      const submitEvent = async (eventType, notes) => {
+      const submitEvent = async (eventType, notes, durationMs) => {
         const taskId = getCurrentTaskId();
         const task = getCurrentTask();
         const payload = {
@@ -364,6 +366,7 @@
           task_label: task ? task.title : taskId,
           event_type: eventType,
           manual_page: '',
+          duration_ms: Number.isFinite(Number(durationMs)) ? Math.max(0, Number(durationMs)) : null,
           notes: String(notes || ''),
           source: 'physical_manual'
         };
@@ -508,21 +511,32 @@
             actionBtn.dataset.mode = 'complete_trial';
             actionBtn.textContent = 'Complete trial';
             actionBtn.className = 'success';
+            if (nextBtn) {
+              nextBtn.style.display = 'none';
+            }
           } else {
-            actionBtn.style.display = 'inline-block';
-
             if (isStarted) {
+              actionBtn.style.display = 'inline-block';
               actionBtn.dataset.mode = 'complete';
               actionBtn.textContent = 'I have completed this task';
               actionBtn.className = 'success';
+              if (nextBtn) {
+                nextBtn.style.display = 'none';
+              }
             } else if (isCompleted) {
-              actionBtn.dataset.mode = 'next';
-              actionBtn.textContent = 'Proceed to next task';
-              actionBtn.className = 'secondary';
+              actionBtn.style.display = 'none';
+              if (nextBtn) {
+                nextBtn.style.display = 'inline-block';
+                nextBtn.disabled = false;
+              }
             } else {
+              actionBtn.style.display = 'inline-block';
               actionBtn.dataset.mode = 'start';
               actionBtn.textContent = 'Start current task';
               actionBtn.className = 'success';
+              if (nextBtn) {
+                nextBtn.style.display = 'none';
+              }
             }
           }
         }
@@ -603,6 +617,31 @@
         }
       });
 
+      const proceedToNextTask = async () => {
+        const taskId = getCurrentTaskId();
+        if (!state.completedTaskIds.includes(taskId)) {
+          setStatus('Complete the current task first.', false);
+          return;
+        }
+
+        if (state.currentTaskIndex < taskOrder.length - 1) {
+          state.currentTaskIndex += 1;
+          const nextTaskId = getCurrentTaskId();
+          await submitEvent('task_start', '');
+          state.startedTaskId = nextTaskId;
+          state.startedAt = new Date().toISOString();
+          state.completedTaskIds = state.completedTaskIds.filter((id) => id !== nextTaskId);
+          delete state.completedElapsedMsByTask[nextTaskId];
+          state.timedOutTaskIds = state.timedOutTaskIds.filter((id) => id !== nextTaskId);
+          setRunnerState(state);
+          renderTask();
+          setStatus(`Moved to ${nextTaskId} and started timing.`, true);
+          return;
+        }
+
+        setStatus('All tasks completed.', true);
+      };
+
       actionBtn.addEventListener('click', async () => {
         if (!validateCommon()) return;
 
@@ -656,7 +695,7 @@
             }
 
             const elapsedAtCompletionMs = getActiveElapsedMs();
-            await submitEvent('task_end', 'participant_completed');
+            await submitEvent('task_end', 'participant_completed', elapsedAtCompletionMs);
             state.startedTaskId = '';
             state.startedAt = '';
             state.completedElapsedMsByTask[taskId] = elapsedAtCompletionMs;
@@ -667,30 +706,6 @@
             setRunnerState(state);
             renderTask();
             setStatus(`Completed ${taskId}.`, true);
-            return;
-          }
-
-          if (mode === 'next') {
-            if (!state.completedTaskIds.includes(taskId)) {
-              setStatus('Complete the current task first.', false);
-              return;
-            }
-
-            if (state.currentTaskIndex < taskOrder.length - 1) {
-              state.currentTaskIndex += 1;
-              const nextTaskId = getCurrentTaskId();
-              await submitEvent('task_start', '');
-              state.startedTaskId = nextTaskId;
-              state.startedAt = new Date().toISOString();
-              state.completedTaskIds = state.completedTaskIds.filter((id) => id !== nextTaskId);
-               delete state.completedElapsedMsByTask[nextTaskId];
-              setRunnerState(state);
-              renderTask();
-              setStatus(`Moved to ${nextTaskId} and started timing.`, true);
-              return;
-            }
-
-            setStatus('All tasks completed.', true);
             return;
           }
 
@@ -710,6 +725,15 @@
           }
         } catch (error) {
           setStatus(error.message || 'Failed to process action.', false);
+        }
+      });
+
+      nextBtn.addEventListener('click', async () => {
+        if (!validateCommon()) return;
+        try {
+          await proceedToNextTask();
+        } catch (error) {
+          setStatus(error.message || 'Failed to move to next task.', false);
         }
       });
 
