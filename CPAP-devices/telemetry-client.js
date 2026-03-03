@@ -1879,8 +1879,13 @@
       endTask('short_form_answer_submitted');
 
       if (nextTaskId) {
-        const nextLabel = presetTaskDescriptions[nextTaskId] ? presetTaskDescriptions[nextTaskId].title : nextTaskId;
-        startTask(nextTaskId, nextLabel);
+        setParticipantNextTaskState({
+          status: 'next',
+          current_task_id: taskId,
+          next_task_id: nextTaskId,
+          next_task_label: getTaskDisplayLabel(nextTaskId),
+          transition_reason: 'participant_clicked_end'
+        });
       } else {
         setParticipantNextTaskState({
           status: 'completed'
