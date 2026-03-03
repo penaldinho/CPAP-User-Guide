@@ -73,10 +73,10 @@
               <label><input type="radio" name="gender" value="female" /> Female</label>
               <label><input type="radio" name="gender" value="male" /> Male</label>
               <label><input type="radio" name="gender" value="non_binary" /> Non-binary</label>
-              <label><input type="radio" name="gender" value="other" /> Other (please specify)</label>
+              <label><input type="radio" name="gender" value="other" /> Other</label>
               <label><input type="radio" name="gender" value="prefer_not_say" /> Prefer not to say</label>
             </div>
-            <label id="gender_other_wrap" style="display:none;">Other gender (if selected)
+            <label id="gender_other_wrap" style="display:none;">Other gender (if selected, optional)
               <input id="gender_other" type="text" />
             </label>
             <div class="error-hint"></div>
@@ -324,7 +324,6 @@
       let hasErrors = false;
       if (!ageYears) { setQuestionError('q-age', 'Please provide your age.'); hasErrors = true; }
       if (!gender) { setQuestionError('q-gender', 'Please select one option.'); hasErrors = true; }
-      if (gender === 'other' && !genderOther) { setQuestionError('q-gender', 'Please specify your gender for "Other".'); hasErrors = true; }
       if (!education) { setQuestionError('q-education', 'Please select one option.'); hasErrors = true; }
       if (!techComfort) { setQuestionError('q-tech-comfort', 'Please select a rating.'); hasErrors = true; }
       if (!baselineQ6) { setQuestionError('q-baseline-q6', 'Please select a rating.'); hasErrors = true; }
