@@ -195,6 +195,7 @@
     ];
 
     let shapedWidth = Number.isFinite(baseWidth) ? baseWidth : 280;
+    let hasOverlap = false;
     candidates.forEach((element) => {
       if (!isElementVisibleForLayout(element)) {
         return;
@@ -207,19 +208,31 @@
         return;
       }
 
+      hasOverlap = true;
+
       const maxWidthWithoutOverlap = Math.floor(calloutRight - rect.right - 12);
       if (Number.isFinite(maxWidthWithoutOverlap)) {
         shapedWidth = Math.min(shapedWidth, maxWidthWithoutOverlap);
       }
     });
 
-    const minWidth = 170;
+    const minWidth = 130;
     const finalWidth = Math.max(minWidth, Math.min(baseWidth, shapedWidth));
+    const textSpan = callout.querySelector('span');
     callout.style.width = `${finalWidth}px`;
     callout.style.maxWidth = `${finalWidth}px`;
-    callout.style.lineHeight = finalWidth < baseWidth ? '1.28' : '1.2';
-    callout.style.paddingTop = finalWidth < baseWidth ? '8px' : '6px';
-    callout.style.paddingBottom = finalWidth < baseWidth ? '8px' : '6px';
+    callout.style.lineHeight = hasOverlap ? '1.24' : '1.2';
+    callout.style.paddingTop = hasOverlap ? '6px' : '6px';
+    callout.style.paddingBottom = hasOverlap ? '6px' : '6px';
+    callout.style.maxHeight = hasOverlap ? '56px' : '';
+    callout.style.overflow = hasOverlap ? 'hidden' : '';
+
+    if (textSpan) {
+      textSpan.style.display = hasOverlap ? '-webkit-box' : '';
+      textSpan.style.webkitLineClamp = hasOverlap ? '2' : '';
+      textSpan.style.webkitBoxOrient = hasOverlap ? 'vertical' : '';
+      textSpan.style.overflow = hasOverlap ? 'hidden' : '';
+    }
   };
 
   const updateTaskCardSafeArea = () => {
@@ -1720,9 +1733,9 @@
 
     const shortFormPreamble = document.createElement('div');
     shortFormPreamble.id = 'mtg-short-form-task-preamble';
-    shortFormPreamble.style.fontSize = '12px';
+    shortFormPreamble.style.fontSize = '14px';
     shortFormPreamble.style.color = '#334155';
-    shortFormPreamble.style.lineHeight = '1.35';
+    shortFormPreamble.style.lineHeight = '1.4';
     shortFormPreamble.style.marginBottom = '8px';
 
     const shortFormHint = document.createElement('div');
