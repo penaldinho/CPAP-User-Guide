@@ -204,6 +204,7 @@
     const endpoint = (isLocalHost || isHostedChat)
       ? '/api/physical-trial'
       : 'https://chat.medtechguides.uk/api/physical-trial';
+    const questionnaireStartedAtMs = Date.now();
 
     const statusEl = document.getElementById('status');
 
@@ -371,6 +372,7 @@
       const formatPreference = radioValue('format_preference');
       const formatMixDetails = String(document.getElementById('pre_format_mix_details').value || '').trim();
       const consentParticipation = Boolean(document.getElementById('consent_participation').checked);
+      const questionnaireDurationMs = Math.max(0, Date.now() - questionnaireStartedAtMs);
 
       let hasErrors = false;
       if (!ageYears) { setQuestionError('q-age', 'Please provide your age.'); hasErrors = true; }
@@ -423,6 +425,7 @@
         baseline_q8_1_to_5: baselineQ8,
         format_preference: formatPreference,
         format_mix_details: formatMixDetails,
+        questionnaire_duration_ms: questionnaireDurationMs,
         consent_to_participate: consentParticipation,
         free_text_notes: String(document.getElementById('notes').value || '').trim()
       };

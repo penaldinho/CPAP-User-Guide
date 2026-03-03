@@ -136,6 +136,7 @@
     const endpoint = (isLocalHost || isHostedChat)
       ? '/api/physical-trial'
       : 'https://chat.medtechguides.uk/api/physical-trial';
+    const questionnaireStartedAtMs = Date.now();
 
     const statusEl = document.getElementById('status');
 
@@ -213,6 +214,7 @@
       const postQ7 = radioValue('post_q7');
       const formatPreference = radioValue('format_preference');
       const formatMixDetails = String(document.getElementById('post_format_mix_details').value || '').trim();
+      const questionnaireDurationMs = Math.max(0, Date.now() - questionnaireStartedAtMs);
 
       let hasErrors = false;
       if (!postQ1) { setQuestionError('q-post-q1', 'Please select a rating.'); hasErrors = true; }
@@ -240,6 +242,7 @@
         post_q7_1_to_5: postQ7,
         format_preference: formatPreference,
         format_mix_details: formatMixDetails,
+        questionnaire_duration_ms: questionnaireDurationMs,
         free_text_notes: String(document.getElementById('notes').value || '').trim()
       };
 

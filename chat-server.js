@@ -767,6 +767,7 @@ const insertTelemetryRecordPostgres = async (record) => {
             task_id,
             task_label,
             question_id,
+            duration_ms,
             answer_text,
             part_a_answer_text,
             part_b_answer_text,
@@ -774,7 +775,7 @@ const insertTelemetryRecordPostgres = async (record) => {
             part_d_answer_text,
             trial_mode
           )
-          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
         `,
         [
           Number.isFinite(telemetryEventId) ? telemetryEventId : null,
@@ -785,6 +786,7 @@ const insertTelemetryRecordPostgres = async (record) => {
           normalized.task_id,
           normalized.task_label,
           questionId,
+          parseBoundedIntegerSafely(normalized.duration_ms, 0, 86400000),
           answerText || '',
           partAAnswerText,
           partBAnswerText,
@@ -860,6 +862,7 @@ const insertQuestionnaireRecordPostgres = async (record) => {
           task_id,
           task_label,
           question_id,
+          duration_ms,
           answer_text,
           part_a_answer_text,
           part_b_answer_text,
@@ -867,7 +870,7 @@ const insertQuestionnaireRecordPostgres = async (record) => {
           part_d_answer_text,
           trial_mode
         )
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
       `,
       [
         null,
@@ -878,6 +881,7 @@ const insertQuestionnaireRecordPostgres = async (record) => {
         taskId,
         normalized.task_label || taskId,
         taskId,
+        parseBoundedIntegerSafely(normalized.duration_ms, 0, 86400000),
         answerText,
         partAAnswerText,
         partBAnswerText,
@@ -898,6 +902,7 @@ const insertQuestionnaireRecordPostgres = async (record) => {
         session_id,
         participant_id,
         observer_id,
+        questionnaire_duration_ms,
         q1_age_years,
         q2_gender,
         q2_gender_other_text,
@@ -921,7 +926,7 @@ const insertQuestionnaireRecordPostgres = async (record) => {
         raw_response
       )
       VALUES (
-        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26
+        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27
       )
     `;
 
@@ -931,6 +936,7 @@ const insertQuestionnaireRecordPostgres = async (record) => {
       normalized.session_id || '',
       normalized.participant_id || '',
       normalized.observer_id || '',
+      parseBoundedIntegerSafely(response.questionnaire_duration_ms, 0, 86400000),
       parseBoundedIntegerSafely(response.age_years, 0, 120),
       String(response.gender || '').trim(),
       String(response.gender_other_text || '').trim(),
@@ -966,6 +972,7 @@ const insertQuestionnaireRecordPostgres = async (record) => {
         session_id,
         participant_id,
         observer_id,
+        questionnaire_duration_ms,
         q1_instructions_ease,
         q2_info_ease,
         q3_step_by_step_help,
@@ -979,7 +986,7 @@ const insertQuestionnaireRecordPostgres = async (record) => {
         raw_response
       )
       VALUES (
-        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16
+        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17
       )
     `;
 
@@ -989,6 +996,7 @@ const insertQuestionnaireRecordPostgres = async (record) => {
       normalized.session_id || '',
       normalized.participant_id || '',
       normalized.observer_id || '',
+      parseBoundedIntegerSafely(response.questionnaire_duration_ms, 0, 86400000),
       parseLikertSafely(response.post_q1_1_to_5),
       parseLikertSafely(response.post_q2_1_to_5),
       parseLikertSafely(response.post_q3_1_to_5),
@@ -1169,6 +1177,11 @@ const storeQuestionnaireRecord = async (record) => {
     }
     console.error('Postgres questionnaire write failed:', error.message);
   }
+};
+
+const isDedicatedQuestionnaireTaskId = (taskId) => {
+  const key = String(taskId || '').trim().toLowerCase();
+  return key === 'pre-trial-questionnaire' || key === 'post-trial-questionnaire';
 };
 
 const readTelemetryRecordsForExport = async (participantId) => {
@@ -2060,7 +2073,9 @@ app.post('/api/physical-trial', async (req, res) => {
       timestamp: payload.timestamp || new Date().toISOString()
     });
 
-    await storePhysicalTrialRecord(record);
+    if (!isDedicatedQuestionnaireTaskId(taskId)) {
+      await storePhysicalTrialRecord(record);
+    }
     await storeQuestionnaireRecord(record);
     res.status(204).end();
   } catch (error) {

@@ -93,6 +93,7 @@ CREATE TABLE IF NOT EXISTS short_form_results (
   task_id TEXT,
   task_label TEXT,
   question_id TEXT NOT NULL,
+  duration_ms INTEGER,
   answer_text TEXT,
   part_a_answer_text TEXT,
   part_b_answer_text TEXT,
@@ -115,6 +116,9 @@ ALTER TABLE short_form_results
 
 ALTER TABLE short_form_results
   ADD COLUMN IF NOT EXISTS trial_mode TEXT;
+
+ALTER TABLE short_form_results
+  ADD COLUMN IF NOT EXISTS duration_ms INTEGER;
 
 ALTER TABLE short_form_results
   ALTER COLUMN trial_mode SET DEFAULT 'digital';
@@ -218,6 +222,7 @@ CREATE TABLE IF NOT EXISTS pre_trial_questionnaire (
   session_id TEXT,
   participant_id TEXT NOT NULL,
   observer_id TEXT,
+  questionnaire_duration_ms INTEGER,
   q1_age_years INTEGER,
   q2_gender TEXT,
   q2_gender_other_text TEXT,
@@ -243,6 +248,9 @@ CREATE TABLE IF NOT EXISTS pre_trial_questionnaire (
 
 ALTER TABLE pre_trial_questionnaire
   ADD COLUMN IF NOT EXISTS consent_to_participate BOOLEAN;
+
+ALTER TABLE pre_trial_questionnaire
+  ADD COLUMN IF NOT EXISTS questionnaire_duration_ms INTEGER;
 
 ALTER TABLE pre_trial_questionnaire
   ADD COLUMN IF NOT EXISTS q1_age_years INTEGER;
@@ -308,6 +316,7 @@ CREATE TABLE IF NOT EXISTS post_trial_questionnaire (
   session_id TEXT,
   participant_id TEXT NOT NULL,
   observer_id TEXT,
+  questionnaire_duration_ms INTEGER,
   q1_instructions_ease INTEGER,
   q2_info_ease INTEGER,
   q3_step_by_step_help INTEGER,
@@ -323,6 +332,9 @@ CREATE TABLE IF NOT EXISTS post_trial_questionnaire (
 
 ALTER TABLE post_trial_questionnaire
   ADD COLUMN IF NOT EXISTS q1_instructions_ease INTEGER;
+
+ALTER TABLE post_trial_questionnaire
+  ADD COLUMN IF NOT EXISTS questionnaire_duration_ms INTEGER;
 
 ALTER TABLE post_trial_questionnaire
   ADD COLUMN IF NOT EXISTS q2_info_ease INTEGER;
