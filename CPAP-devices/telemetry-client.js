@@ -174,7 +174,8 @@
 
     const candidates = [
       document.getElementById('mtg-task-prompt-card'),
-      document.getElementById('mtg-participant-end-task-wrap')
+      document.getElementById('mtg-participant-end-task-wrap'),
+      document.getElementById('mtg-trial-intro-overlay-card')
     ];
 
     let coveredHeight = 0;
@@ -1202,6 +1203,64 @@
     return card;
   };
 
+  const removeTrialIntroOverlayCard = () => {
+    const existing = document.getElementById('mtg-trial-intro-overlay-card');
+    if (existing) {
+      existing.remove();
+      updateTaskCardSafeArea();
+    }
+  };
+
+  const showTrialIntroOverlayCard = ({ participantId, taskId, taskLabel }) => {
+    removeTrialIntroOverlayCard();
+
+    const card = document.createElement('aside');
+    card.id = 'mtg-trial-intro-overlay-card';
+    card.style.position = 'fixed';
+    card.style.left = '50%';
+    card.style.bottom = '96px';
+    card.style.transform = 'translateX(-50%)';
+    card.style.width = 'min(720px, calc(100vw - 24px))';
+    card.style.maxWidth = 'calc(100vw - 24px)';
+    card.style.maxHeight = '42vh';
+    card.style.overflow = 'auto';
+    card.style.background = '#ecfdf5';
+    card.style.border = '1px solid #34d399';
+    card.style.borderRadius = '10px';
+    card.style.boxShadow = '0 10px 24px rgba(16, 185, 129, 0.18)';
+    card.style.padding = '12px';
+    card.style.zIndex = '9700';
+    card.style.fontFamily = 'system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif';
+    card.style.color = '#1f2937';
+
+    card.innerHTML = `
+      <div style="font-size:14px; font-weight:700; color:#0f172a; margin-bottom:6px;">About this trial</div>
+      <div style="font-size:13px; color:#334155; line-height:1.45;">
+        You will complete 7 activities in total: 3 practical scenarios followed by 4 short questions.<br />
+        Each scenario has a 5:00 time limit, and each question has a 1:30 time limit.<br />
+        Question tasks have multiple sections; type each section answer as soon as you find it so it is logged.<br />
+        Work through them in order using the on-screen buttons.<br />
+        A timer runs for each activity, and your progress is recorded automatically.
+      </div>
+      <div style="display:flex; justify-content:flex-end; margin-top:10px;">
+        <button data-role="start-trial" type="button" style="padding:8px 12px; border:1px solid #0f766e; border-radius:999px; background:#0f766e; color:#fff; cursor:pointer; font-weight:600;">Start trial</button>
+      </div>
+    `;
+
+    const startButton = card.querySelector('[data-role="start-trial"]');
+    if (startButton) {
+      startButton.addEventListener('click', () => {
+        setParticipantId(participantId);
+        startTask(taskId, taskLabel);
+        disableResearchModeInUrl();
+        removeTrialIntroOverlayCard();
+      });
+    }
+
+    document.body.appendChild(card);
+    updateTaskCardSafeArea();
+  };
+
   const setTaskPromptExpanded = (expanded) => {
     const next = Boolean(expanded);
     if (isTaskPromptExpanded === next) return;
@@ -1912,6 +1971,8 @@
   };
 
   const renderResearchPanel = (forceOpen = false, allowDuringActiveTask = false) => {
+    removeTrialIntroOverlayCard();
+
     const presetTasks = [
       { id: 'scenario_card_1', label: 'Scenario Card 1 – First-Time Setup (Setup)' },
       { id: 'scenario_card_2', label: 'Scenario Card 2 – Fit and Start Therapy (Routine Use)' },
@@ -1997,17 +2058,6 @@
           <button id="mtg-task-start" type="button" style="flex:1; padding:7px 10px; border:1px solid #cbd5e1; border-radius:6px; background:#ecfdf3; cursor:pointer;">Start task</button>
           <button id="mtg-task-end" type="button" style="flex:1; padding:7px 10px; border:1px solid #cbd5e1; border-radius:6px; background:#eff6ff; cursor:pointer;">End task</button>
         </div>
-        <div id="mtg-trial-intro-card" style="display:none; border:1px solid #dbe2ef; border-radius:8px; padding:10px 12px; background:#f8fafc;">
-          <div style="font-weight:700; color:#0f172a; margin-bottom:4px;">About this trial</div>
-          <div style="font-size:13px; color:#334155; line-height:1.45;">
-            You will complete 7 activities in total: 3 practical scenarios followed by 4 short questions.<br />
-            Work through them in order using the on-screen buttons.<br />
-            A timer runs for each activity, and your progress is recorded automatically.
-          </div>
-          <div style="display:flex; justify-content:flex-end; margin-top:10px;">
-            <button id="mtg-start-trial" type="button" style="padding:8px 12px; border:1px solid #0f766e; border-radius:999px; background:#0f766e; color:#fff; cursor:pointer; font-weight:600;">Start trial</button>
-          </div>
-        </div>
         <div id="mtg-task-timer" style="padding:7px 10px; border:1px solid #e5e7eb; border-radius:6px; background:#f8fafc; font-weight:600;">Task timer: 00:00</div>
         <button id="mtg-export-csv" type="button" style="padding:7px 10px; border:1px solid #cbd5e1; border-radius:6px; background:#fff7ed; cursor:pointer;">Export CSV</button>
         <div id="mtg-research-state" style="font-size:12px; color:#4b5563; overflow-wrap:anywhere;"></div>
@@ -2026,8 +2076,6 @@
     const taskLabelCustomInput = document.getElementById('mtg-task-label-custom');
     const taskStart = document.getElementById('mtg-task-start');
     const taskEnd = document.getElementById('mtg-task-end');
-    const trialIntroCard = document.getElementById('mtg-trial-intro-card');
-    const startTrialBtn = document.getElementById('mtg-start-trial');
     const taskTimer = document.getElementById('mtg-task-timer');
     const exportCsvBtn = document.getElementById('mtg-export-csv');
     const stateText = document.getElementById('mtg-research-state');
@@ -2138,9 +2186,6 @@
       }
       syncCustomTaskVisibility();
       syncTaskStartButtonLabel();
-      if (trialIntroCard) {
-        trialIntroCard.style.display = 'none';
-      }
     };
 
     const syncFromTaskLabel = () => {
@@ -2157,9 +2202,6 @@
       }
       syncCustomTaskVisibility();
       syncTaskStartButtonLabel();
-      if (trialIntroCard) {
-        trialIntroCard.style.display = 'none';
-      }
     };
 
     const refreshState = () => {
@@ -2208,18 +2250,21 @@
     if (taskStart) {
       taskStart.addEventListener('click', () => {
         if (isScenarioOneSelection()) {
-          if (trialIntroCard) {
-            trialIntroCard.style.display = 'block';
+          const participantId = String(participantInput ? participantInput.value : '').trim();
+          const taskId = getSelectedTaskId();
+          const taskLabel = getSelectedTaskLabel();
+
+          if (!participantId || !taskId) {
+            window.alert('Please set both Participant ID and Task ID before continuing to the trial.');
+            refreshState();
+            return;
           }
+
+          panel.remove();
+          showTrialIntroOverlayCard({ participantId, taskId, taskLabel });
           return;
         }
 
-        launchSelectedTaskFromPanel();
-      });
-    }
-
-    if (startTrialBtn) {
-      startTrialBtn.addEventListener('click', () => {
         launchSelectedTaskFromPanel();
       });
     }
