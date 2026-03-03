@@ -174,49 +174,52 @@
       return;
     }
 
-    const dockRect = dock.getBoundingClientRect();
     const callout = dock.querySelector('.mobile-chat-callout');
-    const targetRect = callout && isElementVisibleForLayout(callout)
-      ? callout.getBoundingClientRect()
-      : dockRect;
-
-    if (!Number.isFinite(targetRect.width) || !Number.isFinite(targetRect.height) || targetRect.width <= 0 || targetRect.height <= 0) {
+    if (!callout || !isElementVisibleForLayout(callout)) {
       return;
     }
 
-    if (!dock.dataset.mtgBaseBottom) {
-      const computed = window.getComputedStyle(dock);
-      const parsed = Number.parseFloat(String(computed.bottom || '0'));
-      dock.dataset.mtgBaseBottom = String(Number.isFinite(parsed) ? parsed : 10);
+    if (!callout.dataset.mtgBaseWidth) {
+      const computedCallout = window.getComputedStyle(callout);
+      const parsedWidth = Number.parseFloat(String(computedCallout.width || '280'));
+      callout.dataset.mtgBaseWidth = String(Number.isFinite(parsedWidth) ? parsedWidth : 280);
     }
 
-    const baseBottom = Number.parseFloat(dock.dataset.mtgBaseBottom || '10');
+    const baseWidth = Number.parseFloat(callout.dataset.mtgBaseWidth || '280');
+    const calloutRect = callout.getBoundingClientRect();
+    const calloutRight = calloutRect.right;
     const candidates = [
       document.getElementById('mtg-task-prompt-card'),
       document.getElementById('mtg-participant-end-task-wrap'),
       document.getElementById('mtg-trial-intro-overlay-card')
     ];
 
-    let extraBottomPx = 0;
+    let shapedWidth = Number.isFinite(baseWidth) ? baseWidth : 280;
     candidates.forEach((element) => {
       if (!isElementVisibleForLayout(element)) {
         return;
       }
 
       const rect = element.getBoundingClientRect();
-      const overlapsHorizontally = rect.left < targetRect.right && rect.right > targetRect.left;
-      const overlapsVertically = rect.top < targetRect.bottom && rect.bottom > targetRect.top;
+      const overlapsHorizontally = rect.left < calloutRect.right && rect.right > calloutRect.left;
+      const overlapsVertically = rect.top < calloutRect.bottom && rect.bottom > calloutRect.top;
       if (!overlapsHorizontally || !overlapsVertically) {
         return;
       }
 
-      const pushUp = Math.ceil(rect.bottom - targetRect.top + 12);
-      if (pushUp > extraBottomPx) {
-        extraBottomPx = pushUp;
+      const maxWidthWithoutOverlap = Math.floor(calloutRight - rect.right - 12);
+      if (Number.isFinite(maxWidthWithoutOverlap)) {
+        shapedWidth = Math.min(shapedWidth, maxWidthWithoutOverlap);
       }
     });
 
-    dock.style.bottom = `${Math.max(baseBottom, baseBottom + extraBottomPx)}px`;
+    const minWidth = 170;
+    const finalWidth = Math.max(minWidth, Math.min(baseWidth, shapedWidth));
+    callout.style.width = `${finalWidth}px`;
+    callout.style.maxWidth = `${finalWidth}px`;
+    callout.style.lineHeight = finalWidth < baseWidth ? '1.28' : '1.2';
+    callout.style.paddingTop = finalWidth < baseWidth ? '8px' : '6px';
+    callout.style.paddingBottom = finalWidth < baseWidth ? '8px' : '6px';
   };
 
   const updateTaskCardSafeArea = () => {
@@ -1514,6 +1517,7 @@
     card.innerHTML = `
       <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
         <strong style="font-size:13px; color:#0f172a;">Task in progress</strong>
+        <button id="mtg-task-prompt-finish-btn" type="button" style="padding:6px 10px; border:1px solid #0f766e; background:#0f766e; color:#ffffff; border-radius:999px; font-size:12px; font-weight:600; cursor:pointer; white-space:nowrap;">I have completed this task</button>
       </div>
       <div style="margin-top:6px; font-size:12px; color:#334155; font-weight:600;">Elapsed: ${escapeHtml(elapsedWithCapText)}</div>
       <div style="margin-top:8px; color:#334155; line-height:1.4; font-size:14px; overflow:hidden; display:${scenarioDescription ? '-webkit-box' : 'none'}; -webkit-line-clamp:${isExpanded ? '3' : '2'}; -webkit-box-orient:vertical;">${escapeHtml(scenarioDescription)}</div>
@@ -1523,9 +1527,6 @@
       <div style="margin-top:8px; display:${isExpanded ? 'block' : 'none'};">
         <div style="font-size:13px; font-weight:600; line-height:1.3; display:${isScenarioTask ? 'none' : 'block'};">${escapeHtml(displayLabel)}</div>
         <div style="margin-top:8px; font-size:12px; color:#334155; line-height:1.35;">${listMarkup}</div>
-      </div>
-      <div style="position:sticky; bottom:0; margin-top:8px; padding-top:8px; background:#ecfdf5; display:flex; justify-content:flex-end; border-top:1px solid #d1fae5;">
-        <button id="mtg-task-prompt-finish-btn" type="button" style="padding:6px 10px; border:1px solid #0f766e; background:#0f766e; color:#ffffff; border-radius:999px; font-size:12px; font-weight:600; cursor:pointer; white-space:nowrap;">I have completed this task</button>
       </div>
     `;
     card.style.bottom = '12px';
