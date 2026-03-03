@@ -648,7 +648,13 @@
   const taskStateSyncState = {
     inFlight: false,
     lastPolledAt: 0,
-    intervalId: null
+    intervalId: null,
+    localTransitionUntilMs: 0
+  };
+
+  const markLocalTaskTransition = (durationMs = 4500) => {
+    const windowMs = Number.isFinite(Number(durationMs)) ? Math.max(0, Number(durationMs)) : 4500;
+    taskStateSyncState.localTransitionUntilMs = Date.now() + windowMs;
   };
 
   const getTaskStateApiUrl = () => getApiUrl().replace(/\/api\/telemetry$/, '/api/telemetry/task-state');
@@ -714,6 +720,18 @@
         const localTask = getSharedTaskState();
         const localTaskId = String(localTask.task_id || '').trim();
         const localStartedAt = String(localTask.started_at || '').trim();
+        const transitionGuardActive = Date.now() < Number(taskStateSyncState.localTransitionUntilMs || 0);
+
+        if (transitionGuardActive && localTaskId && localTaskId !== serverTask.task_id) {
+          if (!isTaskSubscribedInTab()) {
+            setTaskSubscribedInTab(true);
+          }
+          markTaskActiveInUrl(localTask);
+          enableResearchModeInUrl();
+          syncParticipantEndButton();
+          syncTaskPromptCard();
+          return;
+        }
 
         if (localTaskId !== serverTask.task_id || localStartedAt !== serverTask.started_at) {
           setTaskState(serverTask);
@@ -731,6 +749,18 @@
       }
 
       const sharedTask = getSharedTaskState();
+      const transitionGuardActive = Date.now() < Number(taskStateSyncState.localTransitionUntilMs || 0);
+      if (transitionGuardActive && String(sharedTask.task_id || '').trim()) {
+        if (!isTaskSubscribedInTab()) {
+          setTaskSubscribedInTab(true);
+        }
+        markTaskActiveInUrl(sharedTask);
+        enableResearchModeInUrl();
+        syncParticipantEndButton();
+        syncTaskPromptCard();
+        return;
+      }
+
       if (String(sharedTask.task_id || '').trim()) {
         setTaskState({});
       }
@@ -1265,13 +1295,13 @@
       <div style="font-size:18px; font-weight:700; color:#0f172a; margin-bottom:6px; line-height:1.25;">About this trial</div>
       <div style="font-size:16px; color:#334155; line-height:1.55;">
         You will complete 7 activities in total: 3 practical scenarios followed by 4 short questions.<br />
-        Each scenario has a 5:00 time limit, and each question has a 1:30 time limit.<br />
+        Each scenario has a 5:00-minute time limit, and each question has a 1:30-minute time limit.<br />
         Question tasks have multiple sections; type each section answer as soon as you find it so it is logged.<br />
         When you finish a task, click “I have completed this task”.<br />
         Once a task is marked complete, you cannot return to it and it is treated as finished.<br />
-        Once you click Start trial, the timer for the first task starts immediately.<br />
         Work through them in order using the on-screen buttons.<br />
-        A timer runs for each activity, and your progress is recorded automatically.
+        A timer runs for each activity, and your progress is recorded automatically.<br />
+        Once you click Start trial, the timer for the first task starts immediately.
       </div>
       <div style="display:flex; justify-content:flex-end; margin-top:10px;">
         <button data-role="start-trial" type="button" style="padding:8px 12px; border:1px solid #0f766e; border-radius:999px; background:#0f766e; color:#fff; cursor:pointer; font-weight:600;">Start trial</button>
@@ -1452,6 +1482,7 @@
     };
     setTaskSubscribedInTab(true);
     setTaskState(nextState);
+    markLocalTaskTransition();
     markTaskActiveInUrl(nextState);
     syncTaskPromptCard();
     track('task_start', {
@@ -1488,6 +1519,7 @@
 
     setTaskState({});
     setTaskSubscribedInTab(false);
+    markLocalTaskTransition();
     markTaskClearedInUrl();
     syncTaskPromptCard();
   };
@@ -1887,12 +1919,7 @@
 
     if (participantNextLabel) {
       if (hasPendingNextTask) {
-        const nextLabel = String(participantNextState.next_task_label || getTaskDisplayLabel(participantNextState.next_task_id || '')).trim();
-        if (timedOut) {
-          participantNextLabel.textContent = `Time limit reached for this task. Please continue to: ${nextLabel || String(participantNextState.next_task_id || '').trim()}`;
-        } else {
-          participantNextLabel.textContent = `Next task: ${nextLabel || String(participantNextState.next_task_id || '').trim()}`;
-        }
+        participantNextLabel.textContent = timedOut ? 'Time limit reached for this task.' : '';
       } else if (showCompletedSequenceCard) {
         participantNextLabel.textContent = timedOut
           ? 'Time limit reached for the final task. All participant tasks are complete. Press Ctrl+Alt+R to open Research Controls.'
