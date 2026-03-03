@@ -903,6 +903,7 @@ const insertQuestionnaireRecordPostgres = async (record) => {
         education,
         occupation,
         tech_comfort,
+        print_instruction_comfort,
         baseline_q6,
         baseline_q7,
         baseline_q8,
@@ -920,7 +921,7 @@ const insertQuestionnaireRecordPostgres = async (record) => {
         raw_response
       )
       VALUES (
-        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25
+        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26
       )
     `;
 
@@ -935,6 +936,7 @@ const insertQuestionnaireRecordPostgres = async (record) => {
       String(response.education || '').trim(),
       String(response.occupation || '').trim(),
       parseLikertSafely(response.tech_comfort_1_to_5),
+      parseLikertSafely(response.print_instruction_comfort_1_to_5),
       parseLikertSafely(response.baseline_q6_1_to_5),
       parseLikertSafely(response.baseline_q7_1_to_5),
       parseLikertSafely(response.baseline_q8_1_to_5),

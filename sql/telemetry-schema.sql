@@ -223,11 +223,10 @@ CREATE TABLE IF NOT EXISTS pre_trial_questionnaire (
   education TEXT,
   occupation TEXT,
   tech_comfort INTEGER,
+  print_instruction_comfort INTEGER,
   baseline_q6 INTEGER,
   baseline_q7 INTEGER,
   baseline_q8 INTEGER,
-  format_preference TEXT,
-  format_mix_details TEXT,
   consent_to_participate BOOLEAN,
   device_experience_none BOOLEAN,
   device_experience_blood_pressure_monitor BOOLEAN,
@@ -247,10 +246,7 @@ ALTER TABLE pre_trial_questionnaire
   ADD COLUMN IF NOT EXISTS occupation TEXT;
 
 ALTER TABLE pre_trial_questionnaire
-  ADD COLUMN IF NOT EXISTS format_preference TEXT;
-
-ALTER TABLE pre_trial_questionnaire
-  ADD COLUMN IF NOT EXISTS format_mix_details TEXT;
+  ADD COLUMN IF NOT EXISTS print_instruction_comfort INTEGER;
 
 CREATE INDEX IF NOT EXISTS idx_pre_trial_questionnaire_participant_time
   ON pre_trial_questionnaire (participant_id, received_at DESC);
@@ -270,13 +266,9 @@ CREATE TABLE IF NOT EXISTS post_trial_questionnaire (
   post_q6 INTEGER,
   post_q7 INTEGER,
   format_preference TEXT,
-  format_mix_details TEXT,
   free_text_notes TEXT,
   raw_response JSONB
 );
-
-ALTER TABLE post_trial_questionnaire
-  ADD COLUMN IF NOT EXISTS format_mix_details TEXT;
 
 CREATE INDEX IF NOT EXISTS idx_post_trial_questionnaire_participant_time
   ON post_trial_questionnaire (participant_id, received_at DESC);
