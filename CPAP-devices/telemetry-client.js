@@ -1312,7 +1312,7 @@
         Question tasks have multiple sections; type each section answer as soon as you find it so it is logged.<br />
         When you finish a task, click “I have completed this task”.<br />
         Once a task is marked complete, you cannot return to it and it is treated as finished.<br />
-        Work through them in order using the on-screen buttons.<br />
+        Work through the tasks in order using the on-screen buttons.<br />
         A timer runs for each activity, and your progress is recorded automatically.<br />
         Once you click Start trial, the timer for the first task starts immediately.
       </div>
@@ -1819,6 +1819,12 @@
     participantNextWrap.style.width = 'min(720px, calc(100vw - 24px))';
     participantNextWrap.style.boxSizing = 'border-box';
 
+    const participantNextHeader = document.createElement('div');
+    participantNextHeader.style.display = 'flex';
+    participantNextHeader.style.alignItems = 'center';
+    participantNextHeader.style.justifyContent = 'space-between';
+    participantNextHeader.style.gap = '8px';
+
     const participantNextTitle = document.createElement('div');
     participantNextTitle.id = 'mtg-participant-next-task-title';
     participantNextTitle.style.fontSize = '14px';
@@ -1826,6 +1832,25 @@
     participantNextTitle.style.color = '#0f172a';
     participantNextTitle.style.marginBottom = '6px';
     participantNextTitle.textContent = 'Task complete';
+
+    const participantNextClose = document.createElement('button');
+    participantNextClose.id = 'mtg-participant-next-task-close';
+    participantNextClose.type = 'button';
+    participantNextClose.style.display = 'none';
+    participantNextClose.style.border = '0';
+    participantNextClose.style.background = 'transparent';
+    participantNextClose.style.color = '#64748b';
+    participantNextClose.style.cursor = 'pointer';
+    participantNextClose.style.fontSize = '18px';
+    participantNextClose.style.lineHeight = '1';
+    participantNextClose.style.padding = '0 2px';
+    participantNextClose.textContent = '×';
+    participantNextClose.setAttribute('aria-label', 'Close');
+
+    participantNextClose.addEventListener('click', () => {
+      clearParticipantNextTaskState();
+      syncParticipantEndButton();
+    });
 
     const participantNextLabel = document.createElement('div');
     participantNextLabel.id = 'mtg-participant-next-task-label';
@@ -1860,7 +1885,9 @@
       syncParticipantEndButton();
     });
 
-    participantNextWrap.appendChild(participantNextTitle);
+    participantNextHeader.appendChild(participantNextTitle);
+    participantNextHeader.appendChild(participantNextClose);
+    participantNextWrap.appendChild(participantNextHeader);
     participantNextWrap.appendChild(participantNextLabel);
     participantNextWrap.appendChild(participantNextButton);
 
@@ -1880,6 +1907,7 @@
     const endBtn = document.getElementById('mtg-participant-end-task-btn');
     const participantNextWrap = document.getElementById('mtg-participant-next-task-wrap');
     const participantNextTitle = document.getElementById('mtg-participant-next-task-title');
+    const participantNextClose = document.getElementById('mtg-participant-next-task-close');
     const participantNextLabel = document.getElementById('mtg-participant-next-task-label');
     const participantNextButton = document.getElementById('mtg-participant-next-task-btn');
     const shortFormWrap = document.getElementById('mtg-short-form-answer-wrap');
@@ -1924,6 +1952,10 @@
 
     if (participantNextWrap) {
       participantNextWrap.style.display = !taskId && (hasPendingNextTask || showCompletedSequenceCard) ? 'block' : 'none';
+    }
+
+    if (participantNextClose) {
+      participantNextClose.style.display = showCompletedSequenceCard ? 'inline-block' : 'none';
     }
 
     if (participantNextTitle) {
