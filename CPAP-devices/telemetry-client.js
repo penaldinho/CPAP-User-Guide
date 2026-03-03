@@ -261,6 +261,35 @@
     'short_form_q4'
   ];
 
+  const scenarioTaskCapMs = 5 * 60 * 1000;
+  const shortFormTaskCapMs = 90 * 1000;
+
+  const getTaskCapMs = (taskId) => {
+    const key = String(taskId || '').trim();
+    if (!key) return null;
+    if (/^scenario_card_\d+$/i.test(key)) return scenarioTaskCapMs;
+    if (/^short_form_q[1-4]$/i.test(key)) return shortFormTaskCapMs;
+    return null;
+  };
+
+  const getElapsedMsForTaskState = (taskState) => {
+    if (!taskState || !taskState.task_id || !taskState.started_at) {
+      return 0;
+    }
+
+    const startedAtMs = Date.parse(String(taskState.started_at || ''));
+    return Number.isFinite(startedAtMs) ? Math.max(0, Date.now() - startedAtMs) : 0;
+  };
+
+  const getDisplayedElapsedMsForTaskState = (taskState) => {
+    const elapsedMs = getElapsedMsForTaskState(taskState);
+    const capMs = getTaskCapMs(taskState && taskState.task_id);
+    if (!Number.isFinite(capMs)) {
+      return elapsedMs;
+    }
+    return Math.min(elapsedMs, capMs);
+  };
+
   const getTaskDisplayLabel = (taskId) => {
     const key = String(taskId || '').trim();
     if (!key) return '';
@@ -1158,9 +1187,12 @@
       return;
     }
 
-    const startedAtMs = Date.parse(String(taskState.started_at || ''));
-    const elapsedMs = Number.isFinite(startedAtMs) ? Math.max(0, Date.now() - startedAtMs) : 0;
+    const capMs = getTaskCapMs(taskId);
+    const elapsedMs = getDisplayedElapsedMsForTaskState(taskState);
     const elapsedText = formatElapsedDuration(elapsedMs);
+    const elapsedWithCapText = Number.isFinite(capMs)
+      ? `${elapsedText} / ${formatElapsedDuration(capMs)}`
+      : elapsedText;
     const entry = presetTaskDescriptions[taskId] || null;
     const displayLabel = (entry && entry.title) || fallbackLabel || taskId;
     const lines = entry && Array.isArray(entry.steps) ? entry.steps : [];
@@ -1190,7 +1222,7 @@
         <strong style="font-size:13px; color:#0f172a;">Task in progress</strong>
         <span style="font-size:11px; color:#475569; background:#f1f5f9; border:1px solid #e2e8f0; border-radius:999px; padding:2px 8px;">${escapeHtml(taskId)}</span>
       </div>
-      <div style="margin-top:6px; font-size:12px; color:#334155; font-weight:600;">Elapsed: ${escapeHtml(elapsedText)}</div>
+      <div style="margin-top:6px; font-size:12px; color:#334155; font-weight:600;">Elapsed: ${escapeHtml(elapsedWithCapText)}</div>
       <div style="margin-top:8px; color:#334155; line-height:1.4; font-size:14px; overflow:hidden; display:${scenarioDescription ? '-webkit-box' : 'none'}; -webkit-line-clamp:${isExpanded ? '3' : '2'}; -webkit-box-orient:vertical;">${escapeHtml(scenarioDescription)}</div>
       <div style="margin-top:6px; color:#334155; line-height:1.4; font-size:13px; display:${isExpanded && isScenarioTask && instructionsLine ? 'block' : 'none'};">${escapeHtml(String(instructionsLine || ''))}</div>
       <div style="margin-top:6px; color:#334155; line-height:1.35; font-size:12px; display:${isExpanded ? 'block' : 'none'};">${escapeHtml(completionInstruction)}</div>
@@ -1230,7 +1262,11 @@
     if (!state.task_id) return;
 
     const startedAt = state.started_at ? Date.parse(state.started_at) : null;
-    const durationMs = Number.isFinite(startedAt) ? Math.max(0, Date.now() - startedAt) : null;
+    const rawDurationMs = Number.isFinite(startedAt) ? Math.max(0, Date.now() - startedAt) : null;
+    const capMs = getTaskCapMs(state.task_id);
+    const durationMs = Number.isFinite(rawDurationMs)
+      ? (Number.isFinite(capMs) ? Math.min(rawDurationMs, capMs) : rawDurationMs)
+      : null;
 
     track('task_end', {
       task_id: state.task_id,
@@ -1251,6 +1287,60 @@
     setTaskSubscribedInTab(false);
     markTaskClearedInUrl();
     syncTaskPromptCard();
+  };
+
+  let taskCapProcessing = false;
+  const maybeApplyActiveTaskTimeCap = () => {
+    if (taskCapProcessing) {
+      return;
+    }
+
+    const state = getTaskState();
+    const currentTaskId = String(state.task_id || '').trim();
+    if (!currentTaskId) {
+      return;
+    }
+
+    const capMs = getTaskCapMs(currentTaskId);
+    if (!Number.isFinite(capMs)) {
+      return;
+    }
+
+    const elapsedMs = getElapsedMsForTaskState(state);
+    if (elapsedMs < capMs) {
+      return;
+    }
+
+    taskCapProcessing = true;
+    try {
+      const nextTaskId = getNextTaskIdInSequence(currentTaskId);
+
+      if (nextTaskId) {
+        setParticipantNextTaskState({
+          status: 'next',
+          current_task_id: currentTaskId,
+          next_task_id: nextTaskId,
+          next_task_label: getTaskDisplayLabel(nextTaskId),
+          transition_reason: 'time_cap_reached'
+        });
+      } else {
+        setParticipantNextTaskState({
+          status: 'completed',
+          transition_reason: 'time_cap_reached'
+        });
+      }
+
+      track('task_time_cap_reached', {
+        task_id: currentTaskId,
+        task_label: String(state.task_label || ''),
+        duration_ms: capMs
+      });
+
+      endTask('time_cap_reached');
+      syncParticipantEndButton();
+    } finally {
+      taskCapProcessing = false;
+    }
   };
 
   const ensureParticipantEndButton = () => {
@@ -1555,6 +1645,7 @@
     const isShortFormTask = /^short_form_q[1-4]$/i.test(taskId);
     const endBtn = document.getElementById('mtg-participant-end-task-btn');
     const participantNextWrap = document.getElementById('mtg-participant-next-task-wrap');
+    const participantNextTitle = document.getElementById('mtg-participant-next-task-title');
     const participantNextLabel = document.getElementById('mtg-participant-next-task-label');
     const participantNextButton = document.getElementById('mtg-participant-next-task-btn');
     const shortFormWrap = document.getElementById('mtg-short-form-answer-wrap');
@@ -1569,6 +1660,8 @@
     const shortFormFields = document.getElementById('mtg-short-form-answer-fields');
 
     const participantNextState = getParticipantNextTaskState();
+    const transitionReason = String(participantNextState.transition_reason || '').trim();
+    const timedOut = transitionReason === 'time_cap_reached';
     const hasPendingNextTask = !taskId && String(participantNextState.next_task_id || '').trim();
     const hasCompletedSequence = !taskId && String(participantNextState.status || '').trim() === 'completed';
 
@@ -1596,12 +1689,22 @@
       participantNextWrap.style.display = !taskId && (hasPendingNextTask || hasCompletedSequence) ? 'block' : 'none';
     }
 
+    if (participantNextTitle) {
+      participantNextTitle.textContent = timedOut ? 'Time limit reached' : 'Task complete';
+    }
+
     if (participantNextLabel) {
       if (hasPendingNextTask) {
         const nextLabel = String(participantNextState.next_task_label || getTaskDisplayLabel(participantNextState.next_task_id || '')).trim();
-        participantNextLabel.textContent = `Next task: ${nextLabel || String(participantNextState.next_task_id || '').trim()}`;
+        if (timedOut) {
+          participantNextLabel.textContent = `Time limit reached for this task. Please continue to: ${nextLabel || String(participantNextState.next_task_id || '').trim()}`;
+        } else {
+          participantNextLabel.textContent = `Next task: ${nextLabel || String(participantNextState.next_task_id || '').trim()}`;
+        }
       } else if (hasCompletedSequence) {
-        participantNextLabel.textContent = 'All participant tasks are complete. Press Ctrl+Alt+R to open Research Controls.';
+        participantNextLabel.textContent = timedOut
+          ? 'Time limit reached for the final task. All participant tasks are complete. Press Ctrl+Alt+R to open Research Controls.'
+          : 'All participant tasks are complete. Press Ctrl+Alt+R to open Research Controls.';
       } else {
         participantNextLabel.textContent = '';
       }
@@ -1641,9 +1744,12 @@
     }
 
     const definition = getShortFormQuestionDefinition(taskId);
-    const startedAtMs = Date.parse(String(taskState.started_at || ''));
-    const elapsedMs = Number.isFinite(startedAtMs) ? Math.max(0, Date.now() - startedAtMs) : 0;
+    const capMs = getTaskCapMs(taskId);
+    const elapsedMs = getDisplayedElapsedMsForTaskState(taskState);
     const elapsedText = formatElapsedDuration(elapsedMs);
+    const elapsedWithCapText = Number.isFinite(capMs)
+      ? `${elapsedText} / ${formatElapsedDuration(capMs)}`
+      : elapsedText;
 
     if (shortFormTaskHeader) {
       shortFormTaskHeader.innerHTML = `
@@ -1653,7 +1759,7 @@
     }
 
     if (shortFormElapsed) {
-      shortFormElapsed.textContent = `Elapsed: ${elapsedText}`;
+      shortFormElapsed.textContent = `Elapsed: ${elapsedWithCapText}`;
     }
 
     if (shortFormPreamble) {
@@ -1841,6 +1947,17 @@
           <button id="mtg-task-start" type="button" style="flex:1; padding:7px 10px; border:1px solid #cbd5e1; border-radius:6px; background:#ecfdf3; cursor:pointer;">Start task</button>
           <button id="mtg-task-end" type="button" style="flex:1; padding:7px 10px; border:1px solid #cbd5e1; border-radius:6px; background:#eff6ff; cursor:pointer;">End task</button>
         </div>
+        <div id="mtg-trial-intro-card" style="display:none; border:1px solid #dbe2ef; border-radius:8px; padding:10px 12px; background:#f8fafc;">
+          <div style="font-weight:700; color:#0f172a; margin-bottom:4px;">About this trial</div>
+          <div style="font-size:13px; color:#334155; line-height:1.45;">
+            You will complete 7 activities in total: 3 practical scenarios followed by 4 short questions.<br />
+            Work through them in order using the on-screen buttons.<br />
+            A timer runs for each activity, and your progress is recorded automatically.
+          </div>
+          <div style="display:flex; justify-content:flex-end; margin-top:10px;">
+            <button id="mtg-start-trial" type="button" style="padding:8px 12px; border:1px solid #0f766e; border-radius:999px; background:#0f766e; color:#fff; cursor:pointer; font-weight:600;">Start trial</button>
+          </div>
+        </div>
         <div id="mtg-task-timer" style="padding:7px 10px; border:1px solid #e5e7eb; border-radius:6px; background:#f8fafc; font-weight:600;">Task timer: 00:00</div>
         <button id="mtg-export-csv" type="button" style="padding:7px 10px; border:1px solid #cbd5e1; border-radius:6px; background:#fff7ed; cursor:pointer;">Export CSV</button>
         <div id="mtg-research-state" style="font-size:12px; color:#4b5563; overflow-wrap:anywhere;"></div>
@@ -1859,6 +1976,8 @@
     const taskLabelCustomInput = document.getElementById('mtg-task-label-custom');
     const taskStart = document.getElementById('mtg-task-start');
     const taskEnd = document.getElementById('mtg-task-end');
+    const trialIntroCard = document.getElementById('mtg-trial-intro-card');
+    const startTrialBtn = document.getElementById('mtg-start-trial');
     const taskTimer = document.getElementById('mtg-task-timer');
     const exportCsvBtn = document.getElementById('mtg-export-csv');
     const stateText = document.getElementById('mtg-research-state');
@@ -1885,9 +2004,11 @@
         return;
       }
 
-      const startedAt = Date.parse(taskState.started_at);
-      const durationMs = Number.isFinite(startedAt) ? Math.max(0, Date.now() - startedAt) : 0;
-      taskTimer.textContent = `Task timer: ${formatDuration(durationMs)}`;
+      const capMs = getTaskCapMs(taskState.task_id);
+      const durationMs = getDisplayedElapsedMsForTaskState(taskState);
+      taskTimer.textContent = Number.isFinite(capMs)
+        ? `Task timer: ${formatDuration(durationMs)} / ${formatDuration(capMs)}`
+        : `Task timer: ${formatDuration(durationMs)}`;
     };
 
     const ensureTimerRunning = () => {
@@ -1927,6 +2048,32 @@
       return String(taskLabelSelect ? taskLabelSelect.value : '').trim();
     };
 
+    const isScenarioOneSelection = () => String(getSelectedTaskId() || '').trim() === 'scenario_card_1';
+
+    const syncTaskStartButtonLabel = () => {
+      if (!taskStart) return;
+      taskStart.textContent = isScenarioOneSelection() ? 'Proceed to trial' : 'Start task';
+    };
+
+    const launchSelectedTaskFromPanel = () => {
+      const participantId = String(participantInput ? participantInput.value : '').trim();
+      const taskId = getSelectedTaskId();
+      const taskLabel = getSelectedTaskLabel();
+
+      if (!participantId || !taskId) {
+        window.alert('Please set both Participant ID and Task ID before starting a task.');
+        refreshState();
+        return false;
+      }
+
+      setParticipantId(participantId);
+      startTask(taskId, taskLabel);
+      disableResearchModeInUrl();
+      panel.remove();
+      refreshState();
+      return true;
+    };
+
     const syncFromTaskId = () => {
       if (!taskIdSelect || !taskLabelSelect) return;
       if (taskIdSelect.value === CUSTOM_TASK_VALUE) {
@@ -1940,6 +2087,10 @@
         taskLabelSelect.value = matchingLabel;
       }
       syncCustomTaskVisibility();
+      syncTaskStartButtonLabel();
+      if (trialIntroCard) {
+        trialIntroCard.style.display = 'none';
+      }
     };
 
     const syncFromTaskLabel = () => {
@@ -1955,6 +2106,10 @@
         taskIdSelect.value = matchingId;
       }
       syncCustomTaskVisibility();
+      syncTaskStartButtonLabel();
+      if (trialIntroCard) {
+        trialIntroCard.style.display = 'none';
+      }
     };
 
     const refreshState = () => {
@@ -1981,6 +2136,7 @@
         }
       }
       syncCustomTaskVisibility();
+      syncTaskStartButtonLabel();
 
       const taskSummary = taskState.task_id
         ? `Active task: ${taskState.task_id}${taskState.task_label ? ` (${taskState.task_label})` : ''}`
@@ -2001,21 +2157,20 @@
 
     if (taskStart) {
       taskStart.addEventListener('click', () => {
-        const participantId = String(participantInput ? participantInput.value : '').trim();
-        const taskId = getSelectedTaskId();
-        const taskLabel = getSelectedTaskLabel();
-
-        if (!participantId || !taskId) {
-          window.alert('Please set both Participant ID and Task ID before starting a task.');
-          refreshState();
+        if (isScenarioOneSelection()) {
+          if (trialIntroCard) {
+            trialIntroCard.style.display = 'block';
+          }
           return;
         }
 
-        setParticipantId(participantId);
-        startTask(taskId, taskLabel);
-        disableResearchModeInUrl();
-        panel.remove();
-        refreshState();
+        launchSelectedTaskFromPanel();
+      });
+    }
+
+    if (startTrialBtn) {
+      startTrialBtn.addEventListener('click', () => {
+        launchSelectedTaskFromPanel();
       });
     }
 
@@ -2178,6 +2333,7 @@
     });
 
     window.setInterval(() => {
+      maybeApplyActiveTaskTimeCap();
       syncParticipantEndButton();
       syncTaskPromptCard();
     }, 1000);
