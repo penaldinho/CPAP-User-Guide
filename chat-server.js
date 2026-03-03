@@ -901,10 +901,13 @@ const insertQuestionnaireRecordPostgres = async (record) => {
         age_years,
         gender,
         education,
+        occupation,
         tech_comfort,
         baseline_q6,
         baseline_q7,
         baseline_q8,
+        format_preference,
+        format_mix_details,
         consent_to_participate,
         device_experience_none,
         device_experience_blood_pressure_monitor,
@@ -917,7 +920,7 @@ const insertQuestionnaireRecordPostgres = async (record) => {
         raw_response
       )
       VALUES (
-        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22
+        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25
       )
     `;
 
@@ -930,10 +933,13 @@ const insertQuestionnaireRecordPostgres = async (record) => {
       parseBoundedIntegerSafely(response.age_years, 0, 120),
       String(response.gender || '').trim(),
       String(response.education || '').trim(),
+      String(response.occupation || '').trim(),
       parseLikertSafely(response.tech_comfort_1_to_5),
       parseLikertSafely(response.baseline_q6_1_to_5),
       parseLikertSafely(response.baseline_q7_1_to_5),
       parseLikertSafely(response.baseline_q8_1_to_5),
+      String(response.format_preference || '').trim(),
+      String(response.format_mix_details || '').trim(),
       parseBooleanSafely(response.consent_to_participate),
       includesChoice(deviceExperience, 'none'),
       includesChoice(deviceExperience, 'blood_pressure_monitor'),
@@ -966,11 +972,12 @@ const insertQuestionnaireRecordPostgres = async (record) => {
         post_q6,
         post_q7,
         format_preference,
+        format_mix_details,
         free_text_notes,
         raw_response
       )
       VALUES (
-        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15
+        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16
       )
     `;
 
@@ -988,6 +995,7 @@ const insertQuestionnaireRecordPostgres = async (record) => {
       parseLikertSafely(response.post_q6_1_to_5),
       parseLikertSafely(response.post_q7_1_to_5),
       String(response.format_preference || '').trim(),
+      String(response.format_mix_details || '').trim(),
       String(response.free_text_notes || '').trim(),
       JSON.stringify(response)
     ];

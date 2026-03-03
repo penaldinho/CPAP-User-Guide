@@ -84,7 +84,7 @@
 
           <div class="q" id="q-education">
             <div>3. Highest level of education completed<span class="req">*</span></div>
-            <div class="hint">Please select one highest level only.</div>
+            <div class="hint">Please select one option only.</div>
             <div class="grid">
               <label><input type="radio" name="education" value="secondary_or_below" /> Secondary school or below</label>
               <label><input type="radio" name="education" value="further_education" /> Further education (college/apprenticeship)</label>
@@ -94,8 +94,15 @@
             <div class="error-hint"></div>
           </div>
 
+          <div class="q" id="q-occupation">
+            <label>4. Occupation (optional)
+              <input id="occupation" type="text" />
+            </label>
+            <div class="error-hint"></div>
+          </div>
+
           <div class="q" id="q-device-experience">
-            <div>4. Experience with home medical or monitoring devices (tick all that apply)<span class="req">*</span></div>
+            <div>5. Experience with home medical or monitoring devices (tick all that apply)<span class="req">*</span></div>
             <div class="grid">
               <label><input type="checkbox" name="device_experience" value="none" /> None</label>
               <label><input type="checkbox" name="device_experience" value="blood_pressure_monitor" /> Blood pressure monitor</label>
@@ -111,7 +118,7 @@
           </div>
 
           <div class="q" id="q-tech-comfort">
-            <div>5. Comfort with technology (websites, apps, online forms) — 1 = Not at all comfortable, 5 = Extremely comfortable<span class="req">*</span></div>
+            <div>6. Comfort with technology (websites, apps, online forms) — 1 = Not at all comfortable, 5 = Extremely comfortable<span class="req">*</span></div>
             <div class="likert">
               <span class="likert-anchor">Not at all comfortable</span>
               <label><input type="radio" name="tech_comfort" value="1" /> 1</label>
@@ -131,7 +138,7 @@
         <p class="hint">Please tick one box for each statement. 1 = Strongly disagree, 5 = Strongly agree.</p>
         <div class="grid">
           <div class="q" id="q-baseline-q6">
-            <div>6. I feel confident I could set up an unfamiliar medical device at home using available guidance (for example, written, online, or video materials).<span class="req">*</span></div>
+            <div>7. I feel confident I could set up an unfamiliar medical device at home using available guidance (for example, written, online, or video materials).<span class="req">*</span></div>
             <div class="likert">
               <span class="likert-anchor">Strongly disagree</span>
               <label><input type="radio" name="baseline_q6" value="1" /> 1</label><label><input type="radio" name="baseline_q6" value="2" /> 2</label><label><input type="radio" name="baseline_q6" value="3" /> 3</label><label><input type="radio" name="baseline_q6" value="4" /> 4</label><label><input type="radio" name="baseline_q6" value="5" /> 5</label>
@@ -140,7 +147,7 @@
             <div class="error-hint"></div>
           </div>
           <div class="q" id="q-baseline-q7">
-            <div>7. I usually find it easy to follow step by step instructions for new equipment.<span class="req">*</span></div>
+            <div>8. I usually find it easy to follow step by step instructions for new equipment.<span class="req">*</span></div>
             <div class="likert">
               <span class="likert-anchor">Strongly disagree</span>
               <label><input type="radio" name="baseline_q7" value="1" /> 1</label><label><input type="radio" name="baseline_q7" value="2" /> 2</label><label><input type="radio" name="baseline_q7" value="3" /> 3</label><label><input type="radio" name="baseline_q7" value="4" /> 4</label><label><input type="radio" name="baseline_q7" value="5" /> 5</label>
@@ -149,7 +156,7 @@
             <div class="error-hint"></div>
           </div>
           <div class="q" id="q-baseline-q8">
-            <div>8. I would feel confident trying to solve a problem with a home medical device (for example, resolving an error message).<span class="req">*</span></div>
+            <div>9. I would feel confident trying to solve a problem with a home medical device (for example, resolving an error message).<span class="req">*</span></div>
             <div class="likert">
               <span class="likert-anchor">Strongly disagree</span>
               <label><input type="radio" name="baseline_q8" value="1" /> 1</label><label><input type="radio" name="baseline_q8" value="2" /> 2</label><label><input type="radio" name="baseline_q8" value="3" /> 3</label><label><input type="radio" name="baseline_q8" value="4" /> 4</label><label><input type="radio" name="baseline_q8" value="5" /> 5</label>
@@ -157,6 +164,24 @@
             </div>
             <div class="error-hint"></div>
           </div>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>C. Format preference</legend>
+        <div class="q" id="q-pre-format-preference">
+          <div>10. If you had to learn to use a similar unfamiliar medical device at home, which format would you prefer?<span class="req">*</span></div>
+          <div class="grid">
+            <label><input type="radio" name="format_preference" value="printed_instructions" /> Printed instructions</label>
+            <label><input type="radio" name="format_preference" value="online_website" /> Online interactive website</label>
+            <label><input type="radio" name="format_preference" value="pdf_document" /> PDF document</label>
+            <label><input type="radio" name="format_preference" value="mix_of_formats" /> A mix of formats</label>
+            <label><input type="radio" name="format_preference" value="no_preference" /> No preference</label>
+          </div>
+          <label id="pre_format_mix_details_wrap" style="display:none;">Please specify which formats were mixed<span class="req">*</span>
+            <input id="pre_format_mix_details" type="text" />
+          </label>
+          <div class="error-hint"></div>
         </div>
       </fieldset>
 
@@ -207,6 +232,27 @@
         hint.textContent = message;
       }
     };
+
+    const preFormatPreferenceInputs = Array.from(document.querySelectorAll('input[name="format_preference"]'));
+    const preFormatMixDetailsWrap = document.getElementById('pre_format_mix_details_wrap');
+    const preFormatMixDetailsInput = document.getElementById('pre_format_mix_details');
+
+    const syncPreFormatMixDetailsVisibility = () => {
+      const selectedFormat = radioValue('format_preference');
+      const shouldShowMixDetails = selectedFormat === 'mix_of_formats';
+
+      if (!preFormatMixDetailsWrap) return;
+
+      preFormatMixDetailsWrap.style.display = shouldShowMixDetails ? '' : 'none';
+      if (!shouldShowMixDetails && preFormatMixDetailsInput) {
+        preFormatMixDetailsInput.value = '';
+      }
+    };
+
+    preFormatPreferenceInputs.forEach((input) => {
+      input.addEventListener('change', syncPreFormatMixDetailsVisibility);
+    });
+    syncPreFormatMixDetailsVisibility();
 
     const genderOtherWrap = document.getElementById('gender_other_wrap');
     const genderOtherInput = document.getElementById('gender_other');
@@ -285,6 +331,8 @@
     const clearPreTrialForm = () => {
       document.getElementById('participant_id').value = '';
       document.getElementById('age_years').value = '';
+      document.getElementById('occupation').value = '';
+      document.getElementById('pre_format_mix_details').value = '';
       document.getElementById('gender_other').value = '';
       document.getElementById('device_experience_other').value = '';
       document.getElementById('notes').value = '';
@@ -311,6 +359,7 @@
 
       const ageYears = String(document.getElementById('age_years').value || '').trim();
       const gender = radioValue('gender');
+      const occupation = String(document.getElementById('occupation').value || '').trim();
       const genderOther = String(document.getElementById('gender_other').value || '').trim();
       const education = radioValue('education');
       const deviceExperience = checkboxValues('device_experience');
@@ -319,6 +368,8 @@
       const baselineQ6 = radioValue('baseline_q6');
       const baselineQ7 = radioValue('baseline_q7');
       const baselineQ8 = radioValue('baseline_q8');
+      const formatPreference = radioValue('format_preference');
+      const formatMixDetails = String(document.getElementById('pre_format_mix_details').value || '').trim();
       const consentParticipation = Boolean(document.getElementById('consent_participation').checked);
 
       let hasErrors = false;
@@ -329,6 +380,8 @@
       if (!baselineQ6) { setQuestionError('q-baseline-q6', 'Please select a rating.'); hasErrors = true; }
       if (!baselineQ7) { setQuestionError('q-baseline-q7', 'Please select a rating.'); hasErrors = true; }
       if (!baselineQ8) { setQuestionError('q-baseline-q8', 'Please select a rating.'); hasErrors = true; }
+      if (!formatPreference) { setQuestionError('q-pre-format-preference', 'Please select one option.'); hasErrors = true; }
+      if (formatPreference === 'mix_of_formats' && !formatMixDetails) { setQuestionError('q-pre-format-preference', 'Please specify which formats were mixed.'); hasErrors = true; }
 
       if (!deviceExperience.length) {
         setQuestionError('q-device-experience', 'Please select at least one option.');
@@ -359,6 +412,7 @@
       const responseData = {
         age_years: ageYears,
         gender,
+        occupation,
         gender_other_text: genderOther,
         education,
         device_experience: deviceExperience,
@@ -367,6 +421,8 @@
         baseline_q6_1_to_5: baselineQ6,
         baseline_q7_1_to_5: baselineQ7,
         baseline_q8_1_to_5: baselineQ8,
+        format_preference: formatPreference,
+        format_mix_details: formatMixDetails,
         consent_to_participate: consentParticipation,
         free_text_notes: String(document.getElementById('notes').value || '').trim()
       };

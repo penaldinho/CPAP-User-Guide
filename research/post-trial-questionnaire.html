@@ -104,10 +104,14 @@
             <div>8. If you had to learn to use a similar medical device at home in the future, which format would you prefer?<span class="req">*</span></div>
             <div class="grid">
               <label><input type="radio" name="format_preference" value="printed_instructions" /> Printed instructions</label>
-              <label><input type="radio" name="format_preference" value="online_website_or_pdf" /> Online (website or PDF)</label>
-              <label><input type="radio" name="format_preference" value="mix_of_both" /> A mix of both</label>
+              <label><input type="radio" name="format_preference" value="online_website" /> Online interactive website</label>
+              <label><input type="radio" name="format_preference" value="pdf_document" /> PDF document</label>
+              <label><input type="radio" name="format_preference" value="mix_of_formats" /> A mix of formats</label>
               <label><input type="radio" name="format_preference" value="no_preference" /> No preference</label>
             </div>
+            <label id="post_format_mix_details_wrap" style="display:none;">Please specify which formats were mixed<span class="req">*</span>
+              <input id="post_format_mix_details" type="text" />
+            </label>
             <div class="error-hint"></div>
           </div>
         </div>
@@ -157,9 +161,31 @@
       }
     };
 
+    const postFormatPreferenceInputs = Array.from(document.querySelectorAll('input[name="format_preference"]'));
+    const postFormatMixDetailsWrap = document.getElementById('post_format_mix_details_wrap');
+    const postFormatMixDetailsInput = document.getElementById('post_format_mix_details');
+
+    const syncPostFormatMixDetailsVisibility = () => {
+      const selectedFormat = radioValue('format_preference');
+      const shouldShowMixDetails = selectedFormat === 'mix_of_formats';
+
+      if (!postFormatMixDetailsWrap) return;
+
+      postFormatMixDetailsWrap.style.display = shouldShowMixDetails ? '' : 'none';
+      if (!shouldShowMixDetails && postFormatMixDetailsInput) {
+        postFormatMixDetailsInput.value = '';
+      }
+    };
+
+    postFormatPreferenceInputs.forEach((input) => {
+      input.addEventListener('change', syncPostFormatMixDetailsVisibility);
+    });
+    syncPostFormatMixDetailsVisibility();
+
 
     const clearPostTrialForm = () => {
       document.getElementById('participant_id').value = '';
+      document.getElementById('post_format_mix_details').value = '';
       document.getElementById('notes').value = '';
       document.querySelectorAll('input[type="radio"]').forEach((el) => {
         el.checked = false;
@@ -186,6 +212,7 @@
       const postQ6 = radioValue('post_q6');
       const postQ7 = radioValue('post_q7');
       const formatPreference = radioValue('format_preference');
+      const formatMixDetails = String(document.getElementById('post_format_mix_details').value || '').trim();
 
       let hasErrors = false;
       if (!postQ1) { setQuestionError('q-post-q1', 'Please select a rating.'); hasErrors = true; }
@@ -196,6 +223,7 @@
       if (!postQ6) { setQuestionError('q-post-q6', 'Please select a rating.'); hasErrors = true; }
       if (!postQ7) { setQuestionError('q-post-q7', 'Please select a rating.'); hasErrors = true; }
       if (!formatPreference) { setQuestionError('q-format-preference', 'Please select one option.'); hasErrors = true; }
+      if (formatPreference === 'mix_of_formats' && !formatMixDetails) { setQuestionError('q-format-preference', 'Please specify which formats were mixed.'); hasErrors = true; }
 
       if (hasErrors) {
         statusEl.textContent = 'Please fix the highlighted fields.';
@@ -211,6 +239,7 @@
         post_q6_1_to_5: postQ6,
         post_q7_1_to_5: postQ7,
         format_preference: formatPreference,
+        format_mix_details: formatMixDetails,
         free_text_notes: String(document.getElementById('notes').value || '').trim()
       };
 
