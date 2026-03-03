@@ -188,6 +188,13 @@
     const baseWidth = Number.parseFloat(callout.dataset.mtgBaseWidth || '280');
     const calloutRect = callout.getBoundingClientRect();
     const calloutRight = calloutRect.right;
+    const baseLeft = calloutRight - baseWidth;
+    const overlapProbeRect = {
+      left: baseLeft,
+      right: calloutRight,
+      top: calloutRect.top,
+      bottom: calloutRect.bottom
+    };
     const candidates = [
       document.getElementById('mtg-task-prompt-card'),
       document.getElementById('mtg-participant-end-task-wrap'),
@@ -202,8 +209,8 @@
       }
 
       const rect = element.getBoundingClientRect();
-      const overlapsHorizontally = rect.left < calloutRect.right && rect.right > calloutRect.left;
-      const overlapsVertically = rect.top < calloutRect.bottom && rect.bottom > calloutRect.top;
+      const overlapsHorizontally = rect.left < overlapProbeRect.right && rect.right > overlapProbeRect.left;
+      const overlapsVertically = rect.top < overlapProbeRect.bottom && rect.bottom > overlapProbeRect.top;
       if (!overlapsHorizontally || !overlapsVertically) {
         return;
       }
@@ -216,22 +223,26 @@
       }
     });
 
-    const minWidth = 130;
+    const minWidth = 110;
     const finalWidth = Math.max(minWidth, Math.min(baseWidth, shapedWidth));
     const textSpan = callout.querySelector('span');
     callout.style.width = `${finalWidth}px`;
     callout.style.maxWidth = `${finalWidth}px`;
-    callout.style.lineHeight = hasOverlap ? '1.24' : '1.2';
-    callout.style.paddingTop = hasOverlap ? '6px' : '6px';
-    callout.style.paddingBottom = hasOverlap ? '6px' : '6px';
-    callout.style.maxHeight = hasOverlap ? '56px' : '';
-    callout.style.overflow = hasOverlap ? 'hidden' : '';
+    callout.style.lineHeight = hasOverlap ? '1.32' : '1.2';
+    callout.style.paddingTop = hasOverlap ? '8px' : '6px';
+    callout.style.paddingBottom = hasOverlap ? '8px' : '6px';
+    callout.style.height = 'auto';
+    callout.style.maxHeight = 'none';
+    callout.style.overflow = 'visible';
+    callout.style.borderRadius = hasOverlap ? '10px' : '12px';
 
     if (textSpan) {
-      textSpan.style.display = hasOverlap ? '-webkit-box' : '';
-      textSpan.style.webkitLineClamp = hasOverlap ? '2' : '';
-      textSpan.style.webkitBoxOrient = hasOverlap ? 'vertical' : '';
-      textSpan.style.overflow = hasOverlap ? 'hidden' : '';
+      textSpan.style.display = 'block';
+      textSpan.style.webkitLineClamp = '';
+      textSpan.style.webkitBoxOrient = '';
+      textSpan.style.overflow = 'visible';
+      textSpan.style.whiteSpace = 'normal';
+      textSpan.style.wordBreak = 'break-word';
     }
   };
 
