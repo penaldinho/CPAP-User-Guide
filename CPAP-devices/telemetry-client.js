@@ -1308,7 +1308,9 @@
       <div style="font-size:18px; font-weight:700; color:#0f172a; margin-bottom:6px; line-height:1.25;">About this trial</div>
       <div style="font-size:16px; color:#334155; line-height:1.55;">
         You will complete 7 activities in total: 3 practical scenarios followed by 4 short questions.<br />
+        Task timings, completion outcomes, and task responses/interactions will be recorded for research purposes only.<br />
         Each scenario has a 5:00-minute time limit, and each question has a 1:30-minute time limit.<br />
+        You may find it helpful to focus on information that is most relevant to each task, given the time limit.<br />
         Question tasks have multiple sections; type each section answer as soon as you find it so it is logged.<br />
         When you finish a task, click “I have completed this task”.<br />
         Once a task is marked complete, you cannot return to it and it is treated as finished.<br />
