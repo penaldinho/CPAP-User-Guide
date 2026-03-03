@@ -54,6 +54,8 @@
             You will complete 7 activities in total: 3 practical scenarios followed by 4 short questions.<br />
             Each scenario has a 5:00 time limit, and each question has a 1:30 time limit.<br />
             Question tasks have multiple sections; type each section answer as soon as you find it so it is logged.<br />
+            When you finish a task, click “I have completed this task”.<br />
+            Once a task is marked complete, you cannot return to it and it is treated as finished.<br />
             Work through them in order using the on-screen buttons.<br />
             A timer runs for each activity, and your progress is recorded automatically.
           </div>
@@ -423,6 +425,33 @@
         setRunnerState(state);
       };
 
+      const getShortFormCompletionSummary = (taskId, populatedDraft) => {
+        const task = tasks[String(taskId || '').trim()] || null;
+        const parts = Array.isArray(task && task.parts) ? task.parts : [];
+        const expectedKeys = parts
+          .map((part) => String(part && part.key || '').trim())
+          .filter(Boolean);
+
+        if (!expectedKeys.length) {
+          return {
+            isIncomplete: false,
+            answeredCount: Object.keys(populatedDraft || {}).length,
+            totalCount: 0
+          };
+        }
+
+        const answeredCount = expectedKeys.filter((key) => {
+          return Object.prototype.hasOwnProperty.call(populatedDraft || {}, key)
+            && String((populatedDraft || {})[key] || '').trim().length > 0;
+        }).length;
+
+        return {
+          isIncomplete: answeredCount < expectedKeys.length,
+          answeredCount,
+          totalCount: expectedKeys.length
+        };
+      };
+
       const renderTask = () => {
         const isTrialScreen = state.screen === 'trial' && !!state.participantId;
         setupScreenEl.style.display = isTrialScreen ? 'none' : 'grid';
@@ -581,8 +610,23 @@
 
             if (task.kind === 'short_form') {
               const draft = getPopulatedShortFormDraftForTask(taskId);
+              const completion = getShortFormCompletionSummary(taskId, draft);
+
+              if (completion.isIncomplete) {
+                const confirmed = window.confirm(
+                  `You have answered ${completion.answeredCount} of ${completion.totalCount} sections. Submit your answer anyway?`
+                );
+                if (!confirmed) {
+                  return;
+                }
+              }
+
+              const responsePayload = Object.keys(draft).length
+                ? draft
+                : buildNullShortFormPartsForTask(taskId);
+
               await submitEvent('note', JSON.stringify({
-                short_form_response: draft,
+                short_form_response: responsePayload,
                 task_id: taskId
               }));
               clearShortFormDraftForTask(taskId);

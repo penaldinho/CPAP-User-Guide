@@ -1099,6 +1099,34 @@
     return `Provide your response for each section (${keys[0]})-(${keys[keys.length - 1]}) below.`;
   };
 
+  const getShortFormCompletionSummary = (taskId, rawParts) => {
+    const definition = getShortFormQuestionDefinition(taskId);
+    const orderedParts = Array.isArray(definition && definition.parts) ? definition.parts : [];
+    const expectedKeys = orderedParts
+      .map((part) => String(part && part.key || '').trim())
+      .filter(Boolean);
+
+    if (!expectedKeys.length) {
+      return {
+        isIncomplete: false,
+        answeredCount: Object.keys(rawParts && typeof rawParts === 'object' ? rawParts : {}).length,
+        totalCount: 0
+      };
+    }
+
+    const normalized = rawParts && typeof rawParts === 'object' ? rawParts : {};
+    const answeredCount = expectedKeys.filter((key) => {
+      return Object.prototype.hasOwnProperty.call(normalized, key)
+        && String(normalized[key] || '').trim().length > 0;
+    }).length;
+
+    return {
+      isIncomplete: answeredCount < expectedKeys.length,
+      answeredCount,
+      totalCount: expectedKeys.length
+    };
+  };
+
   const collectPopulatedShortFormAnswers = (rawParts) => {
     const next = {};
     Object.entries(rawParts && typeof rawParts === 'object' ? rawParts : {}).forEach(([key, value]) => {
@@ -1239,6 +1267,8 @@
         You will complete 7 activities in total: 3 practical scenarios followed by 4 short questions.<br />
         Each scenario has a 5:00 time limit, and each question has a 1:30 time limit.<br />
         Question tasks have multiple sections; type each section answer as soon as you find it so it is logged.<br />
+        When you finish a task, click “I have completed this task”.<br />
+        Once a task is marked complete, you cannot return to it and it is treated as finished.<br />
         Work through them in order using the on-screen buttons.<br />
         A timer runs for each activity, and your progress is recorded automatically.
       </div>
@@ -1347,7 +1377,7 @@
       : 'Hover this card to expand';
     const completionInstruction = isShortFormTask
       ? 'Type your answer in the box below, then click Submit answer.'
-      : 'When finished, click “I have finished this task”.';
+      : 'When finished, click “I have completed this task”.';
     const instructionsLine = lines.find((line) => /you may use the instructions at any time/i.test(String(line || '')));
     const detailLines = lines.filter((line, index) => {
       if (index !== 0) return true;
@@ -1363,7 +1393,7 @@
     card.innerHTML = `
       <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
         <strong style="font-size:13px; color:#0f172a;">Task in progress</strong>
-        <button id="mtg-task-prompt-finish-btn" type="button" style="padding:6px 10px; border:1px solid #0f766e; background:#0f766e; color:#ffffff; border-radius:999px; font-size:12px; font-weight:600; cursor:pointer; white-space:nowrap;">I have finished this task</button>
+        <button id="mtg-task-prompt-finish-btn" type="button" style="padding:6px 10px; border:1px solid #0f766e; background:#0f766e; color:#ffffff; border-radius:999px; font-size:12px; font-weight:600; cursor:pointer; white-space:nowrap;">I have completed this task</button>
       </div>
       <div style="margin-top:6px; font-size:12px; color:#334155; font-weight:600;">Elapsed: ${escapeHtml(elapsedWithCapText)}</div>
       <div style="margin-top:8px; color:#334155; line-height:1.4; font-size:14px; overflow:hidden; display:${scenarioDescription ? '-webkit-box' : 'none'}; -webkit-line-clamp:${isExpanded ? '3' : '2'}; -webkit-box-orient:vertical;">${escapeHtml(scenarioDescription)}</div>
@@ -1643,7 +1673,7 @@
     button.style.fontWeight = '600';
     button.style.cursor = 'pointer';
     button.style.boxShadow = '0 10px 24px rgba(0,0,0,0.2)';
-    button.textContent = 'I have finished this task';
+    button.textContent = 'I have completed this task';
 
     const shortFormTaskIds = ['short_form_q1', 'short_form_q2', 'short_form_q3', 'short_form_q4'];
 
@@ -1663,7 +1693,24 @@
         answerParts[key] = String(input.value || '').trim();
       });
 
-      const submittedAny = submitPartialShortFormAnswer(taskId, String(state.task_label || '').trim(), answerParts, 'short_form_answer_submitted');
+      const completion = getShortFormCompletionSummary(taskId, answerParts);
+      const hasAnyAnswer = Object.values(answerParts).some((value) => String(value || '').trim().length > 0);
+      if (completion.isIncomplete) {
+        const confirmed = window.confirm(
+          `You have answered ${completion.answeredCount} of ${completion.totalCount} sections. Submit your answer anyway?`
+        );
+        if (!confirmed) {
+          return;
+        }
+      }
+
+      const submittedAny = submitPartialShortFormAnswer(
+        taskId,
+        String(state.task_label || '').trim(),
+        answerParts,
+        'short_form_answer_submitted',
+        { forceNullWhenEmpty: !hasAnyAnswer }
+      );
       if (!submittedAny) {
         window.alert('Please provide at least one answer before submitting.');
         return;
