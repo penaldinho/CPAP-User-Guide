@@ -118,29 +118,15 @@
           </div>
 
           <div class="q" id="q-tech-comfort">
-            <div>6. How comfortable are you using everyday digital tools (for example websites, apps, and online forms)? — 1 = Not at all comfortable, 5 = Extremely comfortable<span class="req">*</span></div>
+            <div>6. How would you rate your digital literacy? — 1 = Very low, 5 = Very high<span class="req">*</span></div>
             <div class="likert">
-              <span class="likert-anchor">Not at all comfortable</span>
+              <span class="likert-anchor">Very low</span>
               <label><input type="radio" name="tech_comfort" value="1" /> 1</label>
               <label><input type="radio" name="tech_comfort" value="2" /> 2</label>
               <label><input type="radio" name="tech_comfort" value="3" /> 3</label>
               <label><input type="radio" name="tech_comfort" value="4" /> 4</label>
               <label><input type="radio" name="tech_comfort" value="5" /> 5</label>
-              <span class="likert-anchor right">Extremely comfortable</span>
-            </div>
-            <div class="error-hint"></div>
-          </div>
-
-          <div class="q" id="q-print-instruction-comfort">
-            <div>7. How comfortable are you following printed written instructions? — 1 = Not at all comfortable, 5 = Extremely comfortable<span class="req">*</span></div>
-            <div class="likert">
-              <span class="likert-anchor">Not at all comfortable</span>
-              <label><input type="radio" name="print_instruction_comfort" value="1" /> 1</label>
-              <label><input type="radio" name="print_instruction_comfort" value="2" /> 2</label>
-              <label><input type="radio" name="print_instruction_comfort" value="3" /> 3</label>
-              <label><input type="radio" name="print_instruction_comfort" value="4" /> 4</label>
-              <label><input type="radio" name="print_instruction_comfort" value="5" /> 5</label>
-              <span class="likert-anchor right">Extremely comfortable</span>
+              <span class="likert-anchor right">Very high</span>
             </div>
             <div class="error-hint"></div>
           </div>
@@ -152,7 +138,7 @@
         <p class="hint">Please tick one box for each statement. 1 = Strongly disagree, 5 = Strongly agree.</p>
         <div class="grid">
           <div class="q" id="q-baseline-q6">
-            <div>8. I feel confident I could set up an unfamiliar medical device at home using available guidance (for example, written, online, or video materials).<span class="req">*</span></div>
+            <div>7. I feel confident using digital guidance to set up an unfamiliar medical device at home.<span class="req">*</span></div>
             <div class="likert">
               <span class="likert-anchor">Strongly disagree</span>
               <label><input type="radio" name="baseline_q6" value="1" /> 1</label><label><input type="radio" name="baseline_q6" value="2" /> 2</label><label><input type="radio" name="baseline_q6" value="3" /> 3</label><label><input type="radio" name="baseline_q6" value="4" /> 4</label><label><input type="radio" name="baseline_q6" value="5" /> 5</label>
@@ -161,7 +147,7 @@
             <div class="error-hint"></div>
           </div>
           <div class="q" id="q-baseline-q7">
-            <div>9. I usually find it easy to follow step by step instructions for new equipment.<span class="req">*</span></div>
+            <div>8. I feel confident using written guidance to set up an unfamiliar medical device at home.<span class="req">*</span></div>
             <div class="likert">
               <span class="likert-anchor">Strongly disagree</span>
               <label><input type="radio" name="baseline_q7" value="1" /> 1</label><label><input type="radio" name="baseline_q7" value="2" /> 2</label><label><input type="radio" name="baseline_q7" value="3" /> 3</label><label><input type="radio" name="baseline_q7" value="4" /> 4</label><label><input type="radio" name="baseline_q7" value="5" /> 5</label>
@@ -170,7 +156,7 @@
             <div class="error-hint"></div>
           </div>
           <div class="q" id="q-baseline-q8">
-            <div>10. I would feel confident trying to solve a problem with a home medical device (for example, resolving an error message).<span class="req">*</span></div>
+            <div>9. I would feel confident trying to solve a problem with a home medical device (for example, resolving an error message).<span class="req">*</span></div>
             <div class="likert">
               <span class="likert-anchor">Strongly disagree</span>
               <label><input type="radio" name="baseline_q8" value="1" /> 1</label><label><input type="radio" name="baseline_q8" value="2" /> 2</label><label><input type="radio" name="baseline_q8" value="3" /> 3</label><label><input type="radio" name="baseline_q8" value="4" /> 4</label><label><input type="radio" name="baseline_q8" value="5" /> 5</label>
@@ -184,7 +170,7 @@
       <fieldset>
         <legend>C. Format preference</legend>
         <div class="q" id="q-pre-format-preference">
-          <div>11. If you had to learn to use an unfamiliar medical device at home, which format would you prefer?<span class="req">*</span></div>
+          <div>10. If you had to learn to use an unfamiliar medical device at home, which format would you prefer?<span class="req">*</span></div>
           <div class="grid">
             <label><input type="radio" name="format_preference" value="printed_instructions" /> Printed instructions</label>
             <label><input type="radio" name="format_preference" value="online_website" /> Online interactive website</label>
@@ -379,7 +365,6 @@
       const deviceExperience = checkboxValues('device_experience');
       const deviceExperienceOther = String(document.getElementById('device_experience_other').value || '').trim();
       const techComfort = radioValue('tech_comfort');
-      const printInstructionComfort = radioValue('print_instruction_comfort');
       const baselineQ6 = radioValue('baseline_q6');
       const baselineQ7 = radioValue('baseline_q7');
       const baselineQ8 = radioValue('baseline_q8');
@@ -392,7 +377,6 @@
       if (!gender) { setQuestionError('q-gender', 'Please select one option.'); hasErrors = true; }
       if (!education) { setQuestionError('q-education', 'Please select one option.'); hasErrors = true; }
       if (!techComfort) { setQuestionError('q-tech-comfort', 'Please select a rating.'); hasErrors = true; }
-      if (!printInstructionComfort) { setQuestionError('q-print-instruction-comfort', 'Please select a rating.'); hasErrors = true; }
       if (!baselineQ6) { setQuestionError('q-baseline-q6', 'Please select a rating.'); hasErrors = true; }
       if (!baselineQ7) { setQuestionError('q-baseline-q7', 'Please select a rating.'); hasErrors = true; }
       if (!baselineQ8) { setQuestionError('q-baseline-q8', 'Please select a rating.'); hasErrors = true; }
@@ -434,7 +418,6 @@
         device_experience: deviceExperience,
         device_experience_other: deviceExperienceOther,
         tech_comfort_1_to_5: techComfort,
-        print_instruction_comfort_1_to_5: printInstructionComfort,
         baseline_q6_1_to_5: baselineQ6,
         baseline_q7_1_to_5: baselineQ7,
         baseline_q8_1_to_5: baselineQ8,
