@@ -1262,13 +1262,14 @@
     card.style.color = '#1f2937';
 
     card.innerHTML = `
-      <div style="font-size:14px; font-weight:700; color:#0f172a; margin-bottom:6px;">About this trial</div>
-      <div style="font-size:13px; color:#334155; line-height:1.45;">
+      <div style="font-size:18px; font-weight:700; color:#0f172a; margin-bottom:6px; line-height:1.25;">About this trial</div>
+      <div style="font-size:16px; color:#334155; line-height:1.55;">
         You will complete 7 activities in total: 3 practical scenarios followed by 4 short questions.<br />
         Each scenario has a 5:00 time limit, and each question has a 1:30 time limit.<br />
         Question tasks have multiple sections; type each section answer as soon as you find it so it is logged.<br />
         When you finish a task, click “I have completed this task”.<br />
         Once a task is marked complete, you cannot return to it and it is treated as finished.<br />
+        Once you click Start trial, the timer for the first task starts immediately.<br />
         Work through them in order using the on-screen buttons.<br />
         A timer runs for each activity, and your progress is recorded automatically.
       </div>
