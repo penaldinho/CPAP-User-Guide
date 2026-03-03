@@ -72,19 +72,24 @@
             <div class="inline">
               <label><input type="radio" name="gender" value="female" /> Female</label>
               <label><input type="radio" name="gender" value="male" /> Male</label>
-              <label><input type="radio" name="gender" value="non_binary_other" /> Non binary / other</label>
+              <label><input type="radio" name="gender" value="non_binary" /> Non-binary</label>
+              <label><input type="radio" name="gender" value="other" /> Other (please specify)</label>
               <label><input type="radio" name="gender" value="prefer_not_say" /> Prefer not to say</label>
             </div>
+            <label>Other gender (if selected)
+              <input id="gender_other" type="text" />
+            </label>
             <div class="error-hint"></div>
           </div>
 
           <div class="q" id="q-education">
             <div>3. Highest level of education completed<span class="req">*</span></div>
+            <div class="hint">Please select one highest level only.</div>
             <div class="grid">
               <label><input type="radio" name="education" value="secondary_or_below" /> Secondary school or below</label>
               <label><input type="radio" name="education" value="further_education" /> Further education (college/apprenticeship)</label>
-              <label><input type="radio" name="education" value="university_degree" /> University degree</label>
-              <label><input type="radio" name="education" value="postgraduate_degree" /> Postgraduate degree</label>
+              <label><input type="radio" name="education" value="university_degree" /> Undergraduate university degree (e.g. BA, BSc)</label>
+              <label><input type="radio" name="education" value="postgraduate_degree" /> Postgraduate degree (e.g. Master's, PhD)</label>
             </div>
             <div class="error-hint"></div>
           </div>
@@ -203,10 +208,64 @@
       }
     };
 
+    const deviceExperienceInputs = Array.from(document.querySelectorAll('input[name="device_experience"]'));
+    const noneDeviceExperienceInput = document.querySelector('input[name="device_experience"][value="none"]');
+    const otherDeviceExperienceInput = document.querySelector('input[name="device_experience"][value="other"]');
+    const deviceExperienceOtherInput = document.getElementById('device_experience_other');
+
+    const syncDeviceExperienceSelection = () => {
+      if (!noneDeviceExperienceInput) return;
+
+      const nonNoneInputs = deviceExperienceInputs.filter((input) => input.value !== 'none');
+      const hasAnyNonNoneSelected = nonNoneInputs.some((input) => input.checked);
+
+      if (noneDeviceExperienceInput.checked && hasAnyNonNoneSelected) {
+        nonNoneInputs.forEach((input) => {
+          input.checked = false;
+        });
+      } else if (!noneDeviceExperienceInput.checked && hasAnyNonNoneSelected) {
+        noneDeviceExperienceInput.checked = false;
+      }
+    };
+
+    deviceExperienceInputs.forEach((input) => {
+      input.addEventListener('change', () => {
+        if (input.value === 'none' && input.checked) {
+          deviceExperienceInputs.forEach((candidate) => {
+            if (candidate.value !== 'none') {
+              candidate.checked = false;
+            }
+          });
+          return;
+        }
+
+        if (input.value !== 'none' && input.checked && noneDeviceExperienceInput) {
+          noneDeviceExperienceInput.checked = false;
+        }
+
+        syncDeviceExperienceSelection();
+      });
+    });
+
+    if (deviceExperienceOtherInput) {
+      deviceExperienceOtherInput.addEventListener('input', () => {
+        const hasOtherText = String(deviceExperienceOtherInput.value || '').trim().length > 0;
+        if (!hasOtherText || !otherDeviceExperienceInput) {
+          return;
+        }
+
+        otherDeviceExperienceInput.checked = true;
+        if (noneDeviceExperienceInput) {
+          noneDeviceExperienceInput.checked = false;
+        }
+      });
+    }
+
 
     const clearPreTrialForm = () => {
       document.getElementById('participant_id').value = '';
       document.getElementById('age_years').value = '';
+      document.getElementById('gender_other').value = '';
       document.getElementById('device_experience_other').value = '';
       document.getElementById('notes').value = '';
       document.getElementById('consent_participation').checked = false;
@@ -232,6 +291,7 @@
 
       const ageYears = String(document.getElementById('age_years').value || '').trim();
       const gender = radioValue('gender');
+      const genderOther = String(document.getElementById('gender_other').value || '').trim();
       const education = radioValue('education');
       const deviceExperience = checkboxValues('device_experience');
       const deviceExperienceOther = String(document.getElementById('device_experience_other').value || '').trim();
@@ -244,6 +304,7 @@
       let hasErrors = false;
       if (!ageYears) { setQuestionError('q-age', 'Please provide your age.'); hasErrors = true; }
       if (!gender) { setQuestionError('q-gender', 'Please select one option.'); hasErrors = true; }
+      if (gender === 'other' && !genderOther) { setQuestionError('q-gender', 'Please specify your gender for "Other".'); hasErrors = true; }
       if (!education) { setQuestionError('q-education', 'Please select one option.'); hasErrors = true; }
       if (!techComfort) { setQuestionError('q-tech-comfort', 'Please select a rating.'); hasErrors = true; }
       if (!baselineQ6) { setQuestionError('q-baseline-q6', 'Please select a rating.'); hasErrors = true; }
@@ -279,6 +340,7 @@
       const responseData = {
         age_years: ageYears,
         gender,
+        gender_other_text: genderOther,
         education,
         device_experience: deviceExperience,
         device_experience_other: deviceExperienceOther,
@@ -304,13 +366,18 @@
       try {
         submitBtn.disabled = true;
         submitBtn.textContent = 'Submitting...';
+        const submittedAtIso = payload.timestamp;
         const response = await fetch(endpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
         });
         if (response.ok) {
-          window.location.href = 'index.html';
+          const confirmationUrl = new URL('questionnaire-submitted.html', window.location.href);
+          confirmationUrl.searchParams.set('type', 'pre-trial');
+          confirmationUrl.searchParams.set('participant', participantId);
+          confirmationUrl.searchParams.set('submittedAt', submittedAtIso);
+          window.location.href = confirmationUrl.toString();
         } else {
           statusEl.textContent = 'Failed to submit.';
         }
