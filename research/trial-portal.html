@@ -329,7 +329,7 @@
               short_form_response: responsePayload,
               task_id: taskId,
               task_status: 'time_cap_reached'
-            }));
+            }), capMs);
           }
 
           await submitEvent('task_end', 'time_cap_reached', capMs);
@@ -689,6 +689,7 @@
             }
 
             if (task.kind === 'short_form') {
+              const elapsedAtCompletionMs = getActiveElapsedMs();
               const draft = getPopulatedShortFormDraftForTask(taskId);
               const completion = getShortFormCompletionSummary(taskId, draft);
 
@@ -708,7 +709,20 @@
               await submitEvent('note', JSON.stringify({
                 short_form_response: responsePayload,
                 task_id: taskId
-              }));
+              }), elapsedAtCompletionMs);
+
+              await submitEvent('task_end', 'participant_completed', elapsedAtCompletionMs);
+              state.startedTaskId = '';
+              state.startedAt = '';
+              state.completedElapsedMsByTask[taskId] = elapsedAtCompletionMs;
+              state.timedOutTaskIds = state.timedOutTaskIds.filter((id) => id !== taskId);
+              if (!state.completedTaskIds.includes(taskId)) {
+                state.completedTaskIds.push(taskId);
+              }
+              setRunnerState(state);
+              renderTask();
+              setStatus(`Completed ${taskId}.`, true);
+              return;
             }
 
             const elapsedAtCompletionMs = getActiveElapsedMs();

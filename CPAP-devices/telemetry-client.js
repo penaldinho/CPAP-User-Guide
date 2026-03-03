@@ -1295,13 +1295,17 @@
         .join('\n')
       : Object.entries(responseParts).map(([partKey, text]) => `(${partKey}) ${text}`).join('\n');
 
+    const currentTaskState = getTaskState();
+    const durationMs = getDisplayedElapsedMsForTaskState(currentTaskState);
+
     track('short_form_answer_submitted', {
       question_id: key,
       task_id: key,
       task_label: String(taskLabel || '').trim(),
       response_message: answerText,
       response_parts: responseParts,
-      task_status: String(taskStatus || '').trim()
+      task_status: String(taskStatus || '').trim(),
+      duration_ms: Number.isFinite(durationMs) ? durationMs : null
     });
 
     clearShortFormDraft(key);
