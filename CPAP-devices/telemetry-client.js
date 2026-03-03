@@ -1851,10 +1851,12 @@
     const participantNextState = getParticipantNextTaskState();
     const transitionReason = String(participantNextState.transition_reason || '').trim();
     const timedOut = transitionReason === 'time_cap_reached';
+    const researchMode = isResearchMode();
     const hasPendingNextTask = !taskId && String(participantNextState.next_task_id || '').trim();
     const hasCompletedSequence = !taskId && String(participantNextState.status || '').trim() === 'completed';
+    const showCompletedSequenceCard = hasCompletedSequence && researchMode;
 
-    wrap.style.display = ((isShortFormTask && taskId) || hasPendingNextTask || hasCompletedSequence) ? 'block' : 'none';
+    wrap.style.display = ((isShortFormTask && taskId) || hasPendingNextTask || showCompletedSequenceCard) ? 'block' : 'none';
 
     if (!taskId) {
       setTaskPromptExpanded(false);
@@ -1875,7 +1877,7 @@
     }
 
     if (participantNextWrap) {
-      participantNextWrap.style.display = !taskId && (hasPendingNextTask || hasCompletedSequence) ? 'block' : 'none';
+      participantNextWrap.style.display = !taskId && (hasPendingNextTask || showCompletedSequenceCard) ? 'block' : 'none';
     }
 
     if (participantNextTitle) {
@@ -1890,7 +1892,7 @@
         } else {
           participantNextLabel.textContent = `Next task: ${nextLabel || String(participantNextState.next_task_id || '').trim()}`;
         }
-      } else if (hasCompletedSequence) {
+      } else if (showCompletedSequenceCard) {
         participantNextLabel.textContent = timedOut
           ? 'Time limit reached for the final task. All participant tasks are complete. Press Ctrl+Alt+R to open Research Controls.'
           : 'All participant tasks are complete. Press Ctrl+Alt+R to open Research Controls.';
