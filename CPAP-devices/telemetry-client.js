@@ -1305,6 +1305,29 @@
     syncParticipantEndButton();
   };
 
+  const lockVisibleShortFormInputsForTimeout = () => {
+    const shortFormWrap = document.getElementById('mtg-short-form-answer-wrap');
+    if (!shortFormWrap) {
+      return;
+    }
+
+    const partInputs = Array.from(shortFormWrap.querySelectorAll('[data-short-form-part="1"]'));
+    partInputs.forEach((input) => {
+      input.disabled = true;
+      input.style.background = '#e5e7eb';
+      input.style.color = '#6b7280';
+      input.style.cursor = 'not-allowed';
+    });
+
+    const submitButton = document.getElementById('mtg-short-form-answer-submit');
+    if (submitButton) {
+      submitButton.disabled = true;
+      submitButton.style.opacity = '0.65';
+      submitButton.style.cursor = 'not-allowed';
+      submitButton.textContent = 'Time limit reached';
+    }
+  };
+
   const formatElapsedDuration = (durationMs) => {
     const totalSeconds = Math.max(0, Math.floor((durationMs || 0) / 1000));
     const minutes = Math.floor(totalSeconds / 60);
@@ -1495,6 +1518,7 @@
       const nextTaskId = getNextTaskIdInSequence(currentTaskId);
 
       if (/^short_form_q[1-4]$/i.test(currentTaskId)) {
+        lockVisibleShortFormInputsForTimeout();
         submitPartialShortFormAnswer(
           currentTaskId,
           state.task_label || '',
@@ -1822,6 +1846,7 @@
     const shortFormLabel = document.getElementById('mtg-short-form-answer-label');
     const shortFormPrompt = document.getElementById('mtg-short-form-answer-prompt');
     const shortFormFields = document.getElementById('mtg-short-form-answer-fields');
+    const shortFormSubmit = document.getElementById('mtg-short-form-answer-submit');
 
     const participantNextState = getParticipantNextTaskState();
     const transitionReason = String(participantNextState.transition_reason || '').trim();
@@ -1903,6 +1928,12 @@
       if (shortFormFields) {
         shortFormFields.innerHTML = '';
       }
+      if (shortFormSubmit) {
+        shortFormSubmit.disabled = false;
+        shortFormSubmit.style.opacity = '1';
+        shortFormSubmit.style.cursor = 'pointer';
+        shortFormSubmit.textContent = 'Submit answer';
+      }
       updateTaskCardSafeArea();
       return;
     }
@@ -1945,6 +1976,13 @@
     if (shortFormWrap) {
       shortFormWrap.style.maxHeight = isShortFormCardExpanded ? '64vh' : '160px';
       shortFormWrap.style.overflow = isShortFormCardExpanded ? 'auto' : 'hidden';
+    }
+
+    if (shortFormSubmit) {
+      shortFormSubmit.disabled = false;
+      shortFormSubmit.style.opacity = '1';
+      shortFormSubmit.style.cursor = 'pointer';
+      shortFormSubmit.textContent = 'Submit answer';
     }
 
     if (shortFormSteps) {

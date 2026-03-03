@@ -206,7 +206,8 @@
           startedAt: String(parsed.startedAt || '').trim(),
           completedTaskIds: Array.isArray(parsed.completedTaskIds) ? parsed.completedTaskIds : [],
           completedElapsedMsByTask: parsed.completedElapsedMsByTask && typeof parsed.completedElapsedMsByTask === 'object' ? parsed.completedElapsedMsByTask : {},
-          shortFormDrafts: parsed.shortFormDrafts && typeof parsed.shortFormDrafts === 'object' ? parsed.shortFormDrafts : {}
+          shortFormDrafts: parsed.shortFormDrafts && typeof parsed.shortFormDrafts === 'object' ? parsed.shortFormDrafts : {},
+          timedOutTaskIds: Array.isArray(parsed.timedOutTaskIds) ? parsed.timedOutTaskIds : []
         };
       };
 
@@ -249,7 +250,8 @@
         startedAt: '',
         completedTaskIds: [],
         completedElapsedMsByTask: {},
-        shortFormDrafts: {}
+        shortFormDrafts: {},
+        timedOutTaskIds: []
       });
 
       const startNewSession = () => {
@@ -327,6 +329,9 @@
           state.completedElapsedMsByTask[taskId] = capMs;
           if (!state.completedTaskIds.includes(taskId)) {
             state.completedTaskIds.push(taskId);
+          }
+          if (!state.timedOutTaskIds.includes(taskId)) {
+            state.timedOutTaskIds.push(taskId);
           }
           setRunnerState(state);
           renderTask();
@@ -475,6 +480,7 @@
 
         const isStarted = state.startedTaskId === taskId;
         const isCompleted = state.completedTaskIds.includes(taskId);
+        const isTimedOut = state.timedOutTaskIds.includes(taskId);
         const isShortForm = task.kind === 'short_form';
         const isLastTask = state.currentTaskIndex === taskOrder.length - 1;
         const isTrialFinished = isLastTask && isCompleted && !isStarted;
@@ -527,12 +533,27 @@
 
         const answerWrap = document.getElementById('answer-wrap');
         const parts = Array.isArray(task.parts) ? task.parts : [];
+        const shouldDisableShortFormInputs = isTimedOut && !isStarted;
         answerWrap.innerHTML = parts.map((part) => `
           <label>
             <span class="answer-label">${part.label}</span>
-            <textarea data-part-key="${part.key}" placeholder="Type your answer for part ${String(part.key || '').toUpperCase()}…">${draft[part.key] ? String(draft[part.key]) : ''}</textarea>
+            <textarea
+              data-part-key="${part.key}"
+              placeholder="Type your answer for part ${String(part.key || '').toUpperCase()}…"
+              ${shouldDisableShortFormInputs ? 'disabled' : ''}
+              style="${shouldDisableShortFormInputs ? 'background:#e5e7eb;color:#6b7280;cursor:not-allowed;' : ''}"
+            >${draft[part.key] ? String(draft[part.key]) : ''}</textarea>
           </label>
         `).join('');
+
+        if (shouldDisableShortFormInputs) {
+          const warning = document.createElement('div');
+          warning.style.fontSize = '12px';
+          warning.style.color = '#6b7280';
+          warning.style.marginTop = '4px';
+          warning.textContent = 'Time limit reached. Answers are locked for this task.';
+          answerWrap.appendChild(warning);
+        }
 
         const inputs = Array.from(answerWrap.querySelectorAll('textarea[data-part-key]'));
         inputs.forEach((input) => {
@@ -566,7 +587,8 @@
             startedAt: new Date().toISOString(),
             completedTaskIds: [],
             completedElapsedMsByTask: {},
-            shortFormDrafts: {}
+            shortFormDrafts: {},
+            timedOutTaskIds: []
           };
 
           setRunnerState(state);
@@ -595,6 +617,7 @@
             state.startedTaskId = taskId;
             state.startedAt = new Date().toISOString();
             state.completedTaskIds = state.completedTaskIds.filter((id) => id !== taskId);
+            state.timedOutTaskIds = state.timedOutTaskIds.filter((id) => id !== taskId);
             delete state.completedElapsedMsByTask[taskId];
             setRunnerState(state);
             renderTask();
@@ -637,6 +660,7 @@
             state.startedTaskId = '';
             state.startedAt = '';
             state.completedElapsedMsByTask[taskId] = elapsedAtCompletionMs;
+            state.timedOutTaskIds = state.timedOutTaskIds.filter((id) => id !== taskId);
             if (!state.completedTaskIds.includes(taskId)) {
               state.completedTaskIds.push(taskId);
             }
