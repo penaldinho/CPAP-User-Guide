@@ -46,7 +46,6 @@
         <div class="q" id="q-participant">
           <label>Participant ID<span class="req">*</span><input id="participant_id" type="text" required /></label>
           <div class="error-hint"></div>
-          <label>Observer ID<input id="observer_id" type="text" /></label>
         </div>
       </fieldset>
 
@@ -199,7 +198,6 @@
 
     const clearPreTrialForm = () => {
       document.getElementById('participant_id').value = '';
-      document.getElementById('observer_id').value = '';
       document.getElementById('age_years').value = '';
       document.getElementById('device_experience_other').value = '';
       document.getElementById('notes').value = '';
@@ -280,7 +278,6 @@
         timestamp: new Date().toISOString(),
         session_id: `phys_${Date.now().toString(36)}`,
         participant_id: participantId,
-        observer_id: String(document.getElementById('observer_id').value || '').trim(),
         task_id: 'pre-trial-questionnaire',
         task_label: 'Pre-trial questionnaire',
         event_type: 'note',
