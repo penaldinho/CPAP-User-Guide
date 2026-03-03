@@ -218,24 +218,25 @@ CREATE TABLE IF NOT EXISTS pre_trial_questionnaire (
   session_id TEXT,
   participant_id TEXT NOT NULL,
   observer_id TEXT,
-  age_years INTEGER,
-  gender TEXT,
-  education TEXT,
-  occupation TEXT,
-  tech_comfort INTEGER,
-  baseline_q6 INTEGER,
-  baseline_q7 INTEGER,
-  baseline_q8 INTEGER,
-  format_preference TEXT,
-  format_mix_details TEXT,
+  q1_age_years INTEGER,
+  q2_gender TEXT,
+  q2_gender_other_text TEXT,
+  q3_education TEXT,
+  q4_occupation TEXT,
+  q6_digital_literacy INTEGER,
+  q7_digital_guidance INTEGER,
+  q8_physical_guidance INTEGER,
+  q9_problem_solving INTEGER,
+  q10_format_preference TEXT,
+  q10_format_mix_details TEXT,
   consent_to_participate BOOLEAN,
-  device_experience_none BOOLEAN,
-  device_experience_blood_pressure_monitor BOOLEAN,
-  device_experience_blood_glucose_monitor BOOLEAN,
-  device_experience_inhaler_nebuliser BOOLEAN,
-  device_experience_sleep_fitness_tracker BOOLEAN,
-  device_experience_other BOOLEAN,
-  device_experience_other_text TEXT,
+  q5_device_experience_none BOOLEAN,
+  q5_device_experience_blood_pressure_monitor BOOLEAN,
+  q5_device_experience_blood_glucose_monitor BOOLEAN,
+  q5_device_experience_inhaler_nebuliser BOOLEAN,
+  q5_device_experience_sleep_fitness_tracker BOOLEAN,
+  q5_device_experience_other BOOLEAN,
+  q5_device_experience_other_text TEXT,
   free_text_notes TEXT,
   raw_response JSONB
 );
@@ -244,13 +245,58 @@ ALTER TABLE pre_trial_questionnaire
   ADD COLUMN IF NOT EXISTS consent_to_participate BOOLEAN;
 
 ALTER TABLE pre_trial_questionnaire
-  ADD COLUMN IF NOT EXISTS occupation TEXT;
+  ADD COLUMN IF NOT EXISTS q1_age_years INTEGER;
 
 ALTER TABLE pre_trial_questionnaire
-  ADD COLUMN IF NOT EXISTS format_preference TEXT;
+  ADD COLUMN IF NOT EXISTS q2_gender TEXT;
 
 ALTER TABLE pre_trial_questionnaire
-  ADD COLUMN IF NOT EXISTS format_mix_details TEXT;
+  ADD COLUMN IF NOT EXISTS q4_occupation TEXT;
+
+ALTER TABLE pre_trial_questionnaire
+  ADD COLUMN IF NOT EXISTS q2_gender_other_text TEXT;
+
+ALTER TABLE pre_trial_questionnaire
+  ADD COLUMN IF NOT EXISTS q3_education TEXT;
+
+ALTER TABLE pre_trial_questionnaire
+  ADD COLUMN IF NOT EXISTS q6_digital_literacy INTEGER;
+
+ALTER TABLE pre_trial_questionnaire
+  ADD COLUMN IF NOT EXISTS q7_digital_guidance INTEGER;
+
+ALTER TABLE pre_trial_questionnaire
+  ADD COLUMN IF NOT EXISTS q8_physical_guidance INTEGER;
+
+ALTER TABLE pre_trial_questionnaire
+  ADD COLUMN IF NOT EXISTS q9_problem_solving INTEGER;
+
+ALTER TABLE pre_trial_questionnaire
+  ADD COLUMN IF NOT EXISTS q10_format_preference TEXT;
+
+ALTER TABLE pre_trial_questionnaire
+  ADD COLUMN IF NOT EXISTS q10_format_mix_details TEXT;
+
+ALTER TABLE pre_trial_questionnaire
+  ADD COLUMN IF NOT EXISTS q5_device_experience_none BOOLEAN;
+
+ALTER TABLE pre_trial_questionnaire
+  ADD COLUMN IF NOT EXISTS q5_device_experience_blood_pressure_monitor BOOLEAN;
+
+ALTER TABLE pre_trial_questionnaire
+  ADD COLUMN IF NOT EXISTS q5_device_experience_blood_glucose_monitor BOOLEAN;
+
+ALTER TABLE pre_trial_questionnaire
+  ADD COLUMN IF NOT EXISTS q5_device_experience_inhaler_nebuliser BOOLEAN;
+
+ALTER TABLE pre_trial_questionnaire
+  ADD COLUMN IF NOT EXISTS q5_device_experience_sleep_fitness_tracker BOOLEAN;
+
+ALTER TABLE pre_trial_questionnaire
+  ADD COLUMN IF NOT EXISTS q5_device_experience_other BOOLEAN;
+
+ALTER TABLE pre_trial_questionnaire
+  ADD COLUMN IF NOT EXISTS q5_device_experience_other_text TEXT;
 
 CREATE INDEX IF NOT EXISTS idx_pre_trial_questionnaire_participant_time
   ON pre_trial_questionnaire (participant_id, received_at DESC);
@@ -262,21 +308,45 @@ CREATE TABLE IF NOT EXISTS post_trial_questionnaire (
   session_id TEXT,
   participant_id TEXT NOT NULL,
   observer_id TEXT,
-  post_q1 INTEGER,
-  post_q2 INTEGER,
-  post_q3 INTEGER,
-  post_q4 INTEGER,
-  post_q5 INTEGER,
-  post_q6 INTEGER,
-  post_q7 INTEGER,
-  format_preference TEXT,
-  format_mix_details TEXT,
+  q1_instructions_ease INTEGER,
+  q2_info_ease INTEGER,
+  q3_step_by_step_help INTEGER,
+  q4_instructions_satisfaction INTEGER,
+  q5_confidence_setup INTEGER,
+  q6_confidence_troubleshooting INTEGER,
+  q7_mental_effort INTEGER,
+  q8_format_preference TEXT,
+  q8_format_mix_details TEXT,
   free_text_notes TEXT,
   raw_response JSONB
 );
 
 ALTER TABLE post_trial_questionnaire
-  ADD COLUMN IF NOT EXISTS format_mix_details TEXT;
+  ADD COLUMN IF NOT EXISTS q1_instructions_ease INTEGER;
+
+ALTER TABLE post_trial_questionnaire
+  ADD COLUMN IF NOT EXISTS q2_info_ease INTEGER;
+
+ALTER TABLE post_trial_questionnaire
+  ADD COLUMN IF NOT EXISTS q3_step_by_step_help INTEGER;
+
+ALTER TABLE post_trial_questionnaire
+  ADD COLUMN IF NOT EXISTS q4_instructions_satisfaction INTEGER;
+
+ALTER TABLE post_trial_questionnaire
+  ADD COLUMN IF NOT EXISTS q5_confidence_setup INTEGER;
+
+ALTER TABLE post_trial_questionnaire
+  ADD COLUMN IF NOT EXISTS q6_confidence_troubleshooting INTEGER;
+
+ALTER TABLE post_trial_questionnaire
+  ADD COLUMN IF NOT EXISTS q7_mental_effort INTEGER;
+
+ALTER TABLE post_trial_questionnaire
+  ADD COLUMN IF NOT EXISTS q8_format_preference TEXT;
+
+ALTER TABLE post_trial_questionnaire
+  ADD COLUMN IF NOT EXISTS q8_format_mix_details TEXT;
 
 CREATE INDEX IF NOT EXISTS idx_post_trial_questionnaire_participant_time
   ON post_trial_questionnaire (participant_id, received_at DESC);
