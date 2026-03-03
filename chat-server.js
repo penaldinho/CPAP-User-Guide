@@ -1894,8 +1894,8 @@ app.post('/api/observer-notes', async (req, res) => {
     }
 
     if (actionType === 'scenario_score') {
-      if (!/^scenario_card_\d+$/i.test(taskId)) {
-        return res.status(400).json({ error: 'scenario_score is only valid for scenario_card tasks' });
+      if (!/^scenario_card_\d+$/i.test(taskId) && !/^short_form_q[1-4]$/i.test(taskId)) {
+        return res.status(400).json({ error: 'scenario_score is only valid for scenario_card or short_form_q tasks' });
       }
       if (!Number.isFinite(scenarioScore) || scenarioScore < 0 || scenarioScore > 2) {
         return res.status(400).json({ error: 'scenario_score must be 0, 1, or 2' });

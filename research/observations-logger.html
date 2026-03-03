@@ -183,6 +183,10 @@
         return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
       };
 
+      const isScenarioTaskId = (taskId) => /^scenario_card_\d+$/i.test(String(taskId || '').trim());
+      const isShortFormTaskId = (taskId) => /^short_form_q[1-4]$/i.test(String(taskId || '').trim());
+      const requiresScoreForTaskId = (taskId) => isScenarioTaskId(taskId) || isShortFormTaskId(taskId);
+
       const isCustomTask = () => taskIdSelect.value === CUSTOM_TASK_VALUE || taskLabelSelect.value === CUSTOM_TASK_VALUE;
 
       const syncCustomTaskVisibility = () => {
@@ -284,7 +288,7 @@
       };
 
       const submitObservation = async (actionType) => {
-        if (!validateCommon()) return;
+        if (!validateCommon()) return false;
 
         const taskId = getTaskIdValue();
         const manualPage = String(manualPageInput.value || '').trim();
@@ -294,26 +298,26 @@
         if (actionType === 'page_mark' && !manualPage) {
           setStatus('Enter a manual page before logging a page mark.', false);
           manualPageInput.focus();
-          return;
+          return false;
         }
 
         if (actionType === 'scenario_score') {
-          if (!/^scenario_card_\d+$/i.test(taskId)) {
-            setStatus('Scenario score can only be entered for scenario tasks.', false);
+          if (!requiresScoreForTaskId(taskId)) {
+            setStatus('Score can only be entered for scenario or short-form tasks.', false);
             taskIdSelect.focus();
-            return;
+            return false;
           }
           if (!['0', '1', '2'].includes(scenarioScoreRaw)) {
             setStatus('Select a scenario score (0, 1, or 2).', false);
             scenarioScoreSelect.focus();
-            return;
+            return false;
           }
         }
 
         if (actionType === 'note' && !notes) {
           setStatus('Enter notes before logging a note.', false);
           notesInput.focus();
-          return;
+          return false;
         }
 
         const active = getActiveTaskState();
@@ -362,7 +366,16 @@
               key: currentKey,
               participant_id: payload.participant_id,
               task_id: payload.task_id,
-              started_at: payload.timestamp
+              started_at: payload.timestamp,
+              scenario_score_logged: !requiresScoreForTaskId(payload.task_id)
+            });
+          }
+
+          if (actionType === 'scenario_score' && active.key === currentKey) {
+            setActiveTaskState({
+              ...active,
+              scenario_score_logged: true,
+              scenario_score_logged_at: payload.timestamp
             });
           }
 
@@ -371,8 +384,10 @@
           }
 
           updateTaskTimer();
+          return true;
         } catch (error) {
           setStatus(error.message || 'Failed to log observation.', false);
+          return false;
         }
       };
 
@@ -386,25 +401,58 @@
 
         const active = getActiveTaskState();
         const currentKey = getCurrentTaskKey();
+        const taskId = getTaskIdValue();
         if (!active.key || active.key !== currentKey) {
           setStatus('No active task timer found for this participant/task. Start the task first.', false);
+          return;
+        }
+
+        if (requiresScoreForTaskId(taskId) && !active.scenario_score_logged) {
+          setStatus('Log a score before ending this task.', false);
+          scenarioScoreSelect.focus();
           return;
         }
 
         await submitObservation('task_end');
       };
 
+      const logPageMarkAndClear = async () => {
+        const ok = await submitObservation('page_mark');
+        if (ok) {
+          manualPageInput.value = '';
+          manualPageInput.focus();
+        }
+      };
+
+      const logNoteAndClear = async () => {
+        const ok = await submitObservation('note');
+        if (ok) {
+          notesInput.value = '';
+          notesInput.focus();
+        }
+      };
+
       el('btn-start').addEventListener('click', startTask);
       el('btn-end').addEventListener('click', endTask);
-      el('btn-page').addEventListener('click', () => submitObservation('page_mark'));
+      el('btn-page').addEventListener('click', logPageMarkAndClear);
       el('btn-score').addEventListener('click', () => submitObservation('scenario_score'));
-      el('btn-note').addEventListener('click', () => submitObservation('note'));
+      el('btn-note').addEventListener('click', logNoteAndClear);
 
       taskIdSelect.addEventListener('change', syncFromTaskId);
       taskLabelSelect.addEventListener('change', syncFromTaskLabel);
       participantInput.addEventListener('input', updateTaskTimer);
       taskIdSelect.addEventListener('change', updateTaskTimer);
       taskIdCustomInput.addEventListener('input', updateTaskTimer);
+      manualPageInput.addEventListener('keydown', async (event) => {
+        if (event.key !== 'Enter') return;
+        event.preventDefault();
+        await logPageMarkAndClear();
+      });
+      notesInput.addEventListener('keydown', async (event) => {
+        if (event.key !== 'Enter' || event.shiftKey) return;
+        event.preventDefault();
+        await logNoteAndClear();
+      });
 
       metaEl.textContent = `Session: ${getSessionId()}`;
       syncCustomTaskVisibility();

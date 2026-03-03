@@ -1363,7 +1363,7 @@
     card.innerHTML = `
       <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
         <strong style="font-size:13px; color:#0f172a;">Task in progress</strong>
-        <span style="font-size:11px; color:#475569; background:#f1f5f9; border:1px solid #e2e8f0; border-radius:999px; padding:2px 8px;">${escapeHtml(taskId)}</span>
+        <button id="mtg-task-prompt-finish-btn" type="button" style="padding:6px 10px; border:1px solid #0f766e; background:#0f766e; color:#ffffff; border-radius:999px; font-size:12px; font-weight:600; cursor:pointer; white-space:nowrap;">I have finished this task</button>
       </div>
       <div style="margin-top:6px; font-size:12px; color:#334155; font-weight:600;">Elapsed: ${escapeHtml(elapsedWithCapText)}</div>
       <div style="margin-top:8px; color:#334155; line-height:1.4; font-size:14px; overflow:hidden; display:${scenarioDescription ? '-webkit-box' : 'none'}; -webkit-line-clamp:${isExpanded ? '3' : '2'}; -webkit-box-orient:vertical;">${escapeHtml(scenarioDescription)}</div>
@@ -1374,12 +1374,9 @@
         <div style="font-size:13px; font-weight:600; line-height:1.3; display:${isScenarioTask ? 'none' : 'block'};">${escapeHtml(displayLabel)}</div>
         <div style="margin-top:8px; font-size:12px; color:#334155; line-height:1.35;">${listMarkup}</div>
       </div>
-      <div style="margin-top:10px; display:flex; justify-content:flex-end;">
-        <button id="mtg-task-prompt-finish-btn" type="button" style="padding:10px 14px; border:1px solid #0f766e; background:#0f766e; color:#ffffff; border-radius:999px; font-size:14px; font-weight:600; cursor:pointer;">I have finished this task</button>
-      </div>
     `;
     card.style.bottom = '12px';
-    card.style.maxHeight = isExpanded ? '42vh' : (scenarioDescription ? '190px' : '160px');
+    card.style.maxHeight = isExpanded ? '42vh' : (scenarioDescription ? '150px' : '128px');
     card.style.overflow = isExpanded ? 'auto' : 'hidden';
     card.style.display = 'block';
 
