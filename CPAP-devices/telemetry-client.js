@@ -1098,6 +1098,65 @@
     return `Provide your response for each section (${keys[0]})-(${keys[keys.length - 1]}) below.`;
   };
 
+  const collectPopulatedShortFormAnswers = (rawParts) => {
+    const next = {};
+    Object.entries(rawParts && typeof rawParts === 'object' ? rawParts : {}).forEach(([key, value]) => {
+      const partKey = String(key || '').trim();
+      const text = String(value || '').trim();
+      if (!partKey || !text) return;
+      next[partKey] = text;
+    });
+    return next;
+  };
+
+  const submitPartialShortFormAnswer = (taskId, taskLabel, rawParts, taskStatus, options = {}) => {
+    const key = String(taskId || '').trim();
+    if (!/^short_form_q[1-4]$/i.test(key)) {
+      return false;
+    }
+
+    const forceNullWhenEmpty = Boolean(options && options.forceNullWhenEmpty);
+    let responseParts = collectPopulatedShortFormAnswers(rawParts);
+    const definition = getShortFormQuestionDefinition(key);
+    const orderedParts = Array.isArray(definition && definition.parts) ? definition.parts : [];
+
+    if (!Object.keys(responseParts).length && forceNullWhenEmpty) {
+      responseParts = {};
+      orderedParts.forEach((part) => {
+        const partKey = String(part && part.key || '').trim();
+        if (!partKey) return;
+        responseParts[partKey] = null;
+      });
+    }
+
+    if (!Object.keys(responseParts).length) {
+      return false;
+    }
+
+    const answerText = orderedParts.length
+      ? orderedParts
+        .map((part) => {
+          const partKey = String(part && part.key || '').trim();
+          const text = responseParts[partKey];
+          return text ? `(${partKey}) ${text}` : '';
+        })
+        .filter(Boolean)
+        .join('\n')
+      : Object.entries(responseParts).map(([partKey, text]) => `(${partKey}) ${text}`).join('\n');
+
+    track('short_form_answer_submitted', {
+      question_id: key,
+      task_id: key,
+      task_label: String(taskLabel || '').trim(),
+      response_message: answerText,
+      response_parts: responseParts,
+      task_status: String(taskStatus || '').trim()
+    });
+
+    clearShortFormDraft(key);
+    return true;
+  };
+
   const ensureTaskPromptCard = () => {
     const existing = document.getElementById('mtg-task-prompt-card');
     if (existing) return existing;
@@ -1315,6 +1374,16 @@
     try {
       const nextTaskId = getNextTaskIdInSequence(currentTaskId);
 
+      if (/^short_form_q[1-4]$/i.test(currentTaskId)) {
+        submitPartialShortFormAnswer(
+          currentTaskId,
+          state.task_label || '',
+          getShortFormDraft(currentTaskId) || {},
+          'time_cap_reached',
+          { forceNullWhenEmpty: true }
+        );
+      }
+
       if (nextTaskId) {
         setParticipantNextTaskState({
           status: 'next',
@@ -1495,7 +1564,6 @@
         return;
       }
 
-      const definition = getShortFormQuestionDefinition(taskId);
       const partInputs = Array.from(shortFormWrap.querySelectorAll('[data-short-form-part="1"]'));
       const answerParts = {};
 
@@ -1505,29 +1573,11 @@
         answerParts[key] = String(input.value || '').trim();
       });
 
-      const missingPart = (definition && definition.parts || []).find((part) => !String(answerParts[part.key] || '').trim());
-      if (missingPart) {
-        const missingInput = shortFormWrap.querySelector(`[data-short-form-part="1"][data-part-key="${missingPart.key}"]`);
-        window.alert('Please complete all parts before submitting.');
-        if (missingInput && typeof missingInput.focus === 'function') {
-          missingInput.focus();
-        }
+      const submittedAny = submitPartialShortFormAnswer(taskId, String(state.task_label || '').trim(), answerParts, 'short_form_answer_submitted');
+      if (!submittedAny) {
+        window.alert('Please provide at least one answer before submitting.');
         return;
       }
-
-      const answerText = (definition && definition.parts || [])
-        .map((part) => `(${part.key}) ${String(answerParts[part.key] || '').trim()}`)
-        .join('\n');
-
-      track('short_form_answer_submitted', {
-        question_id: taskId,
-        task_id: taskId,
-        task_label: String(state.task_label || '').trim(),
-        response_message: answerText,
-        response_parts: answerParts
-      });
-
-      clearShortFormDraft(taskId);
 
       const currentIndex = shortFormTaskIds.indexOf(taskId);
       const nextTaskId = currentIndex >= 0 && currentIndex < shortFormTaskIds.length - 1

@@ -303,6 +303,20 @@
 
         capProcessing = true;
         try {
+          if (task.kind === 'short_form') {
+            const partial = getPopulatedShortFormDraftForTask(taskId);
+            const responsePayload = Object.keys(partial).length
+              ? partial
+              : buildNullShortFormPartsForTask(taskId);
+
+            await submitEvent('note', JSON.stringify({
+              short_form_response: responsePayload,
+              task_id: taskId,
+              task_status: 'time_cap_reached'
+            }));
+            clearShortFormDraftForTask(taskId);
+          }
+
           await submitEvent('task_end', 'time_cap_reached');
           state.startedTaskId = '';
           state.startedAt = '';
@@ -367,6 +381,30 @@
         return key && state.shortFormDrafts[key] && typeof state.shortFormDrafts[key] === 'object'
           ? state.shortFormDrafts[key]
           : {};
+      };
+
+      const getPopulatedShortFormDraftForTask = (taskId) => {
+        const draft = getShortFormDraftForTask(taskId);
+        const next = {};
+        Object.entries(draft || {}).forEach(([key, value]) => {
+          const partKey = String(key || '').trim();
+          const text = String(value || '').trim();
+          if (!partKey || !text) return;
+          next[partKey] = text;
+        });
+        return next;
+      };
+
+      const buildNullShortFormPartsForTask = (taskId) => {
+        const task = tasks[String(taskId || '').trim()] || null;
+        const parts = Array.isArray(task && task.parts) ? task.parts : [];
+        const next = {};
+        parts.forEach((part) => {
+          const key = String(part && part.key || '').trim();
+          if (!key) return;
+          next[key] = null;
+        });
+        return next;
       };
 
       const updateShortFormDraftForTask = (taskId, draft) => {
@@ -540,16 +578,7 @@
             }
 
             if (task.kind === 'short_form') {
-              const draft = getShortFormDraftForTask(taskId);
-              const parts = Array.isArray(task.parts) ? task.parts : [];
-              const missing = parts.find((part) => !String(draft[part.key] || '').trim());
-              if (missing) {
-                setStatus('Please complete all answer parts before finishing this task.', false);
-                const missingInput = document.querySelector(`textarea[data-part-key="${missing.key}"]`);
-                if (missingInput) missingInput.focus();
-                return;
-              }
-
+              const draft = getPopulatedShortFormDraftForTask(taskId);
               await submitEvent('note', JSON.stringify({
                 short_form_response: draft,
                 task_id: taskId
