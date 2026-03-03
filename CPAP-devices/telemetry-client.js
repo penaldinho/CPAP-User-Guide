@@ -666,6 +666,10 @@
     }
 
     const now = Date.now();
+    if (now < Number(taskStateSyncState.localTransitionUntilMs || 0)) {
+      return;
+    }
+
     if (reason === 'interval' && now - taskStateSyncState.lastPolledAt < 2500) {
       return;
     }
@@ -720,9 +724,15 @@
         const localTask = getSharedTaskState();
         const localTaskId = String(localTask.task_id || '').trim();
         const localStartedAt = String(localTask.started_at || '').trim();
+        const localStartedAtMs = Date.parse(localStartedAt);
+        const serverStartedAtMs = Date.parse(String(serverTask.started_at || ''));
         const transitionGuardActive = Date.now() < Number(taskStateSyncState.localTransitionUntilMs || 0);
+        const localTaskAppearsNewerThanServer = localTaskId
+          && localTaskId !== serverTask.task_id
+          && Number.isFinite(localStartedAtMs)
+          && (!Number.isFinite(serverStartedAtMs) || localStartedAtMs > (serverStartedAtMs + 250));
 
-        if (transitionGuardActive && localTaskId && localTaskId !== serverTask.task_id) {
+        if ((transitionGuardActive && localTaskId && localTaskId !== serverTask.task_id) || localTaskAppearsNewerThanServer) {
           if (!isTaskSubscribedInTab()) {
             setTaskSubscribedInTab(true);
           }
@@ -749,8 +759,11 @@
       }
 
       const sharedTask = getSharedTaskState();
+      const sharedStartedAtMs = Date.parse(String(sharedTask.started_at || ''));
+      const sharedTaskStartedRecently = Number.isFinite(sharedStartedAtMs)
+        && (Date.now() - sharedStartedAtMs) < 15000;
       const transitionGuardActive = Date.now() < Number(taskStateSyncState.localTransitionUntilMs || 0);
-      if (transitionGuardActive && String(sharedTask.task_id || '').trim()) {
+      if ((transitionGuardActive || sharedTaskStartedRecently) && String(sharedTask.task_id || '').trim()) {
         if (!isTaskSubscribedInTab()) {
           setTaskSubscribedInTab(true);
         }
