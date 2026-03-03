@@ -167,6 +167,46 @@ CREATE INDEX IF NOT EXISTS idx_physical_trial_task_time
 CREATE INDEX IF NOT EXISTS idx_physical_trial_event_type_time
   ON physical_trial_events (event_type, received_at DESC);
 
+CREATE TABLE IF NOT EXISTS observer_notes (
+  id BIGSERIAL PRIMARY KEY,
+  received_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  timestamp TIMESTAMPTZ,
+  session_id TEXT,
+  participant_id TEXT NOT NULL,
+  task_id TEXT NOT NULL,
+  task_label TEXT,
+  manual_page TEXT,
+  scenario_score INTEGER,
+  task_length_ms INTEGER,
+  notes TEXT,
+  action_type TEXT NOT NULL,
+  source TEXT NOT NULL DEFAULT 'observations_logger',
+  trial_mode TEXT NOT NULL DEFAULT 'physical',
+  CONSTRAINT observer_notes_scenario_score_range CHECK (scenario_score IS NULL OR (scenario_score >= 0 AND scenario_score <= 2))
+);
+
+ALTER TABLE observer_notes
+  ADD COLUMN IF NOT EXISTS trial_mode TEXT;
+
+ALTER TABLE observer_notes
+  ADD COLUMN IF NOT EXISTS task_length_ms INTEGER;
+
+ALTER TABLE observer_notes
+  ALTER COLUMN trial_mode SET DEFAULT 'physical';
+
+UPDATE observer_notes
+SET trial_mode = 'physical'
+WHERE trial_mode IS NULL;
+
+CREATE INDEX IF NOT EXISTS idx_observer_notes_participant_time
+  ON observer_notes (participant_id, received_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_observer_notes_task_time
+  ON observer_notes (participant_id, task_id, received_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_observer_notes_action_type_time
+  ON observer_notes (action_type, received_at DESC);
+
 CREATE TABLE IF NOT EXISTS pre_trial_questionnaire (
   id BIGSERIAL PRIMARY KEY,
   received_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),

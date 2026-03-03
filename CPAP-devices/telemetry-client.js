@@ -1166,7 +1166,7 @@
     card.id = 'mtg-task-prompt-card';
     card.style.position = 'fixed';
     card.style.left = '50%';
-    card.style.bottom = '96px';
+    card.style.bottom = '12px';
     card.style.transform = 'translateX(-50%)';
     card.style.width = 'min(720px, calc(100vw - 24px))';
     card.style.maxWidth = 'calc(100vw - 24px)';
@@ -1282,6 +1282,31 @@
     return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
   };
 
+  const handleParticipantTaskFinished = () => {
+    const state = getTaskState();
+    const currentTaskId = String(state.task_id || '').trim();
+    const nextTaskId = getNextTaskIdInSequence(currentTaskId);
+
+    if (nextTaskId) {
+      setParticipantNextTaskState({
+        status: 'next',
+        current_task_id: currentTaskId,
+        next_task_id: nextTaskId,
+        next_task_label: getTaskDisplayLabel(nextTaskId)
+      });
+    } else {
+      setParticipantNextTaskState({
+        status: 'completed'
+      });
+    }
+
+    track('task_end_clicked_by_participant', {
+      task_id: currentTaskId || ''
+    });
+    endTask('participant_clicked_end');
+    syncParticipantEndButton();
+  };
+
   const syncTaskPromptCard = () => {
     const taskState = getTaskState();
     const card = ensureTaskPromptCard();
@@ -1349,11 +1374,20 @@
         <div style="font-size:13px; font-weight:600; line-height:1.3; display:${isScenarioTask ? 'none' : 'block'};">${escapeHtml(displayLabel)}</div>
         <div style="margin-top:8px; font-size:12px; color:#334155; line-height:1.35;">${listMarkup}</div>
       </div>
+      <div style="margin-top:10px; display:flex; justify-content:flex-end;">
+        <button id="mtg-task-prompt-finish-btn" type="button" style="padding:10px 14px; border:1px solid #0f766e; background:#0f766e; color:#ffffff; border-radius:999px; font-size:14px; font-weight:600; cursor:pointer;">I have finished this task</button>
+      </div>
     `;
-    card.style.bottom = isShortFormTask ? '170px' : '96px';
-    card.style.maxHeight = isExpanded ? '42vh' : (scenarioDescription ? '138px' : '86px');
+    card.style.bottom = '12px';
+    card.style.maxHeight = isExpanded ? '42vh' : (scenarioDescription ? '190px' : '160px');
     card.style.overflow = isExpanded ? 'auto' : 'hidden';
     card.style.display = 'block';
+
+    const finishBtn = card.querySelector('#mtg-task-prompt-finish-btn');
+    if (finishBtn) {
+      finishBtn.addEventListener('click', handleParticipantTaskFinished);
+    }
+
     updateTaskCardSafeArea();
   };
 
@@ -1658,30 +1692,7 @@
       syncParticipantEndButton();
     });
 
-    button.addEventListener('click', () => {
-      const state = getTaskState();
-      const currentTaskId = String(state.task_id || '').trim();
-      const nextTaskId = getNextTaskIdInSequence(currentTaskId);
-
-      if (nextTaskId) {
-        setParticipantNextTaskState({
-          status: 'next',
-          current_task_id: currentTaskId,
-          next_task_id: nextTaskId,
-          next_task_label: getTaskDisplayLabel(nextTaskId)
-        });
-      } else {
-        setParticipantNextTaskState({
-          status: 'completed'
-        });
-      }
-
-      track('task_end_clicked_by_participant', {
-        task_id: currentTaskId || ''
-      });
-      endTask('participant_clicked_end');
-      syncParticipantEndButton();
-    });
+    button.addEventListener('click', handleParticipantTaskFinished);
 
     const participantNextWrap = document.createElement('div');
     participantNextWrap.id = 'mtg-participant-next-task-wrap';
@@ -1774,7 +1785,7 @@
     const hasPendingNextTask = !taskId && String(participantNextState.next_task_id || '').trim();
     const hasCompletedSequence = !taskId && String(participantNextState.status || '').trim() === 'completed';
 
-    wrap.style.display = (taskId || hasPendingNextTask || hasCompletedSequence) ? 'block' : 'none';
+    wrap.style.display = ((isShortFormTask && taskId) || hasPendingNextTask || hasCompletedSequence) ? 'block' : 'none';
 
     if (!taskId) {
       setTaskPromptExpanded(false);

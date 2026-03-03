@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="robots" content="noindex,nofollow,noarchive" />
-  <title>Physical Trial Logger</title>
+  <title>Observations Logger</title>
   <style>
     body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 0; background: #f4f6fb; color: #1f2937; }
     .wrap { max-width: 760px; margin: 24px auto; padding: 0 16px; }
@@ -16,31 +16,31 @@
     label { display: grid; gap: 5px; font-size: 14px; }
     input, textarea, select { width: 100%; box-sizing: border-box; border: 1px solid #cbd5e1; border-radius: 8px; padding: 10px 11px; font-size: 14px; }
     textarea { min-height: 90px; resize: vertical; }
-    .btns { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
-    button { border: 1px solid #1d4ed8; background: #1d4ed8; color: #fff; border-radius: 8px; padding: 9px 13px; font-weight: 600; cursor: pointer; }
+    .row-action { display: grid; gap: 8px; grid-template-columns: 1fr auto; align-items: end; }
+    .task-timer { border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px 11px; background: #f8fafc; font-weight: 600; font-size: 14px; color: #0f172a; }
+    button { border: 1px solid #1d4ed8; background: #1d4ed8; color: #fff; border-radius: 8px; padding: 9px 13px; font-weight: 600; cursor: pointer; white-space: nowrap; }
     button.secondary { background: #fff; color: #1d4ed8; }
     #status { margin-top: 12px; font-size: 14px; }
     .ok { color: #065f46; }
     .err { color: #991b1b; }
     .meta { font-size: 12px; color: #6b7280; margin-top: 8px; }
     .hidden { display: none; }
-    @media (max-width: 720px) { .grid { grid-template-columns: 1fr; } }
+    @media (max-width: 720px) {
+      .grid { grid-template-columns: 1fr; }
+      .row-action { grid-template-columns: 1fr; }
+    }
   </style>
 </head>
 <body>
   <div class="wrap">
     <div class="card">
-      <h1>Physical Trial Logger</h1>
-      <p>Use this page during paper-manual sessions to log task events directly into the trial database.</p>
+      <h1>Observations Logger</h1>
+      <p>Log observer page marks, scenario scores, and notes during physical-manual trials.</p>
 
       <div class="grid">
         <label>
-          Participant ID / Name
-          <input id="participant_id" type="text" placeholder="e.g. P01 or Jane Smith" required />
-        </label>
-        <label>
-          Observer ID
-          <input id="observer_id" type="text" placeholder="e.g. OBS-1" />
+          Participant ID
+          <input id="participant_id" type="text" placeholder="e.g. P01" required />
         </label>
         <label>
           Task ID
@@ -70,37 +70,51 @@
             <option value="__custom__">Custom task…</option>
           </select>
         </label>
-        <label class="full hidden" id="custom_task_id_wrap">
+        <label class="hidden" id="custom_task_id_wrap">
           Custom Task ID
           <input id="task_id_custom" type="text" placeholder="e.g. task_custom_1" />
         </label>
-        <label class="full hidden" id="custom_task_label_wrap">
+        <label class="hidden" id="custom_task_label_wrap">
           Custom Task Label
           <input id="task_label_custom" type="text" placeholder="e.g. Additional scenario" />
         </label>
-        <label>
-          Manual Page (optional)
-          <input id="manual_page" type="text" placeholder="e.g. 23" />
-        </label>
-        <label>
-          Event Type
-          <select id="event_type">
-            <option value="task_start">task_start</option>
-            <option value="task_end">task_end</option>
-            <option value="page_mark">page_mark</option>
-            <option value="note">note</option>
-          </select>
-        </label>
+
+        <div class="row-action full">
+          <div class="task-timer" id="task_timer">Task timer: 00:00</div>
+          <div style="display:flex; gap:8px;">
+            <button id="btn-start" type="button">Start Task</button>
+            <button id="btn-end" type="button" class="secondary">End Task</button>
+          </div>
+        </div>
+
+        <div class="row-action full">
+          <label style="margin:0;">
+            Manual Page (optional)
+            <input id="manual_page" type="text" placeholder="e.g. 23" />
+          </label>
+          <button id="btn-page" type="button" class="secondary">Log Page Mark</button>
+        </div>
+
+        <div class="row-action full">
+          <label style="margin:0;">
+            Scenario Score
+            <select id="scenario_score">
+              <option value="">Select score</option>
+              <option value="0">0 - Failed</option>
+              <option value="1">1 - Completed with help/errors</option>
+              <option value="2">2 - Completed without help/errors</option>
+            </select>
+          </label>
+          <button id="btn-score" type="button">Enter Score</button>
+        </div>
+
         <label class="full">
           Notes
-          <textarea id="notes" placeholder="Optional notes"></textarea>
+          <textarea id="notes" placeholder="Observer notes"></textarea>
         </label>
       </div>
 
-      <div class="btns">
-        <button id="btn-start" type="button">Start Task</button>
-        <button id="btn-end" type="button">End Task</button>
-        <button id="btn-page" type="button" class="secondary">Log Page Mark</button>
+      <div style="margin-top:10px;">
         <button id="btn-note" type="button" class="secondary">Log Note</button>
       </div>
 
@@ -115,13 +129,13 @@
       const isLocalHost = host === 'localhost' || host === '127.0.0.1';
       const isHostedChat = /(^|\.)chat\.medtechguides\.uk$/i.test(host);
       const endpoint = (isLocalHost || isHostedChat)
-        ? '/api/physical-trial'
-        : 'https://chat.medtechguides.uk/api/physical-trial';
-      const sessionKey = 'physical-trial-session-id';
+        ? '/api/observer-notes'
+        : 'https://chat.medtechguides.uk/api/observer-notes';
+      const sessionKey = 'observer-notes-session-id';
+      const activeTaskKey = 'observer-notes-active-task';
 
       const el = (id) => document.getElementById(id);
       const participantInput = el('participant_id');
-      const observerInput = el('observer_id');
       const taskIdSelect = el('task_id');
       const taskLabelSelect = el('task_label');
       const taskIdCustomInput = el('task_id_custom');
@@ -129,7 +143,8 @@
       const customTaskIdWrap = el('custom_task_id_wrap');
       const customTaskLabelWrap = el('custom_task_label_wrap');
       const manualPageInput = el('manual_page');
-      const eventTypeSelect = el('event_type');
+      const scenarioScoreSelect = el('scenario_score');
+      const taskTimerEl = el('task_timer');
       const notesInput = el('notes');
       const statusEl = el('status');
       const metaEl = el('meta');
@@ -146,7 +161,7 @@
       const labelById = Object.fromEntries(presetTaskPairs);
       const idByLabel = Object.fromEntries(presetTaskPairs.map(([id, label]) => [label, id]));
 
-      const makeSessionId = () => `phys_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+      const makeSessionId = () => `obs_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
       const getSessionId = () => {
         let id = localStorage.getItem(sessionKey);
         if (!id) {
@@ -159,6 +174,13 @@
       const setStatus = (text, ok) => {
         statusEl.textContent = text;
         statusEl.className = ok ? 'ok' : 'err';
+      };
+
+      const formatDuration = (durationMs) => {
+        const totalSeconds = Math.max(0, Math.floor((durationMs || 0) / 1000));
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
+        return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
       };
 
       const isCustomTask = () => taskIdSelect.value === CUSTOM_TASK_VALUE || taskLabelSelect.value === CUSTOM_TASK_VALUE;
@@ -183,6 +205,41 @@
         return String(taskLabelSelect.value || '').trim();
       };
 
+      const getCurrentTaskKey = () => {
+        const participantId = String(participantInput.value || '').trim();
+        const taskId = getTaskIdValue();
+        return `${participantId}::${taskId}`;
+      };
+
+      const getActiveTaskState = () => {
+        try {
+          const parsed = JSON.parse(localStorage.getItem(activeTaskKey) || '{}');
+          return parsed && typeof parsed === 'object' ? parsed : {};
+        } catch {
+          return {};
+        }
+      };
+
+      const setActiveTaskState = (state) => {
+        localStorage.setItem(activeTaskKey, JSON.stringify(state || {}));
+      };
+
+      const clearActiveTaskState = () => {
+        localStorage.removeItem(activeTaskKey);
+      };
+
+      const updateTaskTimer = () => {
+        if (!taskTimerEl) return;
+        const active = getActiveTaskState();
+        const expectedKey = getCurrentTaskKey();
+        const startedAtMs = Date.parse(String(active.started_at || ''));
+        if (!active || !active.key || active.key !== expectedKey || !Number.isFinite(startedAtMs)) {
+          taskTimerEl.textContent = 'Task timer: 00:00';
+          return;
+        }
+        taskTimerEl.textContent = `Task timer: ${formatDuration(Date.now() - startedAtMs)}`;
+      };
+
       const syncFromTaskId = () => {
         if (taskIdSelect.value === CUSTOM_TASK_VALUE) {
           taskLabelSelect.value = CUSTOM_TASK_VALUE;
@@ -190,9 +247,7 @@
           return;
         }
         const matchingLabel = labelById[taskIdSelect.value] || '';
-        if (matchingLabel) {
-          taskLabelSelect.value = matchingLabel;
-        }
+        if (matchingLabel) taskLabelSelect.value = matchingLabel;
         syncCustomTaskVisibility();
       };
 
@@ -203,18 +258,17 @@
           return;
         }
         const matchingId = idByLabel[taskLabelSelect.value] || '';
-        if (matchingId) {
-          taskIdSelect.value = matchingId;
-        }
+        if (matchingId) taskIdSelect.value = matchingId;
         syncCustomTaskVisibility();
       };
 
-      const validate = () => {
+      const validateCommon = () => {
         if (!String(participantInput.value || '').trim()) {
-          setStatus('Participant ID / Name is required.', false);
+          setStatus('Participant ID is required.', false);
           participantInput.focus();
           return false;
         }
+
         const selectedTaskId = getTaskIdValue();
         if (!selectedTaskId) {
           setStatus('Task ID is required.', false);
@@ -225,23 +279,63 @@
           }
           return false;
         }
+
         return true;
       };
 
-      const submitEvent = async (eventTypeOverride) => {
-        if (!validate()) return;
+      const submitObservation = async (actionType) => {
+        if (!validateCommon()) return;
+
+        const taskId = getTaskIdValue();
+        const manualPage = String(manualPageInput.value || '').trim();
+        const notes = String(notesInput.value || '').trim();
+        const scenarioScoreRaw = String(scenarioScoreSelect.value || '').trim();
+
+        if (actionType === 'page_mark' && !manualPage) {
+          setStatus('Enter a manual page before logging a page mark.', false);
+          manualPageInput.focus();
+          return;
+        }
+
+        if (actionType === 'scenario_score') {
+          if (!/^scenario_card_\d+$/i.test(taskId)) {
+            setStatus('Scenario score can only be entered for scenario tasks.', false);
+            taskIdSelect.focus();
+            return;
+          }
+          if (!['0', '1', '2'].includes(scenarioScoreRaw)) {
+            setStatus('Select a scenario score (0, 1, or 2).', false);
+            scenarioScoreSelect.focus();
+            return;
+          }
+        }
+
+        if (actionType === 'note' && !notes) {
+          setStatus('Enter notes before logging a note.', false);
+          notesInput.focus();
+          return;
+        }
+
+        const active = getActiveTaskState();
+        const currentKey = getCurrentTaskKey();
+        const startedAtMs = Date.parse(String(active.started_at || ''));
+        const taskLengthMs = actionType === 'task_end' && active.key === currentKey && Number.isFinite(startedAtMs)
+          ? Math.max(0, Date.now() - startedAtMs)
+          : null;
 
         const payload = {
           timestamp: new Date().toISOString(),
           session_id: getSessionId(),
           participant_id: String(participantInput.value || '').trim(),
-          observer_id: String(observerInput.value || '').trim(),
-          task_id: getTaskIdValue(),
+          task_id: taskId,
           task_label: getTaskLabelValue(),
-          event_type: eventTypeOverride || String(eventTypeSelect.value || '').trim(),
-          manual_page: String(manualPageInput.value || '').trim(),
-          notes: String(notesInput.value || '').trim(),
-          source: 'physical_manual'
+          manual_page: manualPage,
+          scenario_score: actionType === 'scenario_score' ? Number.parseInt(scenarioScoreRaw, 10) : null,
+          task_length_ms: taskLengthMs,
+          notes,
+          action_type: actionType,
+          source: 'observations_logger',
+          trial_mode: 'physical'
         };
 
         try {
@@ -252,33 +346,70 @@
           });
 
           if (!response.ok) {
-            let message = 'Failed to log event.';
+            let message = 'Failed to log observation.';
             try {
               const data = await response.json();
               if (data && data.error) message = data.error;
-            } catch {
-              // ignore parse failure
-            }
+            } catch {}
             throw new Error(message);
           }
 
-          setStatus(`Logged ${payload.event_type} for ${payload.participant_id} (${payload.task_id}).`, true);
+          setStatus(`Logged ${actionType} for ${payload.participant_id} (${payload.task_id}).`, true);
           metaEl.textContent = `Session: ${payload.session_id} • Last event at ${new Date(payload.timestamp).toLocaleString()}`;
+
+          if (actionType === 'task_start') {
+            setActiveTaskState({
+              key: currentKey,
+              participant_id: payload.participant_id,
+              task_id: payload.task_id,
+              started_at: payload.timestamp
+            });
+          }
+
+          if (actionType === 'task_end') {
+            clearActiveTaskState();
+          }
+
+          updateTaskTimer();
         } catch (error) {
-          setStatus(error.message || 'Failed to log event.', false);
+          setStatus(error.message || 'Failed to log observation.', false);
         }
       };
 
-      el('btn-start').addEventListener('click', () => submitEvent('task_start'));
-      el('btn-end').addEventListener('click', () => submitEvent('task_end'));
-      el('btn-page').addEventListener('click', () => submitEvent('page_mark'));
-      el('btn-note').addEventListener('click', () => submitEvent('note'));
+      const startTask = async () => {
+        if (!validateCommon()) return;
+        await submitObservation('task_start');
+      };
+
+      const endTask = async () => {
+        if (!validateCommon()) return;
+
+        const active = getActiveTaskState();
+        const currentKey = getCurrentTaskKey();
+        if (!active.key || active.key !== currentKey) {
+          setStatus('No active task timer found for this participant/task. Start the task first.', false);
+          return;
+        }
+
+        await submitObservation('task_end');
+      };
+
+      el('btn-start').addEventListener('click', startTask);
+      el('btn-end').addEventListener('click', endTask);
+      el('btn-page').addEventListener('click', () => submitObservation('page_mark'));
+      el('btn-score').addEventListener('click', () => submitObservation('scenario_score'));
+      el('btn-note').addEventListener('click', () => submitObservation('note'));
 
       taskIdSelect.addEventListener('change', syncFromTaskId);
       taskLabelSelect.addEventListener('change', syncFromTaskLabel);
+      participantInput.addEventListener('input', updateTaskTimer);
+      taskIdSelect.addEventListener('change', updateTaskTimer);
+      taskIdCustomInput.addEventListener('input', updateTaskTimer);
 
       metaEl.textContent = `Session: ${getSessionId()}`;
       syncCustomTaskVisibility();
+      updateTaskTimer();
+      window.setInterval(updateTaskTimer, 1000);
     })();
   </script>
 </body>

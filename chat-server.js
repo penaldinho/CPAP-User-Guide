@@ -74,6 +74,7 @@ const telemetryDir = path.join(__dirname, 'data');
 const telemetryFilePath = path.join(telemetryDir, 'telemetry-events.ndjson');
 const participantTelemetryDir = path.join(telemetryDir, 'participants');
 const physicalTrialFilePath = path.join(telemetryDir, 'physical-trial-events.ndjson');
+const observerNotesFilePath = path.join(telemetryDir, 'observer-notes.ndjson');
 
 const excludedHtmlFiles = new Set(['chat.html', 'chat-setup.html', 'search.html']);
 
@@ -98,6 +99,9 @@ const ensureTelemetryStorage = () => {
   }
   if (!fs.existsSync(physicalTrialFilePath)) {
     fs.writeFileSync(physicalTrialFilePath, '');
+  }
+  if (!fs.existsSync(observerNotesFilePath)) {
+    fs.writeFileSync(observerNotesFilePath, '');
   }
 };
 
@@ -226,6 +230,22 @@ const physicalTrialSqlColumns = [
   'trial_mode'
 ];
 
+const observerNotesSqlColumns = [
+  'received_at',
+  'timestamp',
+  'session_id',
+  'participant_id',
+  'task_id',
+  'task_label',
+  'manual_page',
+  'scenario_score',
+  'task_length_ms',
+  'notes',
+  'action_type',
+  'source',
+  'trial_mode'
+];
+
 const projectTelemetryRecord = (record) => ({
   received_at: record.received_at || '',
   timestamp: record.timestamp || '',
@@ -273,6 +293,22 @@ const projectPhysicalTrialRecord = (record) => ({
   manual_page: record.manual_page || '',
   notes: record.notes || '',
   source: record.source || 'physical_manual',
+  trial_mode: record.trial_mode || 'physical'
+});
+
+const projectObserverNoteRecord = (record) => ({
+  received_at: record.received_at || '',
+  timestamp: record.timestamp || '',
+  session_id: record.session_id || '',
+  participant_id: record.participant_id || '',
+  task_id: record.task_id || '',
+  task_label: record.task_label || '',
+  manual_page: record.manual_page || '',
+  scenario_score: Number.isFinite(parseIntegerSafely(record.scenario_score)) ? parseIntegerSafely(record.scenario_score) : null,
+  task_length_ms: Number.isFinite(parseIntegerSafely(record.task_length_ms)) ? parseIntegerSafely(record.task_length_ms) : null,
+  notes: record.notes || '',
+  action_type: record.action_type || '',
+  source: record.source || 'observations_logger',
   trial_mode: record.trial_mode || 'physical'
 });
 
@@ -577,6 +613,21 @@ const normalizePhysicalTrialRecordForSql = (record) => {
   };
 };
 
+const normalizeObserverNoteRecordForSql = (record) => {
+  const projected = projectObserverNoteRecord(record);
+  const actionType = String(projected.action_type || '').trim().toLowerCase();
+  return {
+    ...projected,
+    action_type: actionType,
+    source: String(projected.source || 'observations_logger').trim() || 'observations_logger',
+    trial_mode: String(projected.trial_mode || 'physical').trim().toLowerCase() === 'digital' ? 'digital' : 'physical',
+    scenario_score: parseIntegerSafely(projected.scenario_score),
+    task_length_ms: parseIntegerSafely(projected.task_length_ms),
+    received_at: parseDateSafely(record.received_at || projected.received_at || new Date().toISOString()),
+    timestamp: parseDateSafely(record.timestamp || projected.timestamp)
+  };
+};
+
 const computeTaskActionIndexPostgres = async (client, normalizedRecord) => {
   const eventType = String(normalizedRecord.event_type || '').trim().toLowerCase();
   const taskId = String(normalizedRecord.task_id || '').trim();
@@ -710,6 +761,17 @@ const insertPhysicalTrialRecordPostgres = async (record) => {
   const placeholders = physicalTrialSqlColumns.map((_, index) => `$${index + 1}`).join(', ');
   const queryText = `INSERT INTO physical_trial_events (${physicalTrialSqlColumns.join(', ')}) VALUES (${placeholders})`;
   const values = physicalTrialSqlColumns.map((column) => normalized[column]);
+
+  await pool.query(queryText, values);
+};
+
+const insertObserverNoteRecordPostgres = async (record) => {
+  const pool = getTelemetryPgPool();
+  const normalized = normalizeObserverNoteRecordForSql(record);
+
+  const placeholders = observerNotesSqlColumns.map((_, index) => `$${index + 1}`).join(', ');
+  const queryText = `INSERT INTO observer_notes (${observerNotesSqlColumns.join(', ')}) VALUES (${placeholders})`;
+  const values = observerNotesSqlColumns.map((column) => normalized[column]);
 
   await pool.query(queryText, values);
 };
@@ -931,6 +993,11 @@ const writePhysicalTrialRecordToFiles = (record) => {
   fs.appendFileSync(physicalTrialFilePath, `${JSON.stringify(record)}\n`, 'utf8');
 };
 
+const writeObserverNoteRecordToFiles = (record) => {
+  ensureTelemetryStorage();
+  fs.appendFileSync(observerNotesFilePath, `${JSON.stringify(record)}\n`, 'utf8');
+};
+
 const storeTelemetryRecord = async (record) => {
   if (telemetryUsePostgres) {
     try {
@@ -992,6 +1059,24 @@ const storePhysicalTrialRecord = async (record) => {
   }
 
   writePhysicalTrialRecordToFiles(record);
+};
+
+const storeObserverNoteRecord = async (record) => {
+  if (telemetryUsePostgres) {
+    try {
+      await insertObserverNoteRecordPostgres(record);
+      return;
+    } catch (error) {
+      if (!telemetryFallbackToFile) {
+        throw error;
+      }
+      console.error('Postgres observer notes write failed, falling back to file store:', error.message);
+      writeObserverNoteRecordToFiles(record);
+      return;
+    }
+  }
+
+  writeObserverNoteRecordToFiles(record);
 };
 
 const storeQuestionnaireRecord = async (record) => {
@@ -1738,6 +1823,11 @@ app.options('/api/physical-trial', (req, res) => {
   res.status(204).end();
 });
 
+app.options('/api/observer-notes', (req, res) => {
+  withTelemetryCors(res);
+  res.status(204).end();
+});
+
 app.post('/api/physical-trial', async (req, res) => {
   withTelemetryCors(res);
 
@@ -1774,6 +1864,72 @@ app.post('/api/physical-trial', async (req, res) => {
   } catch (error) {
     console.error('Physical trial write error:', error);
     res.status(500).json({ error: 'Failed to store physical trial event' });
+  }
+});
+
+app.post('/api/observer-notes', async (req, res) => {
+  withTelemetryCors(res);
+
+  try {
+    const payload = req.body && typeof req.body === 'object' ? req.body : null;
+    const participantId = String(payload && payload.participant_id || '').trim();
+    const taskId = String(payload && payload.task_id || '').trim();
+    const actionType = String(payload && payload.action_type || '').trim().toLowerCase();
+    const manualPage = String(payload && payload.manual_page || '').trim();
+    const notes = String(payload && payload.notes || '').trim();
+    const scenarioScore = parseIntegerSafely(payload && payload.scenario_score);
+    const taskLengthMs = parseIntegerSafely(payload && payload.task_length_ms);
+
+    if (!payload || !participantId || !taskId || !actionType) {
+      return res.status(400).json({ error: 'participant_id, task_id, and action_type are required' });
+    }
+
+    const allowedActionTypes = new Set(['task_start', 'task_end', 'page_mark', 'scenario_score', 'note']);
+    if (!allowedActionTypes.has(actionType)) {
+      return res.status(400).json({ error: 'action_type must be one of task_start, task_end, page_mark, scenario_score, note' });
+    }
+
+    if (actionType === 'page_mark' && !manualPage) {
+      return res.status(400).json({ error: 'manual_page is required for page_mark' });
+    }
+
+    if (actionType === 'scenario_score') {
+      if (!/^scenario_card_\d+$/i.test(taskId)) {
+        return res.status(400).json({ error: 'scenario_score is only valid for scenario_card tasks' });
+      }
+      if (!Number.isFinite(scenarioScore) || scenarioScore < 0 || scenarioScore > 2) {
+        return res.status(400).json({ error: 'scenario_score must be 0, 1, or 2' });
+      }
+    }
+
+    if (actionType === 'note' && !notes) {
+      return res.status(400).json({ error: 'notes is required for note action_type' });
+    }
+
+    if (actionType === 'task_end' && (taskLengthMs === null || taskLengthMs < 0)) {
+      return res.status(400).json({ error: 'task_length_ms is required for task_end and must be >= 0' });
+    }
+
+    ensureTelemetryStorage();
+
+    const record = projectObserverNoteRecord({
+      ...payload,
+      participant_id: participantId,
+      task_id: taskId,
+      action_type: actionType,
+      scenario_score: actionType === 'scenario_score' ? scenarioScore : null,
+      task_length_ms: actionType === 'task_end' ? taskLengthMs : null,
+      source: 'observations_logger',
+      trial_mode: 'physical',
+      received_at: new Date().toISOString(),
+      timestamp: payload.timestamp || new Date().toISOString()
+    });
+
+    await storeObserverNoteRecord(record);
+    res.status(204).end();
+  } catch (error) {
+    console.error('Observer notes write error:', error);
+    res.status(500).json({ error: 'Failed to store observer note' });
   }
 });
 
