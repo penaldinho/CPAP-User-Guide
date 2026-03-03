@@ -2194,6 +2194,7 @@
           <button id="mtg-task-start" type="button" style="flex:1; padding:7px 10px; border:1px solid #cbd5e1; border-radius:6px; background:#ecfdf3; cursor:pointer;">Start task</button>
           <button id="mtg-task-end" type="button" style="flex:1; padding:7px 10px; border:1px solid #cbd5e1; border-radius:6px; background:#eff6ff; cursor:pointer;">End task</button>
         </div>
+        <button id="mtg-force-end-all" type="button" style="padding:7px 10px; border:1px solid #dc2626; border-radius:6px; background:#fef2f2; color:#991b1b; cursor:pointer;">Force end all active tasks</button>
         <div id="mtg-task-timer" style="padding:7px 10px; border:1px solid #e5e7eb; border-radius:6px; background:#f8fafc; font-weight:600;">Task timer: 00:00</div>
         <button id="mtg-export-csv" type="button" style="padding:7px 10px; border:1px solid #cbd5e1; border-radius:6px; background:#fff7ed; cursor:pointer;">Export CSV</button>
         <div id="mtg-research-state" style="font-size:12px; color:#4b5563; overflow-wrap:anywhere;"></div>
@@ -2212,6 +2213,7 @@
     const taskLabelCustomInput = document.getElementById('mtg-task-label-custom');
     const taskStart = document.getElementById('mtg-task-start');
     const taskEnd = document.getElementById('mtg-task-end');
+    const forceEndAllBtn = document.getElementById('mtg-force-end-all');
     const taskTimer = document.getElementById('mtg-task-timer');
     const exportCsvBtn = document.getElementById('mtg-export-csv');
     const stateText = document.getElementById('mtg-research-state');
@@ -2417,6 +2419,56 @@
       taskEnd.addEventListener('click', () => {
         endTask('ended');
         refreshState();
+      });
+    }
+
+    if (forceEndAllBtn) {
+      forceEndAllBtn.addEventListener('click', async () => {
+        const confirmed = window.confirm('Force end all active tasks for all participants?');
+        if (!confirmed) {
+          return;
+        }
+
+        const originalLabel = forceEndAllBtn.textContent;
+        forceEndAllBtn.disabled = true;
+        forceEndAllBtn.textContent = 'Force ending…';
+
+        try {
+          const response = await fetch(getApiUrl().replace(/\/api\/telemetry$/, '/api/telemetry/force-end-all'), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ source: 'research_controls' })
+          });
+
+          const payload = await response.json().catch(() => ({}));
+          if (!response.ok) {
+            throw new Error(String((payload && payload.error) || 'Request failed'));
+          }
+
+          if (String(getTaskState().task_id || '').trim()) {
+            setTaskState({});
+            setTaskSubscribedInTab(false);
+            clearParticipantNextTaskState();
+            markTaskClearedInUrl();
+            syncTaskPromptCard();
+            syncParticipantEndButton();
+          }
+
+          const forcedCount = Number(payload && payload.forced_count);
+          const participantsScanned = Number(payload && payload.participants_scanned);
+          if (Number.isFinite(forcedCount) && Number.isFinite(participantsScanned)) {
+            window.alert(`Force end complete. Ended ${forcedCount} active task(s) across ${participantsScanned} participant(s).`);
+          } else {
+            window.alert('Force end complete.');
+          }
+
+          refreshState();
+        } catch (error) {
+          window.alert(`Unable to force end tasks: ${error && error.message ? error.message : error}`);
+        } finally {
+          forceEndAllBtn.disabled = false;
+          forceEndAllBtn.textContent = originalLabel;
+        }
       });
     }
 

@@ -334,6 +334,31 @@ const readTelemetryRecordsFromNdjson = (filePath) => {
   return records;
 };
 
+const readDistinctParticipantIdsFromNdjson = () => {
+  ensureTelemetryStorage();
+  if (!fs.existsSync(telemetryFilePath)) {
+    return [];
+  }
+
+  const raw = fs.readFileSync(telemetryFilePath, 'utf8');
+  const lines = raw.split(/\r?\n/).filter(Boolean);
+  const participants = new Set();
+
+  for (const line of lines) {
+    try {
+      const parsed = projectTelemetryRecord(JSON.parse(line));
+      const participantId = String(parsed.participant_id || '').trim();
+      if (participantId) {
+        participants.add(participantId);
+      }
+    } catch {
+      // ignore malformed lines
+    }
+  }
+
+  return Array.from(participants.values());
+};
+
 const getRecordTimeMs = (record) => {
   const value = record.timestamp || record.received_at;
   const parsed = Date.parse(String(value || ''));
@@ -965,6 +990,21 @@ const readTelemetryRecordsPostgres = async (participantId) => {
   return result.rows.map(projectTelemetryRecord);
 };
 
+const readDistinctParticipantIdsPostgres = async () => {
+  const pool = getTelemetryPgPool();
+  const result = await pool.query(
+    `
+      SELECT DISTINCT participant_id
+      FROM telemetry_events
+      WHERE NULLIF(TRIM(participant_id), '') IS NOT NULL
+    `
+  );
+
+  return result.rows
+    .map((row) => String(row.participant_id || '').trim())
+    .filter(Boolean);
+};
+
 const readPhysicalTrialRecordsPostgres = async (participantId) => {
   const pool = getTelemetryPgPool();
   const baseQuery = `
@@ -1177,6 +1217,65 @@ const readPhysicalTrialRecordsForExport = async (participantId) => {
   return readPhysicalTrialRecordsFromNdjson(physicalTrialFilePath);
 };
 
+const scenarioTaskCapMs = 5 * 60 * 1000;
+const shortFormTaskCapMs = 90 * 1000;
+const defaultTaskStaleThresholdMs = 15 * 60 * 1000;
+
+const getTaskCapMs = (taskId) => {
+  const key = String(taskId || '').trim().toLowerCase();
+  if (!key) return null;
+  if (/^scenario_card_\d+$/.test(key)) return scenarioTaskCapMs;
+  if (/^short_form_q[1-4]$/.test(key)) return shortFormTaskCapMs;
+  return null;
+};
+
+const buildStaleTaskResult = (participantId, taskId, taskLabel, startedAtIso, startedAtMs) => {
+  const capMs = getTaskCapMs(taskId);
+  const nowMs = Date.now();
+  const durationMs = Number.isFinite(capMs)
+    ? capMs
+    : (Number.isFinite(startedAtMs) ? Math.max(0, nowMs - startedAtMs) : null);
+  const inferredEndedAtMs = Number.isFinite(capMs) && Number.isFinite(startedAtMs)
+    ? (startedAtMs + capMs)
+    : nowMs;
+
+  return {
+    participant_id: participantId,
+    active_task: null,
+    last_task: {
+      task_id: String(taskId || '').trim(),
+      task_label: String(taskLabel || '').trim(),
+      task_status: 'time_cap_reached_inferred',
+      duration_ms: Number.isFinite(durationMs) ? durationMs : null,
+      ended_at: Number.isFinite(inferredEndedAtMs) ? new Date(inferredEndedAtMs).toISOString() : String(startedAtIso || '').trim()
+    }
+  };
+};
+
+const coerceActiveTaskStateOrInferEnded = (participantId, taskId, taskLabel, startedAtValue) => {
+  const startedAtIso = startedAtValue ? new Date(startedAtValue).toISOString() : '';
+  const startedAtMs = Date.parse(String(startedAtIso || ''));
+  const nowMs = Date.now();
+  const capMs = getTaskCapMs(taskId);
+  const staleThresholdMs = Number.isFinite(capMs)
+    ? Math.max(capMs + 15000, capMs)
+    : defaultTaskStaleThresholdMs;
+
+  if (Number.isFinite(startedAtMs) && (nowMs - startedAtMs) > staleThresholdMs) {
+    return buildStaleTaskResult(participantId, taskId, taskLabel, startedAtIso, startedAtMs);
+  }
+
+  return {
+    participant_id: participantId,
+    active_task: {
+      task_id: String(taskId || '').trim(),
+      task_label: String(taskLabel || '').trim(),
+      started_at: startedAtIso
+    },
+    last_task: null
+  };
+};
+
 const readLatestTaskStatePostgres = async (participantId) => {
   const pool = getTelemetryPgPool();
   const result = await pool.query(
@@ -1209,15 +1308,12 @@ const readLatestTaskStatePostgres = async (participantId) => {
 
   const eventType = String(row.event_type || '').trim().toLowerCase();
   if (eventType === 'task_start') {
-    return {
-      participant_id: participantId,
-      active_task: {
-        task_id: String(row.task_id || '').trim(),
-        task_label: String(row.task_label || '').trim(),
-        started_at: row.event_at ? new Date(row.event_at).toISOString() : ''
-      },
-      last_task: null
-    };
+    return coerceActiveTaskStateOrInferEnded(
+      participantId,
+      String(row.task_id || '').trim(),
+      String(row.task_label || '').trim(),
+      row.event_at
+    );
   }
 
   return {
@@ -1257,15 +1353,12 @@ const readLatestTaskStateFromNdjson = (participantId) => {
 
       const eventAt = parsed.timestamp || parsed.received_at || '';
       if (eventType === 'task_start') {
-        return {
-          participant_id: participantId,
-          active_task: {
-            task_id: taskId,
-            task_label: String(parsed.task_label || '').trim(),
-            started_at: eventAt ? new Date(eventAt).toISOString() : ''
-          },
-          last_task: null
-        };
+        return coerceActiveTaskStateOrInferEnded(
+          participantId,
+          taskId,
+          String(parsed.task_label || '').trim(),
+          eventAt
+        );
       }
 
       return {
@@ -1319,6 +1412,71 @@ const readLatestTaskState = async (participantId) => {
 
   ensureTelemetryStorage();
   return readLatestTaskStateFromNdjson(normalizedParticipant);
+};
+
+const readDistinctParticipantIds = async () => {
+  if (telemetryUsePostgres) {
+    try {
+      const postgresParticipants = await readDistinctParticipantIdsPostgres();
+      if (postgresParticipants.length > 0 || !telemetryFallbackToFile) {
+        return postgresParticipants;
+      }
+      return readDistinctParticipantIdsFromNdjson();
+    } catch (error) {
+      if (!telemetryFallbackToFile) {
+        throw error;
+      }
+      console.error('Distinct participant read failed in postgres, using file fallback:', error.message);
+      return readDistinctParticipantIdsFromNdjson();
+    }
+  }
+
+  return readDistinctParticipantIdsFromNdjson();
+};
+
+const forceEndAllActiveTasks = async () => {
+  const participantIds = await readDistinctParticipantIds();
+  const forced = [];
+
+  for (const participantId of participantIds) {
+    const state = await readLatestTaskState(participantId);
+    const activeTask = state && state.active_task ? state.active_task : null;
+    const activeTaskId = String(activeTask && activeTask.task_id || '').trim();
+    if (!activeTaskId) {
+      continue;
+    }
+
+    const startedAtMs = Date.parse(String(activeTask.started_at || ''));
+    const capMs = getTaskCapMs(activeTaskId);
+    const rawDurationMs = Number.isFinite(startedAtMs) ? Math.max(0, Date.now() - startedAtMs) : null;
+    const durationMs = Number.isFinite(rawDurationMs)
+      ? (Number.isFinite(capMs) ? Math.min(rawDurationMs, capMs) : rawDurationMs)
+      : null;
+    const nowIso = new Date().toISOString();
+
+    await storeTelemetryRecord({
+      participant_id: participantId,
+      event_type: 'task_end',
+      task_id: activeTaskId,
+      task_label: String(activeTask.task_label || '').trim(),
+      task_status: 'force_ended_all',
+      duration_ms: Number.isFinite(durationMs) ? durationMs : null,
+      trial_mode: 'digital',
+      timestamp: nowIso,
+      received_at: nowIso
+    });
+
+    forced.push({
+      participant_id: participantId,
+      task_id: activeTaskId
+    });
+  }
+
+  return {
+    participants_scanned: participantIds.length,
+    forced_count: forced.length,
+    forced
+  };
 };
 
 const withTelemetryCors = (res) => {
@@ -1822,6 +1980,11 @@ app.options('/api/telemetry', (req, res) => {
   res.status(204).end();
 });
 
+app.options('/api/telemetry/force-end-all', (req, res) => {
+  withTelemetryCors(res);
+  res.status(204).end();
+});
+
 app.options('/api/physical-trial', (req, res) => {
   withTelemetryCors(res);
   res.status(204).end();
@@ -1961,6 +2124,18 @@ app.post('/api/telemetry', async (req, res) => {
   } catch (error) {
     console.error('Telemetry write error:', error);
     res.status(500).json({ error: 'Failed to store telemetry event' });
+  }
+});
+
+app.post('/api/telemetry/force-end-all', async (req, res) => {
+  withTelemetryCors(res);
+
+  try {
+    const result = await forceEndAllActiveTasks();
+    res.status(200).json(result);
+  } catch (error) {
+    console.error('Force end all tasks error:', error);
+    res.status(500).json({ error: 'Failed to force-end active tasks' });
   }
 });
 
