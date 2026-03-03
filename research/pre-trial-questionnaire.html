@@ -76,7 +76,7 @@
               <label><input type="radio" name="gender" value="other" /> Other (please specify)</label>
               <label><input type="radio" name="gender" value="prefer_not_say" /> Prefer not to say</label>
             </div>
-            <label>Other gender (if selected)
+            <label id="gender_other_wrap" style="display:none;">Other gender (if selected)
               <input id="gender_other" type="text" />
             </label>
             <div class="error-hint"></div>
@@ -207,6 +207,26 @@
         hint.textContent = message;
       }
     };
+
+    const genderOtherWrap = document.getElementById('gender_other_wrap');
+    const genderOtherInput = document.getElementById('gender_other');
+    const genderRadioInputs = Array.from(document.querySelectorAll('input[name="gender"]'));
+
+    const syncGenderOtherVisibility = () => {
+      const selectedGender = radioValue('gender');
+      const shouldShowOther = selectedGender === 'other';
+      if (!genderOtherWrap) return;
+
+      genderOtherWrap.style.display = shouldShowOther ? '' : 'none';
+      if (!shouldShowOther && genderOtherInput) {
+        genderOtherInput.value = '';
+      }
+    };
+
+    genderRadioInputs.forEach((input) => {
+      input.addEventListener('change', syncGenderOtherVisibility);
+    });
+    syncGenderOtherVisibility();
 
     const deviceExperienceInputs = Array.from(document.querySelectorAll('input[name="device_experience"]'));
     const noneDeviceExperienceInput = document.querySelector('input[name="device_experience"][value="none"]');
