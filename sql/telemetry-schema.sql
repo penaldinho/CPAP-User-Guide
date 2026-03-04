@@ -831,3 +831,391 @@ SELECT
   MAX(page_closed_at) AS last_page_closed_at
 FROM telemetry_task_page_spans
 GROUP BY participant_id, task_id, task_instance_seq, page_path;
+
+CREATE TABLE IF NOT EXISTS short_form_rubric_rules (
+  id BIGSERIAL PRIMARY KEY,
+  question_id TEXT NOT NULL,
+  part_key TEXT NOT NULL DEFAULT 'a',
+  rubric_version TEXT NOT NULL DEFAULT 'v1',
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  rule_order INTEGER NOT NULL DEFAULT 100,
+  rule_label TEXT,
+  match_type TEXT NOT NULL,
+  match_value TEXT,
+  numeric_min NUMERIC,
+  numeric_max NUMERIC,
+  score_value NUMERIC(6,3) NOT NULL DEFAULT 1.000,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT short_form_rubric_rules_match_type_check CHECK (match_type IN ('exact', 'contains', 'regex', 'numeric_range', 'contains_any', 'contains_all')),
+  CONSTRAINT short_form_rubric_rules_part_key_check CHECK (part_key IN ('a', 'b', 'c', 'd')),
+  CONSTRAINT short_form_rubric_rules_numeric_range_check CHECK (
+    (match_type <> 'numeric_range')
+    OR (numeric_min IS NOT NULL AND numeric_max IS NOT NULL AND numeric_max >= numeric_min)
+  )
+);
+
+ALTER TABLE short_form_rubric_rules
+  DROP CONSTRAINT IF EXISTS short_form_rubric_rules_match_type_check;
+
+ALTER TABLE short_form_rubric_rules
+  ADD CONSTRAINT short_form_rubric_rules_match_type_check
+  CHECK (match_type IN ('exact', 'contains', 'regex', 'numeric_range', 'contains_any', 'contains_all'));
+
+CREATE INDEX IF NOT EXISTS idx_short_form_rubric_rules_question_part
+  ON short_form_rubric_rules (question_id, part_key, is_active, rule_order, id);
+
+CREATE INDEX IF NOT EXISTS idx_short_form_rubric_rules_active
+  ON short_form_rubric_rules (is_active, question_id, rubric_version);
+
+CREATE OR REPLACE FUNCTION normalize_short_form_text(input_text TEXT)
+RETURNS TEXT
+LANGUAGE sql
+IMMUTABLE
+AS $$
+  SELECT TRIM(
+    REGEXP_REPLACE(
+      REGEXP_REPLACE(
+        REGEXP_REPLACE(
+          REGEXP_REPLACE(
+            REGEXP_REPLACE(
+              REGEXP_REPLACE(
+                REGEXP_REPLACE(
+                  REGEXP_REPLACE(
+                    REGEXP_REPLACE(
+                      REGEXP_REPLACE(
+                        LOWER(TRIM(COALESCE(input_text, ''))),
+                        '\b(get\s+in\s+touch|reach\s+out|talk\s+to|speak\s+to|ring|phone)\b',
+                        ' contact ',
+                        'g'
+                      ),
+                      '\b(care\s*provider|provider|clinician|sleep\s*clinic|health\s*care\s*provider)\b',
+                      ' care provider ',
+                      'g'
+                    ),
+                    '\b(weekley|wekly|wkly|weely|weeky|weeklyy|weekly)\b',
+                    ' weekly ',
+                    'g'
+                  ),
+                  '\b(feet|foot)\b',
+                  ' ft ',
+                  'g'
+                ),
+                '\b(celsius|celcius|centigrade)\b',
+                ' c ',
+                'g'
+              ),
+              '\b(fahrenheit|farenheit|fahrenhiet)\b',
+              ' f ',
+              'g'
+            ),
+            '°',
+            '',
+            'g'
+          ),
+            '[^a-z0-9]+',
+            ' ',
+            'g'
+          ),
+          '\s+',
+          ' ',
+          'g'
+        ),
+        '\bmetre\b',
+        'm',
+        'g'
+      ),
+      '\bmeters\b|\bmetres\b',
+      'm',
+      'g'
+    )
+  );
+$$;
+
+CREATE OR REPLACE FUNCTION normalize_short_form_rule_terms(match_value TEXT)
+RETURNS TEXT[]
+LANGUAGE sql
+IMMUTABLE
+AS $$
+  SELECT COALESCE(
+    ARRAY(
+      SELECT normalize_short_form_text(term)
+      FROM UNNEST(REGEXP_SPLIT_TO_ARRAY(COALESCE(match_value, ''), '\s*\|\|\s*')) AS term
+      WHERE normalize_short_form_text(term) <> ''
+    ),
+    ARRAY[]::TEXT[]
+  );
+$$;
+
+CREATE OR REPLACE VIEW short_form_result_parts AS
+WITH base AS (
+  SELECT
+    s.id AS short_form_result_id,
+    s.received_at,
+    s.timestamp,
+    s.session_id,
+    s.participant_id,
+    COALESCE(NULLIF(s.question_id, ''), NULLIF(s.task_id, '')) AS question_id,
+    s.task_id,
+    s.task_label,
+    s.trial_mode,
+    s.duration_ms,
+    s.answer_text,
+    s.part_a_answer_text,
+    s.part_b_answer_text,
+    s.part_c_answer_text,
+    s.part_d_answer_text
+  FROM short_form_results s
+)
+SELECT
+  b.short_form_result_id,
+  b.received_at,
+  b.timestamp,
+  b.session_id,
+  b.participant_id,
+  b.question_id,
+  b.task_id,
+  b.task_label,
+  b.trial_mode,
+  b.duration_ms,
+  p.part_key,
+  p.answer_text,
+  normalize_short_form_text(p.answer_text) AS answer_text_normalized,
+  CASE
+    WHEN p.answer_text IS NULL THEN NULL
+    ELSE NULLIF(REGEXP_REPLACE((REGEXP_MATCHES(LOWER(p.answer_text), '(-?\d+(?:\.\d+)?)'))[1], ',', '', 'g'), '')::NUMERIC
+  END AS answer_first_number
+FROM base b
+CROSS JOIN LATERAL (
+  VALUES
+    ('a'::TEXT, COALESCE(NULLIF(b.part_a_answer_text, ''), NULLIF(b.answer_text, ''))),
+    ('b'::TEXT, NULLIF(b.part_b_answer_text, '')),
+    ('c'::TEXT, NULLIF(b.part_c_answer_text, '')),
+    ('d'::TEXT, NULLIF(b.part_d_answer_text, ''))
+) AS p(part_key, answer_text)
+WHERE b.question_id IS NOT NULL
+  AND b.question_id <> ''
+  AND p.answer_text IS NOT NULL
+  AND TRIM(p.answer_text) <> '';
+
+CREATE OR REPLACE VIEW short_form_part_scoring AS
+WITH candidate_matches AS (
+  SELECT
+    a.short_form_result_id,
+    a.received_at,
+    a.timestamp,
+    a.session_id,
+    a.participant_id,
+    a.question_id,
+    a.task_id,
+    a.task_label,
+    a.trial_mode,
+    a.duration_ms,
+    a.part_key,
+    a.answer_text,
+    a.answer_text_normalized,
+    a.answer_first_number,
+    r.id AS matched_rule_id,
+    r.rubric_version,
+    r.rule_label,
+    r.match_type,
+    r.score_value,
+    ROW_NUMBER() OVER (
+      PARTITION BY a.short_form_result_id, a.part_key
+      ORDER BY r.rule_order ASC, r.id ASC
+    ) AS match_rank
+  FROM short_form_result_parts a
+  LEFT JOIN short_form_rubric_rules r
+    ON r.is_active = TRUE
+    AND r.question_id = a.question_id
+    AND r.part_key = a.part_key
+    AND (
+      (r.match_type = 'exact' AND a.answer_text_normalized = normalize_short_form_text(r.match_value))
+      OR (r.match_type = 'contains' AND a.answer_text_normalized LIKE '%' || normalize_short_form_text(r.match_value) || '%')
+      OR (
+        r.match_type = 'contains_any'
+        AND EXISTS (
+          SELECT 1
+          FROM UNNEST(normalize_short_form_rule_terms(r.match_value)) AS term
+          WHERE a.answer_text_normalized LIKE '%' || term || '%'
+        )
+      )
+      OR (
+        r.match_type = 'contains_all'
+        AND NOT EXISTS (
+          SELECT 1
+          FROM UNNEST(normalize_short_form_rule_terms(r.match_value)) AS term
+          WHERE a.answer_text_normalized NOT LIKE '%' || term || '%'
+        )
+      )
+      OR (r.match_type = 'regex' AND a.answer_text ~* r.match_value)
+      OR (
+        r.match_type = 'numeric_range'
+        AND a.answer_first_number IS NOT NULL
+        AND a.answer_first_number >= r.numeric_min
+        AND a.answer_first_number <= r.numeric_max
+      )
+    )
+)
+SELECT
+  c.short_form_result_id,
+  c.received_at,
+  c.timestamp,
+  c.session_id,
+  c.participant_id,
+  c.question_id,
+  c.task_id,
+  c.task_label,
+  c.trial_mode,
+  c.duration_ms,
+  c.part_key,
+  c.answer_text,
+  c.answer_text_normalized,
+  c.answer_first_number,
+  c.matched_rule_id,
+  c.rubric_version,
+  c.rule_label,
+  c.match_type,
+  COALESCE(c.score_value, 0)::NUMERIC(6,3) AS score_value,
+  CASE WHEN c.matched_rule_id IS NOT NULL AND COALESCE(c.score_value, 0) > 0 THEN 1 ELSE 0 END AS score_binary,
+  CASE WHEN c.matched_rule_id IS NULL THEN TRUE ELSE FALSE END AS needs_manual_review
+FROM candidate_matches c
+WHERE c.match_rank = 1;
+
+CREATE OR REPLACE VIEW short_form_result_scores AS
+WITH expected_parts AS (
+  SELECT
+    question_id,
+    part_key
+  FROM short_form_rubric_rules
+  WHERE is_active = TRUE
+  GROUP BY question_id, part_key
+),
+result_expected AS (
+  SELECT
+    s.id AS short_form_result_id,
+    COALESCE(NULLIF(s.question_id, ''), NULLIF(s.task_id, '')) AS question_id,
+    e.part_key
+  FROM short_form_results s
+  INNER JOIN expected_parts e
+    ON e.question_id = COALESCE(NULLIF(s.question_id, ''), NULLIF(s.task_id, ''))
+),
+joined AS (
+  SELECT
+    re.short_form_result_id,
+    re.question_id,
+    re.part_key,
+    ps.score_binary,
+    ps.score_value,
+    ps.needs_manual_review
+  FROM result_expected re
+  LEFT JOIN short_form_part_scoring ps
+    ON ps.short_form_result_id = re.short_form_result_id
+    AND ps.part_key = re.part_key
+),
+metadata AS (
+  SELECT
+    s.id AS short_form_result_id,
+    s.received_at,
+    s.timestamp,
+    s.session_id,
+    s.participant_id,
+    COALESCE(NULLIF(s.question_id, ''), NULLIF(s.task_id, '')) AS question_id,
+    s.task_id,
+    s.task_label,
+    s.trial_mode,
+    s.duration_ms
+  FROM short_form_results s
+)
+SELECT
+  m.short_form_result_id,
+  m.received_at,
+  m.timestamp,
+  m.session_id,
+  m.participant_id,
+  m.question_id,
+  m.task_id,
+  m.task_label,
+  m.trial_mode,
+  m.duration_ms,
+  COUNT(*)::INTEGER AS expected_parts_count,
+  COUNT(*) FILTER (WHERE COALESCE(j.score_binary, 0) = 1)::INTEGER AS correct_parts_count,
+  SUM(COALESCE(j.score_value, 0))::NUMERIC(8,3) AS total_score_value,
+  CASE
+    WHEN COUNT(*) = 0 THEN NULL
+    ELSE ROUND((COUNT(*) FILTER (WHERE COALESCE(j.score_binary, 0) = 1)::NUMERIC / COUNT(*)::NUMERIC), 4)
+  END AS proportion_correct,
+  CASE
+    WHEN COUNT(*) = 0 THEN NULL
+    WHEN COUNT(*) FILTER (WHERE COALESCE(j.score_binary, 0) = 1) = COUNT(*) THEN 1
+    ELSE 0
+  END AS all_parts_correct_binary,
+  BOOL_OR(COALESCE(j.needs_manual_review, TRUE)) AS has_any_manual_review_flag
+FROM metadata m
+LEFT JOIN joined j
+  ON j.short_form_result_id = m.short_form_result_id
+GROUP BY
+  m.short_form_result_id,
+  m.received_at,
+  m.timestamp,
+  m.session_id,
+  m.participant_id,
+  m.question_id,
+  m.task_id,
+  m.task_label,
+  m.trial_mode,
+  m.duration_ms;
+
+DROP VIEW IF EXISTS short_form_result_scores_final;
+DROP VIEW IF EXISTS short_form_part_scores_final;
+DROP TABLE IF EXISTS short_form_score_overrides;
+
+INSERT INTO short_form_rubric_rules (
+  question_id,
+  part_key,
+  rubric_version,
+  is_active,
+  rule_order,
+  rule_label,
+  match_type,
+  match_value,
+  numeric_min,
+  numeric_max,
+  score_value
+)
+VALUES
+  ('short_form_q1', 'a', 'v1', TRUE, 1, 'Reject not weekly phrasing', 'regex', '(not\s+weekly|never\s+weekly)', NULL, NULL, 0.000),
+  ('short_form_q1', 'a', 'v1', TRUE, 10, 'Weekly cleaning (weekly)', 'contains', 'weekly', NULL, NULL, 1.000),
+  ('short_form_q1', 'a', 'v1', TRUE, 20, 'Weekly cleaning (once a week)', 'contains', 'once a week', NULL, NULL, 1.000),
+  ('short_form_q1', 'a', 'v1', TRUE, 30, 'Weekly cleaning (every week)', 'contains', 'every week', NULL, NULL, 1.000),
+  ('short_form_q1', 'a', 'v1', TRUE, 40, 'Weekly cleaning (7 days)', 'regex', '(^|[^0-9])7\s*(day|days)($|[^a-z])', NULL, NULL, 1.000),
+  ('short_form_q1', 'a', 'v1', TRUE, 45, 'Weekly cleaning (every 7 days)', 'contains', 'every 7 days', NULL, NULL, 1.000),
+  ('short_form_q1', 'a', 'v1', TRUE, 50, 'Weekly cleaning (once weekly)', 'contains', 'once weekly', NULL, NULL, 1.000),
+  ('short_form_q1', 'a', 'v1', TRUE, 55, 'Weekly cleaning (per week)', 'contains', 'per week', NULL, NULL, 1.000),
+  ('short_form_q1', 'a', 'v1', TRUE, 60, 'Weekly cleaning (typo-tolerant)', 'regex', '\bw[e]{0,2}kly\b', NULL, NULL, 1.000),
+
+  ('short_form_q2', 'a', 'v1', TRUE, 1, 'Reject do not contact provider', 'regex', '(do\s*not\s*contact|dont\s*contact).*(care\s*provider|provider)', NULL, NULL, 0.000),
+  ('short_form_q2', 'a', 'v1', TRUE, 10, 'Contact care provider', 'contains', 'contact your care provider', NULL, NULL, 1.000),
+  ('short_form_q2', 'a', 'v1', TRUE, 20, 'Contact provider', 'contains', 'contact provider', NULL, NULL, 1.000),
+  ('short_form_q2', 'a', 'v1', TRUE, 30, 'Call care provider', 'contains', 'call care provider', NULL, NULL, 1.000),
+  ('short_form_q2', 'a', 'v1', TRUE, 40, 'Do not open and contact provider', 'regex', '(do\s*not\s*open).*(contact|call).*(provider)', NULL, NULL, 1.000),
+  ('short_form_q2', 'a', 'v1', TRUE, 50, 'Get in touch with care provider', 'contains', 'get in touch with care provider', NULL, NULL, 1.000),
+  ('short_form_q2', 'a', 'v1', TRUE, 60, 'Action + provider intent', 'contains_all', 'contact||care provider', NULL, NULL, 1.000),
+  ('short_form_q2', 'a', 'v1', TRUE, 70, 'Seek medical advice', 'contains_any', 'seek medical advice||contact clinic||speak to clinic||call clinic', NULL, NULL, 1.000),
+
+  ('short_form_q3', 'a', 'v1', TRUE, 1, 'Reject not storage range', 'regex', '(not\s*-?20\s*(to|-)\s*50|outside\s*-?20\s*(to|-)\s*50)', NULL, NULL, 0.000),
+  ('short_form_q3', 'a', 'v1', TRUE, 10, 'Storage -20 to 50 C', 'regex', '(-?20\s*(to|-)\s*50\s*°?\s*c)', NULL, NULL, 1.000),
+  ('short_form_q3', 'a', 'v1', TRUE, 20, 'Storage -4 to 122 F', 'regex', '(-?4\s*(to|-)\s*122\s*°?\s*f)', NULL, NULL, 1.000),
+  ('short_form_q3', 'a', 'v1', TRUE, 30, 'Mentions both storage bounds with C', 'regex', '(-?20).*50.*(c|celsius)', NULL, NULL, 1.000),
+  ('short_form_q3', 'a', 'v1', TRUE, 40, 'Storage range no unit', 'regex', '(-?20\s*(to|-|–)\s*50)(\b|\s)', NULL, NULL, 1.000),
+  ('short_form_q3', 'a', 'v1', TRUE, 50, 'Storage between phrasing', 'regex', 'between\s*-?20\s*and\s*50', NULL, NULL, 1.000),
+  ('short_form_q3', 'a', 'v1', TRUE, 60, 'Storage minus phrasing', 'regex', 'minus\s*20\s*(to|-|–)\s*50', NULL, NULL, 1.000),
+
+  ('short_form_q4', 'a', 'v1', TRUE, 1, 'Reject yes-only', 'exact', 'yes', NULL, NULL, 0.000),
+  ('short_form_q4', 'a', 'v1', TRUE, 2, 'Reject sufficient at 7ft', 'regex', '(7\s*(ft|feet)).*(sufficient|enough|long enough)', NULL, NULL, 0.000),
+  ('short_form_q4', 'a', 'v1', TRUE, 10, '7ft not sufficient', 'regex', '(7\s*(ft|feet|foot)).*(not|no|insufficient|too short)', NULL, NULL, 1.000),
+  ('short_form_q4', 'a', 'v1', TRUE, 20, 'ClimateLineAir length 6''6"', 'regex', '(6\s*''\s*6\"|6\.?5\s*(ft|feet)|2\s*m)', NULL, NULL, 1.000),
+  ('short_form_q4', 'a', 'v1', TRUE, 30, 'No, 7ft exceeds tubing length', 'regex', '(no|not sufficient|insufficient).*(7\s*(ft|feet)).*(6\s*''\s*6\"|2\s*m)', NULL, NULL, 1.000),
+  ('short_form_q4', 'a', 'v1', TRUE, 40, 'No-only accepted (binary question)', 'exact', 'no', NULL, NULL, 1.000),
+  ('short_form_q4', 'a', 'v1', TRUE, 50, 'Comparison phrasing 7ft vs 2m', 'contains_all', '7 ft||2 m', NULL, NULL, 1.000)
+ON CONFLICT DO NOTHING;
