@@ -58,14 +58,13 @@
           <div style="font-size:17px;color:#334155;line-height:1.55;">
             You will complete 7 activities in total: 3 practical scenarios followed by 4 short questions.<br />
             Task timings, completion outcomes, and task responses/interactions will be recorded for research purposes only.<br />
-            Each scenario has a 5:00-minute time limit, and each question has a 1:30-minute time limit.<br />
-            You may find it helpful to focus on information that is most relevant to each task, given the time limit.<br />
+            Tasks have recommended pacing targets (scenarios ~5:00 and questions ~1:30), but you can continue if you need more time.<br />
+            Timing is used for research analysis only and is not used to judge your performance.<br />
             Question tasks have multiple sections; type each section answer as soon as you find it so it is logged.<br />
             When you finish a task, click “I have completed this task”.<br />
             Once a task is marked complete, you cannot return to it and it is treated as finished.<br />
             Work through the tasks in order using the on-screen buttons.<br />
-            A timer runs for each activity, and your progress is recorded automatically.<br />
-            Once you click Proceed to trial, the timer for the first task starts immediately.
+            Work at a steady pace and focus on the most relevant information for each task.
           </div>
         </div>
         <div class="btns full" style="margin-top:0;">
@@ -323,12 +322,7 @@
         const elapsedEl = document.getElementById('task-elapsed');
         if (!elapsedEl) return;
 
-        const task = getCurrentTask();
-        const capMs = getTaskCapMs(task);
-        const elapsedText = formatElapsedDuration(getActiveElapsedMs());
-        elapsedEl.textContent = capMs
-          ? `Elapsed: ${elapsedText} / ${formatElapsedDuration(capMs)}`
-          : `Elapsed: ${elapsedText}`;
+        elapsedEl.textContent = 'Work at a steady pace. Timing is not used to judge performance.';
       };
 
       let capProcessing = false;
@@ -344,39 +338,28 @@
         const capMs = getTaskCapMs(task);
         if (!capMs) return;
 
+        if (state.timedOutTaskIds.includes(taskId)) {
+          return;
+        }
+
         const elapsedMs = getActiveElapsedMs();
         if (elapsedMs < capMs) return;
 
         capProcessing = true;
         try {
-          if (task.kind === 'short_form') {
-            const partial = getPopulatedShortFormDraftForTask(taskId);
-            const responsePayload = Object.keys(partial).length
-              ? partial
-              : buildNullShortFormPartsForTask(taskId);
+          await submitEvent('note', JSON.stringify({
+            task_id: taskId,
+            task_status: 'soft_cap_reached'
+          }), capMs);
 
-            await submitEvent('note', JSON.stringify({
-              short_form_response: responsePayload,
-              task_id: taskId,
-              task_status: 'time_cap_reached'
-            }), capMs);
-          }
-
-          await submitEvent('task_end', 'time_cap_reached', capMs);
-          state.startedTaskId = '';
-          state.startedAt = '';
-          state.completedElapsedMsByTask[taskId] = capMs;
-          if (!state.completedTaskIds.includes(taskId)) {
-            state.completedTaskIds.push(taskId);
-          }
           if (!state.timedOutTaskIds.includes(taskId)) {
             state.timedOutTaskIds.push(taskId);
           }
           setRunnerState(state);
           renderTask();
-          setStatus(`Time limit reached for ${taskId}. Proceed to the next task.`, false);
+          setStatus(`Recommended pacing target reached for ${taskId}. You can continue at your own pace.`, true);
         } catch (error) {
-          setStatus(error.message || 'Failed to apply task time limit.', false);
+          setStatus(error.message || 'Failed to apply pacing marker.', false);
         } finally {
           capProcessing = false;
         }
@@ -531,7 +514,7 @@
             <strong style="font-size:13px;color:#0f172a;">Task in progress</strong>
             <span class="task-pill">${taskId}</span>
           </div>
-          <div id="task-elapsed" class="task-elapsed">Elapsed: 00:00</div>
+          <div id="task-elapsed" class="task-elapsed">Work at a steady pace. Timing is not used to judge performance.</div>
           <div class="task-title">${task.title}</div>
           <div class="task-preamble">${task.preamble || ''}</div>
           <div class="task-steps">${task.steps && task.steps.length ? `<ul>${task.steps.map((step) => `<li>${step}</li>`).join('')}</ul>` : ''}</div>
@@ -612,7 +595,7 @@
           warning.style.color = '#6b7280';
           warning.style.marginTop = '4px';
           warning.textContent = isTimedOut
-            ? 'Time limit reached. Answers are locked for this task.'
+            ? 'Recommended pacing target was exceeded for this task.'
             : 'Task completed. Answers are locked for this task.';
           answerWrap.appendChild(warning);
         }
@@ -683,7 +666,7 @@
           state.timedOutTaskIds = state.timedOutTaskIds.filter((id) => id !== nextTaskId);
           setRunnerState(state);
           renderTask();
-          setStatus(`Moved to ${nextTaskId} and started timing.`, true);
+          setStatus(`Moved to ${nextTaskId}.`, true);
           return;
         }
 

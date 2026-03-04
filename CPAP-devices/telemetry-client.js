@@ -13,6 +13,7 @@
   let isShortFormCardExpanded = false;
   let isTaskPromptExpanded = false;
   let isResearchPanelManuallyOpen = false;
+  const softCapNotifiedTaskKeys = new Set();
   let baseBodyPaddingBottomPx = null;
 
   const getApiUrl = () => {
@@ -369,6 +370,13 @@
       return elapsedMs;
     }
     return Math.min(elapsedMs, capMs);
+  };
+
+  const buildSoftCapTaskKey = (taskState) => {
+    if (!taskState || !taskState.task_id) {
+      return '';
+    }
+    return `${String(taskState.task_id || '').trim()}::${String(taskState.started_at || '').trim()}`;
   };
 
   const getTaskDisplayLabel = (taskId) => {
@@ -1371,7 +1379,7 @@
       : Object.entries(responseParts).map(([partKey, text]) => `(${partKey}) ${text}`).join('\n');
 
     const currentTaskState = getTaskState();
-    const durationMs = getDisplayedElapsedMsForTaskState(currentTaskState);
+    const durationMs = getElapsedMsForTaskState(currentTaskState);
 
     track('short_form_answer_submitted', {
       question_id: key,
@@ -1467,14 +1475,13 @@
       <div style="font-size:16px; color:#334155; line-height:1.55;">
         You will complete 7 activities in total: 3 practical scenarios followed by 4 short questions.<br />
         Task timings, completion outcomes, and task responses/interactions will be recorded for research purposes only.<br />
-        Each scenario has a 5:00-minute time limit, and each question has a 1:30-minute time limit.<br />
-        You may find it helpful to focus on information that is most relevant to each task, given the time limit.<br />
+        Tasks have recommended pacing targets (scenarios ~5:00 and questions ~1:30), but you can continue if you need more time.<br />
+        Timing is used for research analysis only and is not used to judge your performance.<br />
         Question tasks have multiple sections; type each section answer as soon as you find it so it is logged.<br />
         When you finish a task, click “I have completed this task”.<br />
         Once a task is marked complete, you cannot return to it and it is treated as finished.<br />
         Work through the tasks in order using the on-screen buttons.<br />
-        A timer runs for each activity, and your progress is recorded automatically.<br />
-        Once you click Start trial, the timer for the first task starts immediately.
+        Work at a steady pace and focus on the most relevant information for each task.
       </div>
       <div style="display:flex; justify-content:flex-end; margin-top:10px;">
         <button data-role="start-trial" type="button" style="padding:8px 12px; border:1px solid #0f766e; border-radius:999px; background:#0f766e; color:#fff; cursor:pointer; font-weight:600;">Start trial</button>
@@ -1587,12 +1594,6 @@
       return;
     }
 
-    const capMs = getTaskCapMs(taskId);
-    const elapsedMs = getDisplayedElapsedMsForTaskState(taskState);
-    const elapsedText = formatElapsedDuration(elapsedMs);
-    const elapsedWithCapText = Number.isFinite(capMs)
-      ? `${elapsedText} / ${formatElapsedDuration(capMs)}`
-      : elapsedText;
     const entry = presetTaskDescriptions[taskId] || null;
     const displayLabel = (entry && entry.title) || fallbackLabel || taskId;
     const lines = entry && Array.isArray(entry.steps) ? entry.steps : [];
@@ -1622,7 +1623,7 @@
         <strong style="font-size:13px; color:#0f172a;">Task in progress</strong>
         <button id="mtg-task-prompt-finish-btn" type="button" style="padding:6px 10px; border:1px solid #0f766e; background:#0f766e; color:#ffffff; border-radius:999px; font-size:12px; font-weight:600; cursor:pointer; white-space:nowrap;">I have completed this task</button>
       </div>
-      <div style="margin-top:6px; font-size:12px; color:#334155; font-weight:600;">Elapsed: ${escapeHtml(elapsedWithCapText)}</div>
+      <div style="margin-top:6px; font-size:12px; color:#334155; font-weight:600;">Work at a steady pace. Timing is not used to judge performance.</div>
       <div style="margin-top:8px; color:#334155; line-height:1.4; font-size:14px; overflow:hidden; display:${scenarioDescription ? '-webkit-box' : 'none'}; -webkit-line-clamp:${isExpanded ? '3' : '2'}; -webkit-box-orient:vertical;">${escapeHtml(scenarioDescription)}</div>
       <div style="margin-top:6px; color:#334155; line-height:1.4; font-size:13px; display:${isExpanded && isScenarioTask && instructionsLine ? 'block' : 'none'};">${escapeHtml(String(instructionsLine || ''))}</div>
       <div style="margin-top:6px; color:#334155; line-height:1.35; font-size:12px; display:${isExpanded ? 'block' : 'none'};">${escapeHtml(completionInstruction)}</div>
@@ -1655,6 +1656,10 @@
     };
     setTaskSubscribedInTab(true);
     setTaskState(nextState);
+    const softCapKey = buildSoftCapTaskKey(nextState);
+    if (softCapKey) {
+      softCapNotifiedTaskKeys.delete(softCapKey);
+    }
     markLocalTaskTransition();
     markTaskActiveInUrl(nextState);
     syncTaskPromptCard();
@@ -1670,10 +1675,7 @@
 
     const startedAt = state.started_at ? Date.parse(state.started_at) : null;
     const rawDurationMs = Number.isFinite(startedAt) ? Math.max(0, Date.now() - startedAt) : null;
-    const capMs = getTaskCapMs(state.task_id);
-    const durationMs = Number.isFinite(rawDurationMs)
-      ? (Number.isFinite(capMs) ? Math.min(rawDurationMs, capMs) : rawDurationMs)
-      : null;
+    const durationMs = Number.isFinite(rawDurationMs) ? rawDurationMs : null;
 
     track('task_end', {
       task_id: state.task_id,
@@ -1692,6 +1694,10 @@
 
     setTaskState({});
     setTaskSubscribedInTab(false);
+    const softCapKey = buildSoftCapTaskKey(state);
+    if (softCapKey) {
+      softCapNotifiedTaskKeys.delete(softCapKey);
+    }
     markLocalTaskTransition();
     markTaskClearedInUrl();
     syncTaskPromptCard();
@@ -1719,44 +1725,23 @@
       return;
     }
 
+    const softCapKey = buildSoftCapTaskKey(state);
+    if (softCapKey && softCapNotifiedTaskKeys.has(softCapKey)) {
+      return;
+    }
+
     taskCapProcessing = true;
     try {
-      const nextTaskId = getNextTaskIdInSequence(currentTaskId);
-
-      if (/^short_form_q[1-4]$/i.test(currentTaskId)) {
-        lockVisibleShortFormInputsForTimeout();
-        submitPartialShortFormAnswer(
-          currentTaskId,
-          state.task_label || '',
-          getShortFormDraft(currentTaskId) || {},
-          'time_cap_reached',
-          { forceNullWhenEmpty: true }
-        );
-      }
-
-      if (nextTaskId) {
-        setParticipantNextTaskState({
-          status: 'next',
-          current_task_id: currentTaskId,
-          next_task_id: nextTaskId,
-          next_task_label: getTaskDisplayLabel(nextTaskId),
-          transition_reason: 'time_cap_reached'
-        });
-      } else {
-        setParticipantNextTaskState({
-          status: 'completed',
-          transition_reason: 'time_cap_reached'
-        });
+      if (softCapKey) {
+        softCapNotifiedTaskKeys.add(softCapKey);
       }
 
       track('task_time_cap_reached', {
         task_id: currentTaskId,
         task_label: String(state.task_label || ''),
-        duration_ms: capMs
+        duration_ms: capMs,
+        task_status: 'soft_cap_reached'
       });
-
-      endTask('time_cap_reached');
-      syncParticipantEndButton();
     } finally {
       taskCapProcessing = false;
     }
@@ -2192,12 +2177,6 @@
     }
 
     const definition = getShortFormQuestionDefinition(taskId);
-    const capMs = getTaskCapMs(taskId);
-    const elapsedMs = getDisplayedElapsedMsForTaskState(taskState);
-    const elapsedText = formatElapsedDuration(elapsedMs);
-    const elapsedWithCapText = Number.isFinite(capMs)
-      ? `${elapsedText} / ${formatElapsedDuration(capMs)}`
-      : elapsedText;
 
     if (shortFormTaskHeader) {
       shortFormTaskHeader.innerHTML = `
@@ -2207,7 +2186,7 @@
     }
 
     if (shortFormElapsed) {
-      shortFormElapsed.textContent = `Elapsed: ${elapsedWithCapText}`;
+      shortFormElapsed.textContent = 'Work at a steady pace. Timing is not used to judge performance.';
     }
 
     if (shortFormPreamble) {
