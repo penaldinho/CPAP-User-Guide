@@ -102,7 +102,7 @@
           </div>
           <div id="next_action" class="next-action" aria-live="polite">Next: Enter participant and task, then start task.</div>
           <div class="kbd-help" aria-label="Keyboard shortcuts">
-            Shortcuts: <kbd>Alt</kbd>+<kbd>S</kbd> Start, <kbd>Alt</kbd>+<kbd>E</kbd> End, <kbd>Alt</kbd>+<kbd>P</kbd> Page mark, <kbd>Alt</kbd>+<kbd>C</kbd> Score, <kbd>Alt</kbd>+<kbd>M</kbd> Submit criteria, <kbd>Alt</kbd>+<kbd>N</kbd> Note, <kbd>Alt</kbd>+<kbd>R</kbd> Error
+            Shortcuts: <kbd>Alt</kbd>+<kbd>S</kbd> Start, <kbd>Alt</kbd>+<kbd>E</kbd> End, <kbd>Alt</kbd>+<kbd>P</kbd> Page mark, <kbd>Alt</kbd>+<kbd>C</kbd> Score + End, <kbd>Alt</kbd>+<kbd>M</kbd> Submit criteria, <kbd>Alt</kbd>+<kbd>N</kbd> Note, <kbd>Alt</kbd>+<kbd>R</kbd> Error
           </div>
         </div>
 
@@ -116,24 +116,10 @@
 
         <div class="row-action full">
           <label style="margin:0;">
-            Scenario Score
-            <select id="scenario_score">
-              <option value="">Select score</option>
-              <option value="0">0 - Failed</option>
-              <option value="1">1 - Completed with help/errors</option>
-              <option value="2">2 - Completed without help/errors</option>
-            </select>
+            Notes
+            <textarea id="notes" placeholder="Observer notes"></textarea>
           </label>
-          <button id="btn-score" type="button">Enter Score</button>
-        </div>
-
-        <div id="criteria_section" class="full hidden criteria-card">
-          <div class="criteria-title">Scenario Marking Criteria</div>
-          <div id="criteria_subtitle" class="criteria-subtitle"></div>
-          <div id="criteria_table_wrap" class="criteria-table-wrap"></div>
-          <div style="margin-top:8px; display:flex; justify-content:flex-end;">
-            <button id="btn-submit-criteria" type="button" class="secondary">Submit Criteria Marks</button>
-          </div>
+          <button id="btn-note" type="button" class="secondary">Log Note</button>
         </div>
 
         <label class="full">
@@ -153,14 +139,27 @@
           <button id="btn-error" type="button" class="secondary">Submit Error</button>
         </div>
 
-        <label class="full">
-          Notes
-          <textarea id="notes" placeholder="Observer notes"></textarea>
-        </label>
-      </div>
+        <div id="criteria_section" class="full hidden criteria-card">
+          <div class="criteria-title">Scenario Marking Criteria</div>
+          <div id="criteria_subtitle" class="criteria-subtitle"></div>
+          <div id="criteria_table_wrap" class="criteria-table-wrap"></div>
+          <div style="margin-top:8px; display:flex; justify-content:flex-end;">
+            <button id="btn-submit-criteria" type="button" class="secondary">Submit Criteria Marks</button>
+          </div>
+        </div>
 
-      <div style="margin-top:10px;">
-        <button id="btn-note" type="button" class="secondary">Log Note</button>
+        <div class="row-action full">
+          <label style="margin:0;">
+            Scenario Score
+            <select id="scenario_score">
+              <option value="">Select score</option>
+              <option value="0">0 - Failed</option>
+              <option value="1">1 - Completed with help/errors</option>
+              <option value="2">2 - Completed without help/errors</option>
+            </select>
+          </label>
+          <button id="btn-score" type="button">Enter Score (Ends Task)</button>
+        </div>
       </div>
 
       <div id="status" aria-live="polite"></div>
@@ -791,6 +790,35 @@
         updateActionState();
       };
 
+      const logScoreAndEndTask = async () => {
+        if (!validateCommon()) return;
+
+        const active = getActiveTaskState();
+        const currentKey = getCurrentTaskKey();
+        const taskId = getTaskIdValue();
+        if (!active.key || active.key !== currentKey) {
+          setStatus('No active task timer found for this participant/task. Start the task first.', false);
+          return;
+        }
+
+        if (isScenarioTaskId(taskId)) {
+          const criteriaSubmitted = await submitCriteriaMarks();
+          if (!criteriaSubmitted) {
+            updateActionState();
+            return;
+          }
+        }
+
+        const scoreLogged = await submitObservation('scenario_score');
+        if (!scoreLogged) {
+          updateActionState();
+          return;
+        }
+
+        await submitObservation('task_end');
+        updateActionState();
+      };
+
       const submitCriteriaMarks = async () => {
         if (!validateCommon()) return false;
 
@@ -852,7 +880,7 @@
       el('btn-start').addEventListener('click', startTask);
       el('btn-end').addEventListener('click', endTask);
       el('btn-page').addEventListener('click', logPageMarkAndClear);
-      el('btn-score').addEventListener('click', () => submitObservation('scenario_score'));
+      el('btn-score').addEventListener('click', logScoreAndEndTask);
       el('btn-note').addEventListener('click', logNoteAndClear);
       el('btn-error').addEventListener('click', logErrorAndClear);
       el('btn-submit-criteria').addEventListener('click', submitCriteriaMarks);
@@ -894,7 +922,7 @@
         if (key === 's') await startTask();
         if (key === 'e') await endTask();
         if (key === 'p') await logPageMarkAndClear();
-        if (key === 'c') await submitObservation('scenario_score');
+        if (key === 'c') await logScoreAndEndTask();
         if (key === 'm') await submitCriteriaMarks();
         if (key === 'n') await logNoteAndClear();
         if (key === 'r') await logErrorAndClear();
