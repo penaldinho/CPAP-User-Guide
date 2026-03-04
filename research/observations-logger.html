@@ -341,6 +341,15 @@
         sessionStorage.setItem(criteriaMarksKey, JSON.stringify(state || {}));
       };
 
+      const clearCriteriaStateForCurrentTask = () => {
+        const marksState = getCriteriaMarksState();
+        const stateKey = getCriteriaStateKey();
+        if (Object.prototype.hasOwnProperty.call(marksState, stateKey)) {
+          delete marksState[stateKey];
+          setCriteriaMarksState(marksState);
+        }
+      };
+
       const getCriteriaStateKey = () => {
         const participantId = String(participantInput.value || '').trim();
         const taskId = getTaskIdValue();
@@ -717,6 +726,8 @@
 
           if (actionType === 'task_end') {
             clearActiveTaskState();
+            clearCriteriaStateForCurrentTask();
+            renderCriteriaSection();
           }
 
           updateTaskTimer();
