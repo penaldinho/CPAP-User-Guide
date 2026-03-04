@@ -12,6 +12,7 @@
   let shortFormRenderedTaskId = '';
   let isShortFormCardExpanded = false;
   let isTaskPromptExpanded = false;
+  let isResearchPanelManuallyOpen = false;
   let baseBodyPaddingBottomPx = null;
 
   const getApiUrl = () => {
@@ -2316,6 +2317,18 @@
   };
 
   const renderResearchPanel = (forceOpen = false, allowDuringActiveTask = false) => {
+    if (!forceOpen && !isResearchPanelManuallyOpen) {
+      const existingPanel = document.getElementById('mtg-research-panel');
+      if (existingPanel) {
+        existingPanel.remove();
+      }
+      return;
+    }
+
+    if (forceOpen) {
+      isResearchPanelManuallyOpen = true;
+    }
+
     if (forceOpen) {
       removeTrialIntroOverlayCard();
     }
@@ -2696,6 +2709,7 @@
           window.clearInterval(timerInterval);
           timerInterval = null;
         }
+        isResearchPanelManuallyOpen = false;
         panel.remove();
       });
     }
@@ -2716,10 +2730,12 @@
 
     const existingPanel = document.getElementById('mtg-research-panel');
     if (existingPanel) {
+      isResearchPanelManuallyOpen = false;
       existingPanel.remove();
       return;
     }
 
+    isResearchPanelManuallyOpen = true;
     renderResearchPanel(true, true);
   };
 
