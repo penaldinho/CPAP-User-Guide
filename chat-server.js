@@ -2783,6 +2783,12 @@ app.post('/api/physical-trial', async (req, res) => {
       await storePhysicalTrialRecord(record);
     }
     await storeQuestionnaireRecord(record);
+
+    if (taskId === 'post-trial-questionnaire' && eventType === 'note') {
+      await updateParticipantAllocationRecord(participantId, 'close_session');
+      await updateParticipantAllocationRecord(participantId, 'set_completed', true);
+    }
+
     res.status(204).end();
   } catch (error) {
     console.error('Physical trial write error:', error);
