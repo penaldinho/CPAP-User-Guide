@@ -1293,8 +1293,83 @@ const readDistinctParticipantIdsPostgres = async () => {
     .filter(Boolean);
 };
 
+const ensureParticipantAllocationSchemaPostgres = async () => {
+  const pool = getTelemetryPgPool();
+
+  await pool.query(
+    `
+      CREATE TABLE IF NOT EXISTS participant_allocation (
+        participant_id TEXT PRIMARY KEY,
+        allocation_group TEXT NOT NULL,
+        session_status TEXT NOT NULL DEFAULT 'not_started',
+        session_opened_at TIMESTAMPTZ,
+        session_closed_at TIMESTAMPTZ,
+        completed BOOLEAN NOT NULL DEFAULT FALSE,
+        completed_at TIMESTAMPTZ,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        CONSTRAINT participant_allocation_group_check CHECK (allocation_group IN ('physical', 'digital')),
+        CONSTRAINT participant_allocation_session_status_check CHECK (session_status IN ('not_started', 'in_progress', 'closed'))
+      )
+    `
+  );
+
+  const alterStatements = [
+    'ALTER TABLE participant_allocation ADD COLUMN IF NOT EXISTS completed BOOLEAN',
+    'ALTER TABLE participant_allocation ADD COLUMN IF NOT EXISTS session_status TEXT',
+    'ALTER TABLE participant_allocation ADD COLUMN IF NOT EXISTS session_opened_at TIMESTAMPTZ',
+    'ALTER TABLE participant_allocation ADD COLUMN IF NOT EXISTS session_closed_at TIMESTAMPTZ',
+    'ALTER TABLE participant_allocation ADD COLUMN IF NOT EXISTS completed_at TIMESTAMPTZ',
+    'ALTER TABLE participant_allocation ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ',
+    'ALTER TABLE participant_allocation ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ',
+    "ALTER TABLE participant_allocation ALTER COLUMN completed SET DEFAULT FALSE",
+    "ALTER TABLE participant_allocation ALTER COLUMN session_status SET DEFAULT 'not_started'"
+  ];
+
+  for (const statement of alterStatements) {
+    await pool.query(statement);
+  }
+
+  await pool.query(
+    `
+      UPDATE participant_allocation
+      SET completed = FALSE
+      WHERE completed IS NULL
+    `
+  );
+
+  await pool.query(
+    `
+      UPDATE participant_allocation
+      SET session_status = 'not_started'
+      WHERE session_status IS NULL OR TRIM(session_status) = ''
+    `
+  );
+
+  await pool.query(
+    `
+      UPDATE participant_allocation
+      SET created_at = NOW()
+      WHERE created_at IS NULL
+    `
+  );
+
+  await pool.query(
+    `
+      UPDATE participant_allocation
+      SET updated_at = NOW()
+      WHERE updated_at IS NULL
+    `
+  );
+
+  await pool.query('CREATE INDEX IF NOT EXISTS idx_participant_allocation_group ON participant_allocation (allocation_group)');
+  await pool.query('CREATE INDEX IF NOT EXISTS idx_participant_allocation_completed ON participant_allocation (completed, updated_at DESC)');
+  await pool.query('CREATE INDEX IF NOT EXISTS idx_participant_allocation_session_status ON participant_allocation (session_status, updated_at DESC)');
+};
+
 const ensureParticipantAllocationDefaultsPostgres = async () => {
   const pool = getTelemetryPgPool();
+  await ensureParticipantAllocationSchemaPostgres();
   const queryText = `
     INSERT INTO participant_allocation (
       participant_id,

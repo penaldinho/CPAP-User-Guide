@@ -237,7 +237,12 @@
         try {
           const response = await fetch(endpointBase, { method: 'GET' });
           if (!response.ok) {
-            throw new Error('Failed to load participant allocation');
+            let details = '';
+            try {
+              details = await response.text();
+            } catch {}
+            const suffix = details ? `: ${details}` : '';
+            throw new Error(`Failed to load participant allocation (HTTP ${response.status})${suffix}`);
           }
 
           const data = await response.json();
