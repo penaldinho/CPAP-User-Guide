@@ -76,6 +76,7 @@ const participantTelemetryDir = path.join(telemetryDir, 'participants');
 const physicalTrialFilePath = path.join(telemetryDir, 'physical-trial-events.ndjson');
 const observerNotesFilePath = path.join(telemetryDir, 'observer-notes.ndjson');
 const participantAllocationFilePath = path.join(telemetryDir, 'participant-allocation.json');
+const participantAllocationPassword = process.env.PARTICIPANT_ALLOCATION_PASSWORD || 'edfred';
 
 const excludedHtmlFiles = new Set(['chat.html', 'chat-setup.html', 'search.html']);
 
@@ -83,6 +84,65 @@ const baseDir = guideConfigs[defaultGuide].dir;
 
 const app = express();
 app.use(express.json());
+
+const isParticipantAllocationProtectedPath = (requestPath) => {
+  const normalizedPath = String(requestPath || '').trim();
+  if (!normalizedPath) return false;
+
+  if (normalizedPath === '/research/participant-allocation.html') {
+    return true;
+  }
+
+  if (normalizedPath === '/api/participant-allocation' || normalizedPath.startsWith('/api/participant-allocation/')) {
+    return true;
+  }
+
+  return false;
+};
+
+const parseBasicAuthHeader = (authorizationHeader) => {
+  const value = String(authorizationHeader || '').trim();
+  if (!value.toLowerCase().startsWith('basic ')) {
+    return null;
+  }
+
+  const encoded = value.slice(6).trim();
+  if (!encoded) {
+    return null;
+  }
+
+  try {
+    const decoded = Buffer.from(encoded, 'base64').toString('utf8');
+    const delimiterIndex = decoded.indexOf(':');
+    if (delimiterIndex < 0) {
+      return null;
+    }
+
+    return {
+      username: decoded.slice(0, delimiterIndex),
+      password: decoded.slice(delimiterIndex + 1)
+    };
+  } catch {
+    return null;
+  }
+};
+
+app.use((req, res, next) => {
+  if (!isParticipantAllocationProtectedPath(req.path)) {
+    return next();
+  }
+
+  const credentials = parseBasicAuthHeader(req.headers.authorization);
+  const providedPassword = String(credentials && credentials.password || '');
+
+  if (providedPassword === participantAllocationPassword) {
+    return next();
+  }
+
+  res.setHeader('WWW-Authenticate', 'Basic realm="Participant Allocation", charset="UTF-8"');
+  return res.status(401).send('Authentication required');
+});
+
 app.use(express.static(baseDir));
 app.use('/CPAP-devices', express.static(path.join(__dirname, 'CPAP-devices')));
 app.use('/images', express.static(path.join(__dirname, 'images')));
@@ -1620,6 +1680,93 @@ const updateParticipantAllocationRecord = async (participantId, action, complete
   return rows[index];
 };
 
+const resetParticipantAllocationSessionStatuses = async (participantIds, resetAll) => {
+  const normalizedIds = Array.isArray(participantIds)
+    ? participantIds
+      .map((value) => String(value || '').trim().toUpperCase())
+      .filter(Boolean)
+    : [];
+
+  if (!resetAll && normalizedIds.length === 0) {
+    throw new Error('participant_ids is required when reset_all is false');
+  }
+
+  if (telemetryUsePostgres) {
+    try {
+      const pool = getTelemetryPgPool();
+      await ensureParticipantAllocationDefaultsPostgres();
+
+      let result;
+      if (resetAll) {
+        result = await pool.query(
+          `
+            UPDATE participant_allocation
+            SET
+              session_status = 'not_started',
+              session_opened_at = NULL,
+              session_closed_at = NULL,
+              updated_at = NOW()
+            RETURNING participant_id
+          `
+        );
+      } else {
+        result = await pool.query(
+          `
+            UPDATE participant_allocation
+            SET
+              session_status = 'not_started',
+              session_opened_at = NULL,
+              session_closed_at = NULL,
+              updated_at = NOW()
+            WHERE participant_id = ANY($1::text[])
+            RETURNING participant_id
+          `,
+          [normalizedIds]
+        );
+      }
+
+      return {
+        reset_count: result.rowCount || 0,
+        reset_participant_ids: (result.rows || []).map((row) => String(row.participant_id || '').trim().toUpperCase()).filter(Boolean)
+      };
+    } catch (error) {
+      if (!telemetryFallbackToFile) {
+        throw error;
+      }
+      console.error('Participant allocation session reset failed in postgres, using file fallback:', error.message);
+    }
+  }
+
+  const rows = readParticipantAllocationRecordsFromFile();
+  const targets = resetAll
+    ? new Set(rows.map((row) => String(row.participant_id || '').trim().toUpperCase()).filter(Boolean))
+    : new Set(normalizedIds);
+
+  let resetCount = 0;
+  const nowIso = new Date().toISOString();
+  const nextRows = rows.map((row) => {
+    const participantId = String(row.participant_id || '').trim().toUpperCase();
+    if (!participantId || !targets.has(participantId)) {
+      return row;
+    }
+
+    resetCount += 1;
+    return {
+      ...row,
+      session_status: 'not_started',
+      session_opened_at: null,
+      session_closed_at: null,
+      updated_at: nowIso
+    };
+  });
+
+  writeParticipantAllocationRecordsToFile(nextRows);
+  return {
+    reset_count: resetCount,
+    reset_participant_ids: Array.from(targets.values())
+  };
+};
+
 const readPhysicalTrialRecordsForExport = async (participantId) => {
   if (telemetryUsePostgres) {
     try {
@@ -2429,6 +2576,11 @@ app.options('/api/participant-allocation', (req, res) => {
   res.status(204).end();
 });
 
+app.options('/api/participant-allocation/reset-statuses', (req, res) => {
+  withTelemetryCors(res);
+  res.status(204).end();
+});
+
 app.get('/api/participant-allocation', async (req, res) => {
   withTelemetryCors(res);
 
@@ -2472,6 +2624,31 @@ app.post('/api/participant-allocation', async (req, res) => {
     }
     console.error('Participant allocation update error:', error);
     res.status(500).json({ error: 'Failed to update participant allocation' });
+  }
+});
+
+app.post('/api/participant-allocation/reset-statuses', async (req, res) => {
+  withTelemetryCors(res);
+
+  try {
+    const payload = req.body && typeof req.body === 'object' ? req.body : {};
+    const resetAll = parseBooleanSafely(payload.reset_all) === true;
+    const participantIds = Array.isArray(payload.participant_ids) ? payload.participant_ids : [];
+
+    if (!resetAll && participantIds.length === 0) {
+      return res.status(400).json({ error: 'participant_ids is required unless reset_all is true' });
+    }
+
+    const result = await resetParticipantAllocationSessionStatuses(participantIds, resetAll);
+    const rows = await readParticipantAllocationRecords();
+    res.status(200).json({
+      reset_count: result.reset_count,
+      reset_participant_ids: result.reset_participant_ids,
+      rows
+    });
+  } catch (error) {
+    console.error('Participant allocation reset statuses error:', error);
+    res.status(500).json({ error: 'Failed to reset participant session statuses' });
   }
 });
 
