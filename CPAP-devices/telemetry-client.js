@@ -809,6 +809,10 @@
   const getTaskStateApiUrl = () => getApiUrl().replace(/\/api\/telemetry$/, '/api/telemetry/task-state');
 
   const reconcileTaskStateFromServer = async (reason) => {
+    if (document.getElementById('mtg-trial-intro-overlay-card')) {
+      return;
+    }
+
     const participantId = String(getParticipantId() || '').trim();
     if (!participantId || taskStateSyncState.inFlight) {
       return;
