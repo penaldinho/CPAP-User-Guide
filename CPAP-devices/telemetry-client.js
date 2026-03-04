@@ -615,12 +615,6 @@
       return;
     }
 
-    setParticipantNextTaskState({
-      participant_id: participantId,
-      next_task_id: introTaskId,
-      status: 'ready'
-    });
-
     showTrialIntroOverlayCard({
       participantId,
       taskId: introTaskId,
