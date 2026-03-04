@@ -582,6 +582,33 @@
     return postUrl.toString();
   };
 
+  const maybeShowTrialIntroFromUrl = () => {
+    const url = new URL(window.location.href);
+    const shouldShow = ['1', 'true', 'yes'].includes(String(url.searchParams.get('mtg_show_trial_intro') || '').trim().toLowerCase());
+    if (!shouldShow) {
+      return;
+    }
+
+    url.searchParams.delete('mtg_show_trial_intro');
+    window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
+
+    const activeTaskId = String((getTaskState() && getTaskState().task_id) || '').trim();
+    if (activeTaskId) {
+      return;
+    }
+
+    const participantId = String(getParticipantId() || '').trim();
+    if (!participantId) {
+      return;
+    }
+
+    showTrialIntroOverlayCard({
+      participantId,
+      taskId: 'scenario_card_1',
+      taskLabel: getTaskDisplayLabel('scenario_card_1')
+    });
+  };
+
   const markTaskClearedInUrl = () => {
     const url = new URL(window.location.href);
     url.searchParams.delete('mtg_task_id');
@@ -2675,6 +2702,7 @@
     hydrateParticipantFromUrl();
     hydrateLastTaskResultFromUrl();
     hydrateTaskStateFromUrl();
+    maybeShowTrialIntroFromUrl();
     if (isTaskSubscribedInTab() && !getSharedTaskState().task_id) {
       setTaskSubscribedInTab(false);
     }
