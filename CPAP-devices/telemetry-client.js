@@ -704,9 +704,6 @@
       const wasSubscribed = isTaskSubscribedInTab();
       if (wasSubscribed) {
         setTaskSubscribedInTab(false);
-        if (!hasParticipantTransitionState) {
-          renderResearchPanel(true);
-        }
       }
       syncParticipantEndButton();
       syncTaskPromptCard();
@@ -730,9 +727,6 @@
     if (isTaskSubscribedInTab()) {
       setTaskSubscribedInTab(false);
       markTaskClearedInUrl();
-      if (!hasParticipantTransitionState) {
-        renderResearchPanel(true);
-      }
     }
     syncParticipantEndButton();
     syncTaskPromptCard();
@@ -952,9 +946,6 @@
       if (isTaskSubscribedInTab()) {
         setTaskSubscribedInTab(false);
         markTaskClearedInUrl();
-        if (!hasParticipantTransitionState) {
-          renderResearchPanel(true);
-        }
       }
       syncParticipantEndButton();
       syncTaskPromptCard();
