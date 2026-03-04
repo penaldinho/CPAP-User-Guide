@@ -75,6 +75,7 @@ const telemetryFilePath = path.join(telemetryDir, 'telemetry-events.ndjson');
 const participantTelemetryDir = path.join(telemetryDir, 'participants');
 const physicalTrialFilePath = path.join(telemetryDir, 'physical-trial-events.ndjson');
 const observerNotesFilePath = path.join(telemetryDir, 'observer-notes.ndjson');
+const participantAllocationFilePath = path.join(telemetryDir, 'participant-allocation.json');
 
 const excludedHtmlFiles = new Set(['chat.html', 'chat-setup.html', 'search.html']);
 
@@ -102,6 +103,9 @@ const ensureTelemetryStorage = () => {
   }
   if (!fs.existsSync(observerNotesFilePath)) {
     fs.writeFileSync(observerNotesFilePath, '');
+  }
+  if (!fs.existsSync(participantAllocationFilePath)) {
+    fs.writeFileSync(participantAllocationFilePath, JSON.stringify(defaultParticipantAllocationRecords, null, 2), 'utf8');
   }
 };
 
@@ -250,6 +254,88 @@ const observerNotesSqlColumns = [
   'trial_mode'
 ];
 
+const defaultParticipantAllocationRecords = [
+  { participant_id: 'P01', allocation_group: 'digital' },
+  { participant_id: 'P02', allocation_group: 'physical' },
+  { participant_id: 'P03', allocation_group: 'physical' },
+  { participant_id: 'P04', allocation_group: 'digital' },
+  { participant_id: 'P05', allocation_group: 'digital' },
+  { participant_id: 'P06', allocation_group: 'physical' },
+  { participant_id: 'P07', allocation_group: 'digital' },
+  { participant_id: 'P08', allocation_group: 'physical' },
+  { participant_id: 'P09', allocation_group: 'physical' },
+  { participant_id: 'P10', allocation_group: 'digital' },
+  { participant_id: 'P11', allocation_group: 'physical' },
+  { participant_id: 'P12', allocation_group: 'digital' },
+  { participant_id: 'P13', allocation_group: 'digital' },
+  { participant_id: 'P14', allocation_group: 'physical' },
+  { participant_id: 'P15', allocation_group: 'physical' },
+  { participant_id: 'P16', allocation_group: 'digital' },
+  { participant_id: 'P17', allocation_group: 'physical' },
+  { participant_id: 'P18', allocation_group: 'digital' },
+  { participant_id: 'P19', allocation_group: 'digital' },
+  { participant_id: 'P20', allocation_group: 'physical' },
+  { participant_id: 'P21', allocation_group: 'digital' },
+  { participant_id: 'P22', allocation_group: 'physical' },
+  { participant_id: 'P23', allocation_group: 'digital' },
+  { participant_id: 'P24', allocation_group: 'physical' },
+  { participant_id: 'P25', allocation_group: 'physical' },
+  { participant_id: 'P26', allocation_group: 'digital' },
+  { participant_id: 'P27', allocation_group: 'physical' },
+  { participant_id: 'P28', allocation_group: 'digital' },
+  { participant_id: 'P29', allocation_group: 'physical' },
+  { participant_id: 'P30', allocation_group: 'digital' }
+];
+
+const defaultParticipantAllocationById = Object.fromEntries(
+  defaultParticipantAllocationRecords.map((row) => [row.participant_id, row.allocation_group])
+);
+
+const participantIdSortValue = (participantId) => {
+  const match = /^P(\d+)$/i.exec(String(participantId || '').trim());
+  if (!match) {
+    return Number.MAX_SAFE_INTEGER;
+  }
+  const parsed = Number.parseInt(match[1], 10);
+  return Number.isFinite(parsed) ? parsed : Number.MAX_SAFE_INTEGER;
+};
+
+const normalizeParticipantAllocationRecord = (record) => {
+  const participantId = String(record && record.participant_id || '').trim().toUpperCase();
+  const fallbackGroup = defaultParticipantAllocationById[participantId];
+  const allocationGroupRaw = String(record && record.allocation_group || fallbackGroup || '').trim().toLowerCase();
+  const allocationGroup = allocationGroupRaw === 'physical' ? 'physical' : 'digital';
+  const sessionOpenedAtDate = parseDateSafely(record && record.session_opened_at);
+  const sessionClosedAtDate = parseDateSafely(record && record.session_closed_at);
+  const sessionStatusRaw = String(record && record.session_status || '').trim().toLowerCase();
+  let sessionStatus = ['not_started', 'in_progress', 'closed'].includes(sessionStatusRaw)
+    ? sessionStatusRaw
+    : (sessionClosedAtDate ? 'closed' : (sessionOpenedAtDate ? 'in_progress' : 'not_started'));
+  const completed = parseBooleanSafely(record && record.completed) === true;
+  const completedAtDate = parseDateSafely(record && record.completed_at);
+  const createdAtDate = parseDateSafely(record && record.created_at);
+  const updatedAtDate = parseDateSafely(record && record.updated_at);
+
+  const sessionOpenedAt = sessionOpenedAtDate ? sessionOpenedAtDate.toISOString() : null;
+  const sessionClosedAt = sessionClosedAtDate ? sessionClosedAtDate.toISOString() : null;
+
+  if (sessionStatus === 'not_started') {
+    sessionStatus = 'not_started';
+  }
+
+  return {
+    participant_id: participantId,
+    allocation_group: allocationGroup,
+    session_status: sessionStatus,
+    session_opened_at: sessionOpenedAt,
+    session_closed_at: sessionClosedAt,
+    completed,
+    completed_at: completed && completedAtDate ? completedAtDate.toISOString() : null,
+    created_at: createdAtDate ? createdAtDate.toISOString() : null,
+    updated_at: updatedAtDate ? updatedAtDate.toISOString() : null
+  };
+};
+
 const projectTelemetryRecord = (record) => ({
   received_at: record.received_at || '',
   timestamp: record.timestamp || '',
@@ -361,6 +447,45 @@ const readDistinctParticipantIdsFromNdjson = () => {
   }
 
   return Array.from(participants.values());
+};
+
+const readParticipantAllocationRecordsFromFile = () => {
+  ensureTelemetryStorage();
+  let parsed;
+
+  try {
+    parsed = JSON.parse(fs.readFileSync(participantAllocationFilePath, 'utf8'));
+  } catch {
+    parsed = [];
+  }
+
+  const incoming = Array.isArray(parsed) ? parsed : [];
+  const rowsById = new Map();
+
+  incoming.forEach((row) => {
+    const normalized = normalizeParticipantAllocationRecord(row);
+    if (!normalized.participant_id) {
+      return;
+    }
+    rowsById.set(normalized.participant_id, normalized);
+  });
+
+  for (const seed of defaultParticipantAllocationRecords) {
+    if (!rowsById.has(seed.participant_id)) {
+      rowsById.set(seed.participant_id, normalizeParticipantAllocationRecord(seed));
+    }
+  }
+
+  const rows = Array.from(rowsById.values())
+    .sort((a, b) => participantIdSortValue(a.participant_id) - participantIdSortValue(b.participant_id));
+
+  fs.writeFileSync(participantAllocationFilePath, JSON.stringify(rows, null, 2), 'utf8');
+  return rows;
+};
+
+const writeParticipantAllocationRecordsToFile = (rows) => {
+  ensureTelemetryStorage();
+  fs.writeFileSync(participantAllocationFilePath, JSON.stringify(rows, null, 2), 'utf8');
 };
 
 const getRecordTimeMs = (record) => {
@@ -1100,6 +1225,46 @@ const readDistinctParticipantIdsPostgres = async () => {
     .filter(Boolean);
 };
 
+const ensureParticipantAllocationDefaultsPostgres = async () => {
+  const pool = getTelemetryPgPool();
+  const queryText = `
+    INSERT INTO participant_allocation (
+      participant_id,
+      allocation_group,
+      session_status,
+      session_opened_at,
+      session_closed_at,
+      completed,
+      completed_at,
+      created_at,
+      updated_at
+    )
+    VALUES ($1, $2, 'not_started', NULL, NULL, FALSE, NULL, NOW(), NOW())
+    ON CONFLICT (participant_id) DO NOTHING
+  `;
+
+  for (const row of defaultParticipantAllocationRecords) {
+    await pool.query(queryText, [row.participant_id, row.allocation_group]);
+  }
+};
+
+const readParticipantAllocationRecordsPostgres = async () => {
+  const pool = getTelemetryPgPool();
+  await ensureParticipantAllocationDefaultsPostgres();
+
+  const result = await pool.query(
+    `
+      SELECT participant_id, allocation_group, session_status, session_opened_at, session_closed_at, completed, completed_at, created_at, updated_at
+      FROM participant_allocation
+      ORDER BY participant_id ASC
+    `
+  );
+
+  return result.rows
+    .map(normalizeParticipantAllocationRecord)
+    .sort((a, b) => participantIdSortValue(a.participant_id) - participantIdSortValue(b.participant_id));
+};
+
 const readPhysicalTrialRecordsPostgres = async (participantId) => {
   const pool = getTelemetryPgPool();
   const baseQuery = `
@@ -1307,6 +1472,152 @@ const readPhysicalTrialRecordsFromNdjson = (filePath) => {
   }
 
   return records;
+};
+
+const readParticipantAllocationRecords = async () => {
+  if (telemetryUsePostgres) {
+    try {
+      const postgresRows = await readParticipantAllocationRecordsPostgres();
+      if (postgresRows.length > 0 || !telemetryFallbackToFile) {
+        return postgresRows;
+      }
+      return readParticipantAllocationRecordsFromFile();
+    } catch (error) {
+      if (!telemetryFallbackToFile) {
+        throw error;
+      }
+      console.error('Participant allocation postgres read failed, using file fallback:', error.message);
+      return readParticipantAllocationRecordsFromFile();
+    }
+  }
+
+  return readParticipantAllocationRecordsFromFile();
+};
+
+const updateParticipantAllocationRecord = async (participantId, action, completed) => {
+  const normalizedId = String(participantId || '').trim().toUpperCase();
+  if (!normalizedId) {
+    throw new Error('participant_id is required');
+  }
+
+  const normalizedAction = String(action || '').trim().toLowerCase();
+  if (!['set_completed', 'open_session', 'close_session'].includes(normalizedAction)) {
+    throw new Error('action must be set_completed, open_session, or close_session');
+  }
+
+  if (telemetryUsePostgres) {
+    try {
+      const pool = getTelemetryPgPool();
+      await ensureParticipantAllocationDefaultsPostgres();
+      let updateResult;
+
+      if (normalizedAction === 'set_completed') {
+        const completionTime = completed ? new Date().toISOString() : null;
+        updateResult = await pool.query(
+          `
+            UPDATE participant_allocation
+            SET
+              completed = $2,
+              completed_at = $3,
+              updated_at = NOW()
+            WHERE participant_id = $1
+            RETURNING participant_id, allocation_group, session_status, session_opened_at, session_closed_at, completed, completed_at, created_at, updated_at
+          `,
+          [normalizedId, completed, completionTime]
+        );
+      }
+
+      if (normalizedAction === 'open_session') {
+        updateResult = await pool.query(
+          `
+            UPDATE participant_allocation
+            SET
+              session_status = 'in_progress',
+              session_opened_at = COALESCE(session_opened_at, NOW()),
+              session_closed_at = NULL,
+              updated_at = NOW()
+            WHERE participant_id = $1
+            RETURNING participant_id, allocation_group, session_status, session_opened_at, session_closed_at, completed, completed_at, created_at, updated_at
+          `,
+          [normalizedId]
+        );
+      }
+
+      if (normalizedAction === 'close_session') {
+        updateResult = await pool.query(
+          `
+            UPDATE participant_allocation
+            SET
+              session_status = 'closed',
+              session_closed_at = NOW(),
+              updated_at = NOW()
+            WHERE participant_id = $1
+            RETURNING participant_id, allocation_group, session_status, session_opened_at, session_closed_at, completed, completed_at, created_at, updated_at
+          `,
+          [normalizedId]
+        );
+      }
+
+      const updated = updateResult.rows[0] ? normalizeParticipantAllocationRecord(updateResult.rows[0]) : null;
+      if (updated) {
+        return updated;
+      }
+
+      throw new Error('participant_id not found in allocation table');
+    } catch (error) {
+      if (!telemetryFallbackToFile) {
+        throw error;
+      }
+      console.error('Participant allocation postgres update failed, using file fallback:', error.message);
+    }
+  }
+
+  const rows = readParticipantAllocationRecordsFromFile();
+  const index = rows.findIndex((row) => String(row.participant_id || '').trim().toUpperCase() === normalizedId);
+  if (index < 0) {
+    throw new Error('participant_id not found in allocation table');
+  }
+
+  const nowIso = new Date().toISOString();
+  const current = rows[index] && typeof rows[index] === 'object' ? rows[index] : {};
+
+  let next = {
+    ...current,
+    updated_at: nowIso
+  };
+
+  if (normalizedAction === 'set_completed') {
+    next = {
+      ...next,
+      completed: Boolean(completed),
+      completed_at: completed ? nowIso : null
+    };
+  }
+
+  if (normalizedAction === 'open_session') {
+    next = {
+      ...next,
+      session_status: 'in_progress',
+      session_opened_at: current.session_opened_at || nowIso,
+      session_closed_at: null
+    };
+  }
+
+  if (normalizedAction === 'close_session') {
+    next = {
+      ...next,
+      session_status: 'closed',
+      session_closed_at: nowIso
+    };
+  }
+
+  rows[index] = {
+    ...normalizeParticipantAllocationRecord(next),
+    updated_at: nowIso
+  };
+
+  writeParticipantAllocationRecordsToFile(rows);
+  return rows[index];
 };
 
 const readPhysicalTrialRecordsForExport = async (participantId) => {
@@ -2111,6 +2422,57 @@ app.options('/api/physical-trial', (req, res) => {
 app.options('/api/observer-notes', (req, res) => {
   withTelemetryCors(res);
   res.status(204).end();
+});
+
+app.options('/api/participant-allocation', (req, res) => {
+  withTelemetryCors(res);
+  res.status(204).end();
+});
+
+app.get('/api/participant-allocation', async (req, res) => {
+  withTelemetryCors(res);
+
+  try {
+    const rows = await readParticipantAllocationRecords();
+    res.status(200).json({ rows });
+  } catch (error) {
+    console.error('Participant allocation read error:', error);
+    res.status(500).json({ error: 'Failed to read participant allocation' });
+  }
+});
+
+app.post('/api/participant-allocation', async (req, res) => {
+  withTelemetryCors(res);
+
+  try {
+    const payload = req.body && typeof req.body === 'object' ? req.body : null;
+    const participantId = String(payload && payload.participant_id || '').trim().toUpperCase();
+    const actionRaw = String(payload && payload.action || '').trim().toLowerCase();
+    const completed = parseBooleanSafely(payload && payload.completed);
+    const action = actionRaw || (completed !== null ? 'set_completed' : '');
+
+    if (!participantId) {
+      return res.status(400).json({ error: 'participant_id is required' });
+    }
+
+    if (!['set_completed', 'open_session', 'close_session'].includes(action)) {
+      return res.status(400).json({ error: 'action must be set_completed, open_session, or close_session' });
+    }
+
+    if (action === 'set_completed' && completed === null) {
+      return res.status(400).json({ error: 'completed must be true or false when action is set_completed' });
+    }
+
+    const updated = await updateParticipantAllocationRecord(participantId, action, completed);
+    res.status(200).json({ row: updated });
+  } catch (error) {
+    const message = String(error && error.message || '');
+    if (message.includes('not found')) {
+      return res.status(404).json({ error: message });
+    }
+    console.error('Participant allocation update error:', error);
+    res.status(500).json({ error: 'Failed to update participant allocation' });
+  }
 });
 
 app.post('/api/physical-trial', async (req, res) => {

@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex,nofollow,noarchive" />
+  <title>Participant Allocation</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 0; background: #f4f6fb; color: #1f2937; }
+    .wrap { max-width: 940px; margin: 24px auto; padding: 0 16px; }
+    .card { background: #fff; border: 1px solid #dbe2ef; border-radius: 10px; padding: 16px; box-shadow: 0 6px 18px rgba(0,0,0,0.06); }
+    h1 { margin: 0 0 8px; font-size: 24px; }
+    p { margin: 0 0 12px; color: #4b5563; }
+    .toolbar { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+    .meta { font-size: 13px; color: #475569; }
+    .table-wrap { overflow-x: auto; border: 1px solid #dbe2ef; border-radius: 8px; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th, td { border-bottom: 1px solid #e2e8f0; padding: 9px 10px; text-align: left; }
+    th { background: #eef2ff; color: #1f2937; }
+    tr:last-child td { border-bottom: none; }
+    .center { text-align: center; }
+    .badge { display: inline-block; border: 1px solid #cbd5e1; border-radius: 999px; padding: 2px 9px; font-size: 12px; font-weight: 600; }
+    .badge.physical { background: #ecfeff; color: #155e75; border-color: #a5f3fc; }
+    .badge.digital { background: #eef2ff; color: #3730a3; border-color: #c7d2fe; }
+    .badge.not_started { background: #f8fafc; color: #475569; border-color: #cbd5e1; }
+    .badge.in_progress { background: #ecfeff; color: #0f766e; border-color: #99f6e4; }
+    .badge.closed { background: #f1f5f9; color: #334155; border-color: #cbd5e1; }
+    .ok { color: #065f46; }
+    .err { color: #991b1b; }
+    button { border: 1px solid #1d4ed8; background: #1d4ed8; color: #fff; border-radius: 8px; padding: 8px 12px; font-weight: 600; cursor: pointer; }
+    button.secondary { background: #fff; color: #1d4ed8; }
+    button.small { padding: 6px 9px; font-size: 12px; }
+    button:disabled, input[type="checkbox"]:disabled { opacity: 0.55; cursor: not-allowed; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>Participant Allocation</h1>
+      <p>Track participant allocation, session open/close times, and final completion status.</p>
+
+      <div class="toolbar">
+        <div class="meta" id="summary">Loading...</div>
+        <div style="display:flex; gap:8px;">
+          <button id="btn-refresh" type="button" class="secondary">Refresh</button>
+          <a href="/research/index.html" style="text-decoration:none;"><button type="button" class="secondary">Back to Research Hub</button></a>
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Participant</th>
+              <th>Allocation</th>
+              <th>Session Status</th>
+              <th>Session Opened</th>
+              <th>Session Closed</th>
+              <th>Session Duration</th>
+              <th>Session Actions</th>
+              <th class="center">Completed</th>
+              <th>Completed At</th>
+            </tr>
+          </thead>
+          <tbody id="allocation_rows"></tbody>
+        </table>
+      </div>
+
+      <div id="status" class="meta" style="margin-top:10px;"></div>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      const host = window.location.hostname;
+      const isLocalHost = host === 'localhost' || host === '127.0.0.1';
+      const isHostedChat = /(^|\.)chat\.medtechguides\.uk$/i.test(host);
+      const endpointBase = (isLocalHost || isHostedChat)
+        ? '/api/participant-allocation'
+        : 'https://chat.medtechguides.uk/api/participant-allocation';
+
+      const el = (id) => document.getElementById(id);
+      const rowsBody = el('allocation_rows');
+      const summaryEl = el('summary');
+      const statusEl = el('status');
+      const refreshButton = el('btn-refresh');
+
+      let rowsState = [];
+      let savingParticipantId = '';
+
+      const setStatus = (text, ok) => {
+        statusEl.textContent = text;
+        statusEl.className = ok ? 'meta ok' : 'meta err';
+      };
+
+      const formatDateTime = (isoValue) => {
+        const parsed = Date.parse(String(isoValue || ''));
+        if (!Number.isFinite(parsed)) return '-';
+        return new Date(parsed).toLocaleString();
+      };
+
+      const formatDuration = (durationMs) => {
+        if (!Number.isFinite(durationMs) || durationMs < 0) {
+          return '-';
+        }
+
+        const totalSeconds = Math.floor(durationMs / 1000);
+        const hours = Math.floor(totalSeconds / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+        const seconds = totalSeconds % 60;
+
+        if (hours > 0) {
+          return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+        }
+
+        return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+      };
+
+      const getSessionDurationText = (row) => {
+        const openedAtMs = Date.parse(String(row && row.session_opened_at || ''));
+        if (!Number.isFinite(openedAtMs)) {
+          return '-';
+        }
+
+        const closedAtMs = Date.parse(String(row && row.session_closed_at || ''));
+        const endMs = Number.isFinite(closedAtMs) ? closedAtMs : Date.now();
+        return formatDuration(Math.max(0, endMs - openedAtMs));
+      };
+
+      const renderSummary = () => {
+        const total = rowsState.length;
+        const completed = rowsState.filter((row) => row.completed).length;
+        const inProgress = rowsState.filter((row) => String(row.session_status || '').toLowerCase() === 'in_progress').length;
+        const pending = Math.max(0, total - completed);
+        summaryEl.textContent = `${completed}/${total} completed • ${pending} pending • ${inProgress} in progress`;
+      };
+
+      const renderRows = () => {
+        if (!Array.isArray(rowsState) || !rowsState.length) {
+          rowsBody.innerHTML = '<tr><td colspan="9">No participant allocation rows found.</td></tr>';
+          renderSummary();
+          return;
+        }
+
+        rowsBody.innerHTML = rowsState.map((row) => {
+          const participantId = String(row.participant_id || '');
+          const allocationGroup = String(row.allocation_group || '').toLowerCase() === 'physical' ? 'physical' : 'digital';
+          const sessionStatus = ['not_started', 'in_progress', 'closed'].includes(String(row.session_status || '').toLowerCase())
+            ? String(row.session_status || '').toLowerCase()
+            : 'not_started';
+          const isSaving = savingParticipantId && savingParticipantId === participantId;
+          const openDisabled = isSaving || sessionStatus === 'in_progress';
+          const closeDisabled = isSaving || sessionStatus !== 'in_progress';
+          return `
+            <tr>
+              <td>${participantId}</td>
+              <td><span class="badge ${allocationGroup}">${allocationGroup}</span></td>
+              <td><span class="badge ${sessionStatus}">${sessionStatus.replace('_', ' ')}</span></td>
+              <td>${row.session_opened_at ? formatDateTime(row.session_opened_at) : '-'}</td>
+              <td>${row.session_closed_at ? formatDateTime(row.session_closed_at) : '-'}</td>
+              <td>${getSessionDurationText(row)}</td>
+              <td>
+                <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                  <button type="button" class="secondary small" data-participant-id="${participantId}" data-action="open_session" ${openDisabled ? 'disabled' : ''}>Open Session</button>
+                  <button type="button" class="secondary small" data-participant-id="${participantId}" data-action="close_session" ${closeDisabled ? 'disabled' : ''}>Close Session</button>
+                </div>
+              </td>
+              <td class="center"><input type="checkbox" data-participant-id="${participantId}" ${row.completed ? 'checked' : ''} ${isSaving ? 'disabled' : ''}></td>
+              <td>${row.completed_at ? formatDateTime(row.completed_at) : '-'}</td>
+            </tr>
+          `;
+        }).join('');
+
+        Array.from(rowsBody.querySelectorAll('input[type="checkbox"][data-participant-id]')).forEach((checkbox) => {
+          checkbox.addEventListener('change', async () => {
+            const participantId = String(checkbox.getAttribute('data-participant-id') || '').trim();
+            if (!participantId) return;
+            await updateCompletion(participantId, checkbox.checked);
+          });
+        });
+
+        Array.from(rowsBody.querySelectorAll('button[data-participant-id][data-action]')).forEach((button) => {
+          button.addEventListener('click', async () => {
+            const participantId = String(button.getAttribute('data-participant-id') || '').trim();
+            const action = String(button.getAttribute('data-action') || '').trim().toLowerCase();
+            if (!participantId || !action) return;
+            await updateSessionAction(participantId, action);
+          });
+        });
+
+        renderSummary();
+      };
+
+      const loadRows = async () => {
+        refreshButton.disabled = true;
+        setStatus('Loading participant allocation...', true);
+
+        try {
+          const response = await fetch(endpointBase, { method: 'GET' });
+          if (!response.ok) {
+            throw new Error('Failed to load participant allocation');
+          }
+
+          const data = await response.json();
+          rowsState = Array.isArray(data && data.rows) ? data.rows : [];
+          renderRows();
+          setStatus(`Loaded ${rowsState.length} participants.`, true);
+        } catch (error) {
+          setStatus(error.message || 'Failed to load participant allocation.', false);
+        } finally {
+          refreshButton.disabled = false;
+        }
+      };
+
+      const updateCompletion = async (participantId, completed) => {
+        savingParticipantId = participantId;
+        renderRows();
+
+        try {
+          const response = await fetch(endpointBase, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ participant_id: participantId, action: 'set_completed', completed })
+          });
+
+          if (!response.ok) {
+            let message = 'Failed to update participant completion state.';
+            try {
+              const data = await response.json();
+              if (data && data.error) message = data.error;
+            } catch {}
+            throw new Error(message);
+          }
+
+          const data = await response.json();
+          const updatedRow = data && data.row && typeof data.row === 'object' ? data.row : null;
+          if (updatedRow) {
+            rowsState = rowsState.map((row) => String(row.participant_id || '') === String(updatedRow.participant_id || '')
+              ? updatedRow
+              : row);
+          }
+
+          setStatus(`Updated ${participantId} (${completed ? 'completed' : 'not completed'}).`, true);
+        } catch (error) {
+          setStatus(error.message || 'Failed to update participant completion state.', false);
+          await loadRows();
+        } finally {
+          savingParticipantId = '';
+          renderRows();
+        }
+      };
+
+      const updateSessionAction = async (participantId, action) => {
+        savingParticipantId = participantId;
+        renderRows();
+
+        try {
+          const response = await fetch(endpointBase, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ participant_id: participantId, action })
+          });
+
+          if (!response.ok) {
+            let message = 'Failed to update participant session state.';
+            try {
+              const data = await response.json();
+              if (data && data.error) message = data.error;
+            } catch {}
+            throw new Error(message);
+          }
+
+          const data = await response.json();
+          const updatedRow = data && data.row && typeof data.row === 'object' ? data.row : null;
+          if (updatedRow) {
+            rowsState = rowsState.map((row) => String(row.participant_id || '') === String(updatedRow.participant_id || '')
+              ? updatedRow
+              : row);
+          }
+
+          const label = action === 'open_session' ? 'session opened' : 'session closed';
+          setStatus(`Updated ${participantId} (${label}).`, true);
+        } catch (error) {
+          setStatus(error.message || 'Failed to update participant session state.', false);
+          await loadRows();
+        } finally {
+          savingParticipantId = '';
+          renderRows();
+        }
+      };
+
+      refreshButton.addEventListener('click', loadRows);
+      loadRows();
+    })();
+  </script>
+</body>
+</html>
