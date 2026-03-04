@@ -1391,23 +1391,6 @@
     card.style.color = '#1f2937';
     card.style.display = 'none';
 
-    card.addEventListener('mouseenter', () => {
-      setTaskPromptExpanded(true);
-    });
-    card.addEventListener('mouseleave', () => {
-      setTaskPromptExpanded(false);
-    });
-    card.addEventListener('focusin', () => {
-      setTaskPromptExpanded(true);
-    });
-    card.addEventListener('focusout', () => {
-      window.setTimeout(() => {
-        if (!card.contains(document.activeElement)) {
-          setTaskPromptExpanded(false);
-        }
-      }, 0);
-    });
-
     document.body.appendChild(card);
     return card;
   };
@@ -1555,7 +1538,6 @@
     }
 
     const taskId = String(taskState.task_id || '').trim();
-    const fallbackLabel = String(taskState.task_label || '').trim();
     const isShortFormTask = /^short_form_q[1-4]$/i.test(taskId);
     const isScenarioTask = /^scenario_card_\d+$/i.test(taskId);
     if (isShortFormTask) {
@@ -1567,14 +1549,9 @@
     }
 
     const entry = presetTaskDescriptions[taskId] || null;
-    const displayLabel = (entry && entry.title) || fallbackLabel || taskId;
     const lines = entry && Array.isArray(entry.steps) ? entry.steps : [];
     const collapsedDescription = String((entry && entry.collapsedDescription) || '').trim();
     const scenarioDescription = collapsedDescription || (lines.length ? String(lines[0] || '').trim() : '');
-    const isExpanded = isTaskPromptExpanded;
-    const promptHint = isExpanded
-      ? 'Move cursor away from this card to collapse'
-      : 'Hover this card to expand';
     const completionInstruction = isShortFormTask
       ? 'Type your answer in the box below, then click Submit answer.'
       : 'When finished, click “I have completed this task”.';
@@ -1591,23 +1568,17 @@
       : '';
 
     card.innerHTML = `
-      <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
-        <strong style="font-size:13px; color:#0f172a;">Task in progress</strong>
-        <button id="mtg-task-prompt-finish-btn" type="button" style="padding:6px 10px; border:1px solid #0f766e; background:#0f766e; color:#ffffff; border-radius:999px; font-size:12px; font-weight:600; cursor:pointer; white-space:nowrap;">I have completed this task</button>
-      </div>
-      <div style="margin-top:6px; font-size:12px; color:#334155; font-weight:600;">Work at a steady pace. Timing is not used to judge performance.</div>
-      <div style="margin-top:8px; color:#334155; line-height:1.4; font-size:14px; overflow:hidden; display:${scenarioDescription ? '-webkit-box' : 'none'}; -webkit-line-clamp:${isExpanded ? '3' : '2'}; -webkit-box-orient:vertical;">${escapeHtml(scenarioDescription)}</div>
-      <div style="margin-top:6px; color:#334155; line-height:1.4; font-size:13px; display:${isExpanded && isScenarioTask && instructionsLine ? 'block' : 'none'};">${escapeHtml(String(instructionsLine || ''))}</div>
-      <div style="margin-top:6px; color:#334155; line-height:1.35; font-size:12px; display:${isExpanded ? 'block' : 'none'};">${escapeHtml(completionInstruction)}</div>
-      <div style="margin-top:6px; font-size:11px; color:#64748b;">${escapeHtml(promptHint)}</div>
-      <div style="margin-top:8px; display:${isExpanded ? 'block' : 'none'};">
-        <div style="font-size:13px; font-weight:600; line-height:1.3; display:${isScenarioTask ? 'none' : 'block'};">${escapeHtml(displayLabel)}</div>
-        <div style="margin-top:8px; font-size:12px; color:#334155; line-height:1.35;">${listMarkup}</div>
+      <div style="color:#334155; line-height:1.4; font-size:14px; display:${scenarioDescription ? 'block' : 'none'};">${escapeHtml(scenarioDescription)}</div>
+      <div style="margin-top:6px; color:#334155; line-height:1.4; font-size:13px; display:${isScenarioTask && instructionsLine ? 'block' : 'none'};">${escapeHtml(String(instructionsLine || ''))}</div>
+      <div style="margin-top:8px; font-size:12px; color:#334155; line-height:1.35; display:${listMarkup ? 'block' : 'none'};">${listMarkup}</div>
+      <div style="margin-top:10px; color:#334155; line-height:1.35; font-size:12px;">${escapeHtml(completionInstruction)}</div>
+      <div style="margin-top:10px; display:flex; justify-content:flex-end;">
+        <button id="mtg-task-prompt-finish-btn" type="button" style="padding:8px 12px; border:1px solid #0f766e; background:#0f766e; color:#ffffff; border-radius:999px; font-size:12px; font-weight:600; cursor:pointer; white-space:nowrap;">I have completed this task</button>
       </div>
     `;
     card.style.bottom = '12px';
-    card.style.maxHeight = isExpanded ? '42vh' : (scenarioDescription ? '150px' : '128px');
-    card.style.overflow = isExpanded ? 'auto' : 'hidden';
+    card.style.maxHeight = '42vh';
+    card.style.overflow = 'auto';
     card.style.display = 'block';
 
     const finishBtn = card.querySelector('#mtg-task-prompt-finish-btn');
@@ -1743,25 +1714,8 @@
     shortFormWrap.style.padding = '10px';
     shortFormWrap.style.width = 'min(720px, calc(100vw - 24px))';
     shortFormWrap.style.boxSizing = 'border-box';
-    shortFormWrap.style.maxHeight = '160px';
-    shortFormWrap.style.overflow = 'hidden';
-
-    shortFormWrap.addEventListener('mouseenter', () => {
-      setShortFormCardExpanded(true);
-    });
-    shortFormWrap.addEventListener('mouseleave', () => {
-      setShortFormCardExpanded(false);
-    });
-    shortFormWrap.addEventListener('focusin', () => {
-      setShortFormCardExpanded(true);
-    });
-    shortFormWrap.addEventListener('focusout', () => {
-      window.setTimeout(() => {
-        if (!shortFormWrap.contains(document.activeElement)) {
-          setShortFormCardExpanded(false);
-        }
-      }, 0);
-    });
+    shortFormWrap.style.maxHeight = '64vh';
+    shortFormWrap.style.overflow = 'auto';
 
     const shortFormTaskHeader = document.createElement('div');
     shortFormTaskHeader.id = 'mtg-short-form-task-header';
@@ -1807,7 +1761,7 @@
     shortFormLabel.style.fontSize = '13px';
     shortFormLabel.style.fontWeight = '600';
     shortFormLabel.style.marginBottom = '6px';
-    shortFormLabel.textContent = 'Enter your answer:';
+    shortFormLabel.textContent = '';
 
     const shortFormPrompt = document.createElement('div');
     shortFormPrompt.id = 'mtg-short-form-answer-prompt';
@@ -1815,7 +1769,7 @@
     shortFormPrompt.style.color = '#334155';
     shortFormPrompt.style.marginBottom = '8px';
     shortFormPrompt.style.lineHeight = '1.35';
-    shortFormPrompt.textContent = 'Provide your answer below.';
+    shortFormPrompt.textContent = '';
 
     const shortFormFields = document.createElement('div');
     shortFormFields.id = 'mtg-short-form-answer-fields';
@@ -2066,11 +2020,8 @@
     }
 
     if (shortFormLabel) {
-      const stepLines = presetTaskDescriptions[taskId] && Array.isArray(presetTaskDescriptions[taskId].steps)
-        ? presetTaskDescriptions[taskId].steps
-        : [];
-      const primaryQuestion = stepLines.length ? String(stepLines[0] || '').trim() : '';
-      shortFormLabel.textContent = primaryQuestion || 'Question';
+      shortFormLabel.textContent = '';
+      shortFormLabel.style.display = 'none';
     }
 
     if (shortFormWrap) {
@@ -2155,14 +2106,13 @@
     const definition = getShortFormQuestionDefinition(taskId);
 
     if (shortFormTaskHeader) {
-      shortFormTaskHeader.innerHTML = `
-        <strong style="font-size:13px; color:#0f172a;">Task in progress</strong>
-        <span style="font-size:11px; color:#475569; background:#f1f5f9; border:1px solid #e2e8f0; border-radius:999px; padding:2px 8px;">${escapeHtml(taskId)}</span>
-      `;
+      shortFormTaskHeader.innerHTML = '';
+      shortFormTaskHeader.style.display = 'none';
     }
 
     if (shortFormElapsed) {
-      shortFormElapsed.textContent = 'Work at a steady pace. Timing is not used to judge performance.';
+      shortFormElapsed.textContent = '';
+      shortFormElapsed.style.display = 'none';
     }
 
     if (shortFormPreamble) {
@@ -2172,18 +2122,17 @@
     }
 
     if (shortFormHint) {
-      shortFormHint.textContent = isShortFormCardExpanded
-        ? 'Move cursor away from this card to collapse.'
-        : 'Hover this card to expand and answer.';
+      shortFormHint.textContent = '';
+      shortFormHint.style.display = 'none';
     }
 
     if (shortFormDetails) {
-      shortFormDetails.style.display = isShortFormCardExpanded ? 'block' : 'none';
+      shortFormDetails.style.display = 'block';
     }
 
     if (shortFormWrap) {
-      shortFormWrap.style.maxHeight = isShortFormCardExpanded ? '64vh' : '160px';
-      shortFormWrap.style.overflow = isShortFormCardExpanded ? 'auto' : 'hidden';
+      shortFormWrap.style.maxHeight = '64vh';
+      shortFormWrap.style.overflow = 'auto';
     }
 
     if (shortFormSubmit) {
@@ -2194,12 +2143,8 @@
     }
 
     if (shortFormSteps) {
-      const lines = definition && Array.isArray((presetTaskDescriptions[taskId] || {}).steps)
-        ? (presetTaskDescriptions[taskId] || {}).steps
-        : [];
-      shortFormSteps.innerHTML = lines.length
-        ? `<ul style="margin:0 0 0 18px; padding:0; display:grid; gap:6px;">${lines.map((line) => `<li style="line-height:1.35;">${escapeHtml(line)}</li>`).join('')}</ul>`
-        : '';
+      shortFormSteps.innerHTML = '';
+      shortFormSteps.style.display = 'none';
     }
 
     if (!shortFormFields) {
@@ -2212,7 +2157,8 @@
         ? (presetTaskDescriptions[taskId] || {}).steps
         : [];
       if (shortFormPrompt) {
-        shortFormPrompt.textContent = getShortFormSectionPrompt(parts);
+        shortFormPrompt.textContent = '';
+        shortFormPrompt.style.display = 'none';
       }
 
       shortFormFields.innerHTML = parts.map((part, index) => {
