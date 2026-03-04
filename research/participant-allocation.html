@@ -88,6 +88,7 @@
       const endpointBase = apiBaseOverride
         ? `${String(apiBaseOverride).replace(/\/$/, '')}/api/participant-allocation`
         : defaultApiRoot;
+      const fallbackEndpointBase = 'https://chat.medtechguides.uk/api/participant-allocation';
 
       const el = (id) => document.getElementById(id);
       const rowsBody = el('allocation_rows');
@@ -102,6 +103,7 @@
       let savingParticipantId = '';
       let selectedForReset = new Set();
       let apiBasicAuthHeader = '';
+      let activeEndpointBase = endpointBase;
 
       const attachApiAuthHeader = (requestOptions) => {
         const options = requestOptions && typeof requestOptions === 'object'
@@ -131,13 +133,41 @@
       };
 
       const fetchParticipantApi = async (urlSuffix, requestOptions) => {
-        const targetUrl = `${endpointBase}${String(urlSuffix || '')}`;
-        let response = await fetch(targetUrl, attachApiAuthHeader(requestOptions));
+        const suffix = String(urlSuffix || '');
+        const fetchWithAuth = async (baseUrl) => {
+          const targetUrl = `${baseUrl}${suffix}`;
+          let response = await fetch(targetUrl, attachApiAuthHeader(requestOptions));
 
-        if (response.status === 401 && !apiBasicAuthHeader) {
-          const confirmed = promptForApiPassword();
-          if (confirmed) {
-            response = await fetch(targetUrl, attachApiAuthHeader(requestOptions));
+          if (response.status === 401 && !apiBasicAuthHeader) {
+            const confirmed = promptForApiPassword();
+            if (confirmed) {
+              response = await fetch(targetUrl, attachApiAuthHeader(requestOptions));
+            }
+          }
+
+          return response;
+        };
+
+        let response = await fetchWithAuth(activeEndpointBase);
+
+        const canFallback =
+          !apiBaseOverride
+          && activeEndpointBase.startsWith('/')
+          && fallbackEndpointBase !== activeEndpointBase
+          && response.status === 404;
+
+        if (canFallback) {
+          let bodyText = '';
+          try {
+            bodyText = await response.clone().text();
+          } catch {}
+
+          const looksLikeGitHubPages404 = /github pages|page not found|the site configured at this address does not contain the requested file/i
+            .test(String(bodyText || ''));
+
+          if (looksLikeGitHubPages404) {
+            activeEndpointBase = fallbackEndpointBase;
+            response = await fetchWithAuth(activeEndpointBase);
           }
         }
 
