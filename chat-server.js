@@ -1789,6 +1789,8 @@ const resetParticipantAllocationSessionStatuses = async (participantIds, resetAl
               session_status = 'not_started',
               session_opened_at = NULL,
               session_closed_at = NULL,
+              completed = FALSE,
+              completed_at = NULL,
               updated_at = NOW()
             RETURNING participant_id
           `
@@ -1801,6 +1803,8 @@ const resetParticipantAllocationSessionStatuses = async (participantIds, resetAl
               session_status = 'not_started',
               session_opened_at = NULL,
               session_closed_at = NULL,
+              completed = FALSE,
+              completed_at = NULL,
               updated_at = NOW()
             WHERE participant_id = ANY($1::text[])
             RETURNING participant_id
@@ -1840,6 +1844,8 @@ const resetParticipantAllocationSessionStatuses = async (participantIds, resetAl
       session_status: 'not_started',
       session_opened_at: null,
       session_closed_at: null,
+      completed: false,
+      completed_at: null,
       updated_at: nowIso
     };
   });
