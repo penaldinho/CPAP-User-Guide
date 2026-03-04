@@ -7,7 +7,7 @@ Interactive training materials and user guide for the AirSense 10 CPAP device.
 The database schema includes an automated rubric scoring system for short-form trial questions.
 
 - Rubric rules table: `short_form_rubric_rules`
-- Per-participant per-part scoring view: `short_form_part_scoring`
+- Per-response answer scoring view: `short_form_part_scoring` (single part: `a`)
 - Per-response aggregate scoring view: `short_form_result_scores`
 
 ### How it works

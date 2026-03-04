@@ -96,23 +96,11 @@ CREATE TABLE IF NOT EXISTS short_form_results (
   duration_ms INTEGER,
   answer_text TEXT,
   part_a_answer_text TEXT,
-  part_b_answer_text TEXT,
-  part_c_answer_text TEXT,
-  part_d_answer_text TEXT,
   trial_mode TEXT NOT NULL DEFAULT 'digital'
 );
 
 ALTER TABLE short_form_results
   ADD COLUMN IF NOT EXISTS part_a_answer_text TEXT;
-
-ALTER TABLE short_form_results
-  ADD COLUMN IF NOT EXISTS part_b_answer_text TEXT;
-
-ALTER TABLE short_form_results
-  ADD COLUMN IF NOT EXISTS part_c_answer_text TEXT;
-
-ALTER TABLE short_form_results
-  ADD COLUMN IF NOT EXISTS part_d_answer_text TEXT;
 
 ALTER TABLE short_form_results
   ADD COLUMN IF NOT EXISTS trial_mode TEXT;
@@ -129,6 +117,15 @@ WHERE trial_mode IS NULL;
 
 ALTER TABLE short_form_results
   ALTER COLUMN answer_text DROP NOT NULL;
+
+ALTER TABLE short_form_results
+  DROP COLUMN IF EXISTS part_b_answer_text;
+
+ALTER TABLE short_form_results
+  DROP COLUMN IF EXISTS part_c_answer_text;
+
+ALTER TABLE short_form_results
+  DROP COLUMN IF EXISTS part_d_answer_text;
 
 CREATE INDEX IF NOT EXISTS idx_short_form_results_participant_time
   ON short_form_results (participant_id, received_at DESC);
@@ -848,7 +845,7 @@ CREATE TABLE IF NOT EXISTS short_form_rubric_rules (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   CONSTRAINT short_form_rubric_rules_match_type_check CHECK (match_type IN ('exact', 'contains', 'regex', 'numeric_range', 'contains_any', 'contains_all')),
-  CONSTRAINT short_form_rubric_rules_part_key_check CHECK (part_key IN ('a', 'b', 'c', 'd')),
+  CONSTRAINT short_form_rubric_rules_part_key_check CHECK (part_key = 'a'),
   CONSTRAINT short_form_rubric_rules_numeric_range_check CHECK (
     (match_type <> 'numeric_range')
     OR (numeric_min IS NOT NULL AND numeric_max IS NOT NULL AND numeric_max >= numeric_min)
@@ -862,6 +859,17 @@ ALTER TABLE short_form_rubric_rules
   ADD CONSTRAINT short_form_rubric_rules_match_type_check
   CHECK (match_type IN ('exact', 'contains', 'regex', 'numeric_range', 'contains_any', 'contains_all'));
 
+ALTER TABLE short_form_rubric_rules
+  DROP CONSTRAINT IF EXISTS short_form_rubric_rules_part_key_check;
+
+ALTER TABLE short_form_rubric_rules
+  ADD CONSTRAINT short_form_rubric_rules_part_key_check
+  CHECK (part_key = 'a');
+
+UPDATE short_form_rubric_rules
+SET part_key = 'a'
+WHERE part_key IS DISTINCT FROM 'a';
+
 CREATE INDEX IF NOT EXISTS idx_short_form_rubric_rules_question_part
   ON short_form_rubric_rules (question_id, part_key, is_active, rule_order, id);
 
@@ -873,63 +881,51 @@ RETURNS TEXT
 LANGUAGE sql
 IMMUTABLE
 AS $$
-  SELECT TRIM(
-    REGEXP_REPLACE(
-      REGEXP_REPLACE(
-        REGEXP_REPLACE(
-          REGEXP_REPLACE(
-            REGEXP_REPLACE(
-              REGEXP_REPLACE(
-                REGEXP_REPLACE(
-                  REGEXP_REPLACE(
-                    REGEXP_REPLACE(
-                      REGEXP_REPLACE(
-                        LOWER(TRIM(COALESCE(input_text, ''))),
-                        '\b(get\s+in\s+touch|reach\s+out|talk\s+to|speak\s+to|ring|phone)\b',
-                        ' contact ',
-                        'g'
-                      ),
-                      '\b(care\s*provider|provider|clinician|sleep\s*clinic|health\s*care\s*provider)\b',
-                      ' care provider ',
-                      'g'
-                    ),
-                    '\b(weekley|wekly|wkly|weely|weeky|weeklyy|weekly)\b',
-                    ' weekly ',
-                    'g'
-                  ),
-                  '\b(feet|foot)\b',
-                  ' ft ',
-                  'g'
-                ),
-                '\b(celsius|celcius|centigrade)\b',
-                ' c ',
-                'g'
-              ),
-              '\b(fahrenheit|farenheit|fahrenhiet)\b',
-              ' f ',
-              'g'
-            ),
-            '°',
-            '',
-            'g'
-          ),
-            '[^a-z0-9]+',
-            ' ',
-            'g'
-          ),
-          '\s+',
-          ' ',
-          'g'
-        ),
-        '\bmetre\b',
-        'm',
-        'g'
-      ),
-      '\bmeters\b|\bmetres\b',
-      'm',
-      'g'
-    )
-  );
+  WITH s0 AS (
+    SELECT LOWER(TRIM(COALESCE(input_text, ''))) AS t
+  ),
+  s1 AS (
+    SELECT REGEXP_REPLACE(t, '\b(get\s+in\s+touch|reach\s+out|talk\s+to|speak\s+to|ring|phone)\b', ' contact ', 'g') AS t
+    FROM s0
+  ),
+  s2 AS (
+    SELECT REGEXP_REPLACE(t, '\b(care\s*provider|provider|clinician|sleep\s*clinic|health\s*care\s*provider)\b', ' care provider ', 'g') AS t
+    FROM s1
+  ),
+  s3 AS (
+    SELECT REGEXP_REPLACE(t, '\b(weekley|wekly|wkly|weely|weeky|weeklyy|weekly)\b', ' weekly ', 'g') AS t
+    FROM s2
+  ),
+  s4 AS (
+    SELECT REGEXP_REPLACE(t, '\b(feet|foot)\b', ' ft ', 'g') AS t
+    FROM s3
+  ),
+  s5 AS (
+    SELECT REGEXP_REPLACE(t, '\b(celsius|celcius|centigrade)\b', ' c ', 'g') AS t
+    FROM s4
+  ),
+  s6 AS (
+    SELECT REGEXP_REPLACE(t, '\b(fahrenheit|farenheit|fahrenhiet)\b', ' f ', 'g') AS t
+    FROM s5
+  ),
+  s7 AS (
+    SELECT REGEXP_REPLACE(t, '°', '', 'g') AS t
+    FROM s6
+  ),
+  s8 AS (
+    SELECT REGEXP_REPLACE(t, '\bmetre\b', 'm', 'g') AS t
+    FROM s7
+  ),
+  s9 AS (
+    SELECT REGEXP_REPLACE(t, '\bmeters\b|\bmetres\b', 'm', 'g') AS t
+    FROM s8
+  ),
+  s10 AS (
+    SELECT REGEXP_REPLACE(t, '[^a-z0-9]+', ' ', 'g') AS t
+    FROM s9
+  )
+  SELECT TRIM(REGEXP_REPLACE(t, '\s+', ' ', 'g'))
+  FROM s10;
 $$;
 
 CREATE OR REPLACE FUNCTION normalize_short_form_rule_terms(match_value TEXT)
@@ -947,8 +943,10 @@ AS $$
   );
 $$;
 
-CREATE OR REPLACE VIEW short_form_result_parts AS
-WITH base AS (
+DROP VIEW IF EXISTS short_form_result_parts;
+
+CREATE OR REPLACE VIEW short_form_part_scoring AS
+WITH base_answers AS (
   SELECT
     s.id AS short_form_result_id,
     s.received_at,
@@ -960,46 +958,36 @@ WITH base AS (
     s.task_label,
     s.trial_mode,
     s.duration_ms,
-    s.answer_text,
-    s.part_a_answer_text,
-    s.part_b_answer_text,
-    s.part_c_answer_text,
-    s.part_d_answer_text
+    'a'::TEXT AS part_key,
+    COALESCE(NULLIF(s.part_a_answer_text, ''), NULLIF(s.answer_text, '')) AS answer_text
   FROM short_form_results s
-)
-SELECT
-  b.short_form_result_id,
-  b.received_at,
-  b.timestamp,
-  b.session_id,
-  b.participant_id,
-  b.question_id,
-  b.task_id,
-  b.task_label,
-  b.trial_mode,
-  b.duration_ms,
-  p.part_key,
-  p.answer_text,
-  normalize_short_form_text(p.answer_text) AS answer_text_normalized,
-  CASE
-    WHEN p.answer_text IS NULL THEN NULL
-    ELSE NULLIF(REGEXP_REPLACE((REGEXP_MATCHES(LOWER(p.answer_text), '(-?\d+(?:\.\d+)?)'))[1], ',', '', 'g'), '')::NUMERIC
-  END AS answer_first_number
-FROM base b
-CROSS JOIN LATERAL (
-  VALUES
-    ('a'::TEXT, COALESCE(NULLIF(b.part_a_answer_text, ''), NULLIF(b.answer_text, ''))),
-    ('b'::TEXT, NULLIF(b.part_b_answer_text, '')),
-    ('c'::TEXT, NULLIF(b.part_c_answer_text, '')),
-    ('d'::TEXT, NULLIF(b.part_d_answer_text, ''))
-) AS p(part_key, answer_text)
-WHERE b.question_id IS NOT NULL
-  AND b.question_id <> ''
-  AND p.answer_text IS NOT NULL
-  AND TRIM(p.answer_text) <> '';
-
-CREATE OR REPLACE VIEW short_form_part_scoring AS
-WITH candidate_matches AS (
+  WHERE COALESCE(NULLIF(s.question_id, ''), NULLIF(s.task_id, '')) IS NOT NULL
+    AND COALESCE(NULLIF(s.question_id, ''), NULLIF(s.task_id, '')) <> ''
+),
+answers AS (
+  SELECT
+    b.short_form_result_id,
+    b.received_at,
+    b.timestamp,
+    b.session_id,
+    b.participant_id,
+    b.question_id,
+    b.task_id,
+    b.task_label,
+    b.trial_mode,
+    b.duration_ms,
+    b.part_key,
+    b.answer_text,
+    normalize_short_form_text(b.answer_text) AS answer_text_normalized,
+    CASE
+      WHEN b.answer_text IS NULL THEN NULL
+      ELSE NULLIF(REGEXP_REPLACE((REGEXP_MATCH(LOWER(b.answer_text), '(-?\d+(?:\.\d+)?)'))[1], ',', '', 'g'), '')::NUMERIC
+    END AS answer_first_number
+  FROM base_answers b
+  WHERE b.answer_text IS NOT NULL
+    AND TRIM(b.answer_text) <> ''
+),
+candidate_matches AS (
   SELECT
     a.short_form_result_id,
     a.received_at,
@@ -1024,7 +1012,7 @@ WITH candidate_matches AS (
       PARTITION BY a.short_form_result_id, a.part_key
       ORDER BY r.rule_order ASC, r.id ASC
     ) AS match_rank
-  FROM short_form_result_parts a
+  FROM answers a
   LEFT JOIN short_form_rubric_rules r
     ON r.is_active = TRUE
     AND r.question_id = a.question_id

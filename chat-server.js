@@ -952,9 +952,6 @@ const insertTelemetryRecordPostgres = async (record) => {
       ? normalized.response_parts
       : null;
     const partAAnswerText = getAnswerPartText(answerParts, 'a');
-    const partBAnswerText = getAnswerPartText(answerParts, 'b');
-    const partCAnswerText = getAnswerPartText(answerParts, 'c');
-    const partDAnswerText = getAnswerPartText(answerParts, 'd');
     const participantId = String(normalized.participant_id || '').trim();
 
     if (eventType === 'short_form_answer_submitted' && questionId && participantId && (answerText || answerParts)) {
@@ -972,12 +969,9 @@ const insertTelemetryRecordPostgres = async (record) => {
             duration_ms,
             answer_text,
             part_a_answer_text,
-            part_b_answer_text,
-            part_c_answer_text,
-            part_d_answer_text,
             trial_mode
           )
-          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
         `,
         [
           Number.isFinite(telemetryEventId) ? telemetryEventId : null,
@@ -991,9 +985,6 @@ const insertTelemetryRecordPostgres = async (record) => {
           parseBoundedIntegerSafely(normalized.duration_ms, 0, 86400000),
           answerText || '',
           partAAnswerText,
-          partBAnswerText,
-          partCAnswerText,
-          partDAnswerText,
           normalized.trial_mode || 'digital'
         ]
       );
@@ -1094,9 +1085,6 @@ const insertQuestionnaireRecordPostgres = async (record) => {
 
   if (isShortFormTask && shortFormResponse) {
     const partAAnswerText = getAnswerPartText(shortFormResponse, 'a');
-    const partBAnswerText = getAnswerPartText(shortFormResponse, 'b');
-    const partCAnswerText = getAnswerPartText(shortFormResponse, 'c');
-    const partDAnswerText = getAnswerPartText(shortFormResponse, 'd');
     const answerText = buildAnswerTextFromParts(shortFormResponse);
 
     await pool.query(
@@ -1113,12 +1101,9 @@ const insertQuestionnaireRecordPostgres = async (record) => {
           duration_ms,
           answer_text,
           part_a_answer_text,
-          part_b_answer_text,
-          part_c_answer_text,
-          part_d_answer_text,
           trial_mode
         )
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
       `,
       [
         null,
@@ -1132,9 +1117,6 @@ const insertQuestionnaireRecordPostgres = async (record) => {
         parseBoundedIntegerSafely(normalized.duration_ms, 0, 86400000),
         answerText,
         partAAnswerText,
-        partBAnswerText,
-        partCAnswerText,
-        partDAnswerText,
         'physical'
       ]
     );
