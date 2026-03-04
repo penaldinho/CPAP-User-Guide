@@ -586,6 +586,8 @@
     const url = new URL(window.location.href);
     const explicitFlag = ['1', 'true', 'yes'].includes(String(url.searchParams.get('mtg_show_trial_intro') || '').trim().toLowerCase());
     const hasPostTrialUrl = Boolean(String(url.searchParams.get('mtg_post_trial_url') || '').trim());
+    const requestedTaskId = String(url.searchParams.get('mtg_task_id') || '').trim();
+    const introTaskId = requestedTaskId || 'scenario_card_1';
     let isPreTrialReferrer = false;
     try {
       const referrerUrl = new URL(document.referrer || '', window.location.origin);
@@ -613,10 +615,16 @@
       return;
     }
 
+    setParticipantNextTaskState({
+      participant_id: participantId,
+      next_task_id: introTaskId,
+      status: 'ready'
+    });
+
     showTrialIntroOverlayCard({
       participantId,
-      taskId: 'scenario_card_1',
-      taskLabel: getTaskDisplayLabel('scenario_card_1')
+      taskId: introTaskId,
+      taskLabel: getTaskDisplayLabel(introTaskId)
     });
   };
 

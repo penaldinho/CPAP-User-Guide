@@ -478,6 +478,7 @@
           } else {
             const digitalTrialUrl = new URL('../index.html', window.location.href);
             digitalTrialUrl.searchParams.set('mtg_participant_id', participantId);
+            digitalTrialUrl.searchParams.set('mtg_task_id', 'scenario_card_1');
             digitalTrialUrl.searchParams.set('mtg_show_trial_intro', '1');
             digitalTrialUrl.searchParams.set('mtg_post_trial_url', `/research/post-trial-questionnaire.html?participant=${encodeURIComponent(participantId)}&lock_participant=1&mode=digital`);
             window.location.href = digitalTrialUrl.toString();

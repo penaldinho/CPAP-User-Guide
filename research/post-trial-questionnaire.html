@@ -133,9 +133,16 @@
     const host = window.location.hostname;
     const isLocalHost = host === 'localhost' || host === '127.0.0.1';
     const isHostedChat = /(^|\.)chat\.medtechguides\.uk$/i.test(host);
+    const isGitHubPagesHost = /(^|\.)github\.io$/i.test(host);
     const endpoint = (isLocalHost || isHostedChat)
       ? '/api/physical-trial'
       : 'https://chat.medtechguides.uk/api/physical-trial';
+    const allocationEndpointBase = (isLocalHost || isHostedChat)
+      ? '/api/participant-allocation'
+      : (isGitHubPagesHost
+        ? 'https://chat.medtechguides.uk/api/participant-allocation'
+        : '/api/participant-allocation');
+    const allocationFallbackEndpointBase = 'https://chat.medtechguides.uk/api/participant-allocation';
     const questionnaireStartedAtMs = Date.now();
     const queryParams = new URLSearchParams(window.location.search);
     const presetParticipant = String(queryParams.get('participant') || '').trim();
@@ -143,6 +150,8 @@
 
     const statusEl = document.getElementById('status');
     const participantInput = document.getElementById('participant_id');
+    let allocationApiAuthHeader = '';
+    let activeAllocationEndpointBase = allocationEndpointBase;
 
     if (participantInput && presetParticipant) {
       participantInput.value = presetParticipant;
@@ -175,6 +184,98 @@
       const hint = block.querySelector('.error-hint');
       if (hint) {
         hint.textContent = message;
+      }
+    };
+
+    const attachAllocationAuthHeader = (requestOptions) => {
+      const options = requestOptions && typeof requestOptions === 'object'
+        ? { ...requestOptions }
+        : {};
+      const headers = options.headers && typeof options.headers === 'object'
+        ? { ...options.headers }
+        : {};
+
+      if (allocationApiAuthHeader) {
+        headers.Authorization = allocationApiAuthHeader;
+      }
+
+      options.headers = headers;
+      return options;
+    };
+
+    const promptForAllocationPassword = () => {
+      const password = window.prompt('Participant Allocation password');
+      if (password === null) {
+        return false;
+      }
+
+      allocationApiAuthHeader = `Basic ${btoa(`participant:${String(password || '')}`)}`;
+      return true;
+    };
+
+    const fetchAllocationApi = async (requestOptions) => {
+      const fetchWithAuth = async (baseUrl) => {
+        let response = await fetch(baseUrl, attachAllocationAuthHeader(requestOptions));
+
+        if (response.status === 401 && !allocationApiAuthHeader) {
+          const confirmed = promptForAllocationPassword();
+          if (confirmed) {
+            response = await fetch(baseUrl, attachAllocationAuthHeader(requestOptions));
+          }
+        }
+
+        return response;
+      };
+
+      let response = await fetchWithAuth(activeAllocationEndpointBase);
+
+      const canFallback =
+        activeAllocationEndpointBase.startsWith('/')
+        && allocationFallbackEndpointBase !== activeAllocationEndpointBase
+        && response.status === 404;
+
+      if (canFallback) {
+        let bodyText = '';
+        try {
+          bodyText = await response.clone().text();
+        } catch {}
+
+        const looksLikeGitHubPages404 = /github pages|page not found|the site configured at this address does not contain the requested file/i
+          .test(String(bodyText || ''));
+
+        if (looksLikeGitHubPages404) {
+          activeAllocationEndpointBase = allocationFallbackEndpointBase;
+          response = await fetchWithAuth(activeAllocationEndpointBase);
+        }
+      }
+
+      return response;
+    };
+
+    const updateParticipantAllocationAfterPostTrial = async (participantId) => {
+      const participant = String(participantId || '').trim();
+      if (!participant) {
+        return;
+      }
+
+      const closeResponse = await fetchAllocationApi({
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ participant_id: participant, action: 'close_session' })
+      });
+
+      if (!closeResponse.ok && closeResponse.status !== 404) {
+        throw new Error('Failed to close participant session');
+      }
+
+      const completeResponse = await fetchAllocationApi({
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ participant_id: participant, action: 'set_completed', completed: true })
+      });
+
+      if (!completeResponse.ok && completeResponse.status !== 404) {
+        throw new Error('Failed to mark participant complete');
       }
     };
 
@@ -283,6 +384,12 @@
           body: JSON.stringify(payload)
         });
         if (response.ok) {
+          try {
+            await updateParticipantAllocationAfterPostTrial(participantId);
+          } catch (allocationError) {
+            console.warn('Participant allocation auto-update failed:', allocationError);
+          }
+
           const confirmationUrl = new URL('questionnaire-submitted.html', window.location.href);
           confirmationUrl.searchParams.set('type', 'post-trial');
           confirmationUrl.searchParams.set('participant', participantId);
