@@ -584,7 +584,17 @@
 
   const maybeShowTrialIntroFromUrl = () => {
     const url = new URL(window.location.href);
-    const shouldShow = ['1', 'true', 'yes'].includes(String(url.searchParams.get('mtg_show_trial_intro') || '').trim().toLowerCase());
+    const explicitFlag = ['1', 'true', 'yes'].includes(String(url.searchParams.get('mtg_show_trial_intro') || '').trim().toLowerCase());
+    const hasPostTrialUrl = Boolean(String(url.searchParams.get('mtg_post_trial_url') || '').trim());
+    let isPreTrialReferrer = false;
+    try {
+      const referrerUrl = new URL(document.referrer || '', window.location.origin);
+      isPreTrialReferrer = /\/research\/pre-trial-questionnaire\.html$/i.test(String(referrerUrl.pathname || ''));
+    } catch {
+      isPreTrialReferrer = false;
+    }
+
+    const shouldShow = explicitFlag || (isPreTrialReferrer && hasPostTrialUrl);
     if (!shouldShow) {
       return;
     }
@@ -592,10 +602,11 @@
     url.searchParams.delete('mtg_show_trial_intro');
     window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
 
-    const activeTaskId = String((getTaskState() && getTaskState().task_id) || '').trim();
-    if (activeTaskId) {
-      return;
-    }
+    clearParticipantNextTaskState();
+    setTaskState({});
+    setTaskSubscribedInTab(false);
+    syncTaskPromptCard();
+    syncParticipantEndButton();
 
     const participantId = String(getParticipantId() || '').trim();
     if (!participantId) {
