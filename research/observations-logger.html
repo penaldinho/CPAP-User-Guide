@@ -491,7 +491,7 @@
 
         const taskId = getTaskIdValue();
         const manualPage = String(manualPageInput.value || '').trim();
-        const notes = String((overrides && overrides.notes) ?? notesInput.value || '').trim();
+        const notes = String((overrides && overrides.notes) ?? (notesInput.value || '')).trim();
         const errorText = String(errorTextInput.value || '').trim();
         const scenarioScoreRaw = String(scenarioScoreSelect.value || '').trim();
         const errorSeverityRaw = String(errorSeveritySelect.value || '').trim().toLowerCase();
