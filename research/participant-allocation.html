@@ -75,12 +75,10 @@
 
   <script>
     (function () {
-      const host = window.location.hostname;
-      const isLocalHost = host === 'localhost' || host === '127.0.0.1';
-      const isHostedChat = /(^|\.)chat\.medtechguides\.uk$/i.test(host);
-      const endpointBase = (isLocalHost || isHostedChat)
-        ? '/api/participant-allocation'
-        : 'https://chat.medtechguides.uk/api/participant-allocation';
+      const apiBaseOverride = new URLSearchParams(window.location.search).get('api_base');
+      const endpointBase = apiBaseOverride
+        ? `${String(apiBaseOverride).replace(/\/$/, '')}/api/participant-allocation`
+        : '/api/participant-allocation';
 
       const el = (id) => document.getElementById(id);
       const rowsBody = el('allocation_rows');

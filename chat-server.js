@@ -132,6 +132,14 @@ app.use((req, res, next) => {
     return next();
   }
 
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
+  if (req.method === 'OPTIONS') {
+    return res.status(204).end();
+  }
+
   const credentials = parseBasicAuthHeader(req.headers.authorization);
   const providedPassword = String(credentials && credentials.password || '');
 
