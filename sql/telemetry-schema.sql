@@ -1112,7 +1112,8 @@ metadata AS (
     s.task_id,
     s.task_label,
     s.trial_mode,
-    s.duration_ms
+    s.duration_ms,
+    COALESCE(NULLIF(s.part_a_answer_text, ''), NULLIF(s.answer_text, '')) AS entered_answer_text
   FROM short_form_results s
 )
 SELECT
@@ -1138,7 +1139,8 @@ SELECT
     WHEN COUNT(*) FILTER (WHERE COALESCE(j.score_binary, 0) = 1) = COUNT(*) THEN 1
     ELSE 0
   END AS all_parts_correct_binary,
-  BOOL_OR(COALESCE(j.needs_manual_review, TRUE)) AS has_any_manual_review_flag
+  BOOL_OR(COALESCE(j.needs_manual_review, TRUE)) AS has_any_manual_review_flag,
+  m.entered_answer_text
 FROM metadata m
 LEFT JOIN joined j
   ON j.short_form_result_id = m.short_form_result_id
@@ -1152,7 +1154,8 @@ GROUP BY
   m.task_id,
   m.task_label,
   m.trial_mode,
-  m.duration_ms;
+  m.duration_ms,
+  m.entered_answer_text;
 
 DROP VIEW IF EXISTS short_form_result_scores_final;
 DROP VIEW IF EXISTS short_form_part_scores_final;
