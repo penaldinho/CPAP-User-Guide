@@ -17,9 +17,14 @@
     input, textarea, select { width: 100%; box-sizing: border-box; border: 1px solid #cbd5e1; border-radius: 8px; padding: 10px 11px; font-size: 14px; }
     textarea { min-height: 90px; resize: vertical; }
     .row-action { display: grid; gap: 8px; grid-template-columns: 1fr auto; align-items: end; }
+    .sticky-controls { position: sticky; top: 8px; z-index: 10; background: #fff; border: 1px solid #dbe2ef; border-radius: 8px; padding: 10px; }
     .task-timer { border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px 11px; background: #f8fafc; font-weight: 600; font-size: 14px; color: #0f172a; }
     button { border: 1px solid #1d4ed8; background: #1d4ed8; color: #fff; border-radius: 8px; padding: 9px 13px; font-weight: 600; cursor: pointer; white-space: nowrap; }
     button.secondary { background: #fff; color: #1d4ed8; }
+    button:disabled { opacity: 0.45; cursor: not-allowed; }
+    .next-action { margin-top: 8px; border: 1px solid #dbe2ef; border-radius: 8px; background: #f8fafc; padding: 9px 10px; font-size: 13px; color: #1f2937; }
+    .kbd-help { margin-top: 8px; font-size: 12px; color: #475569; }
+    .kbd-help kbd { border: 1px solid #cbd5e1; border-bottom-width: 2px; border-radius: 5px; padding: 1px 5px; background: #fff; font-family: inherit; font-size: 11px; }
     #status { margin-top: 12px; font-size: 14px; }
     .ok { color: #065f46; }
     .err { color: #991b1b; }
@@ -87,11 +92,17 @@
           <input id="task_label_custom" type="text" placeholder="e.g. Additional scenario" />
         </label>
 
-        <div class="row-action full">
-          <div class="task-timer" id="task_timer">Task timer: 00:00</div>
-          <div style="display:flex; gap:8px;">
-            <button id="btn-start" type="button">Start Task</button>
-            <button id="btn-end" type="button" class="secondary">End Task</button>
+        <div class="full sticky-controls">
+          <div class="row-action">
+            <div class="task-timer" id="task_timer">Task timer: 00:00</div>
+            <div style="display:flex; gap:8px;">
+              <button id="btn-start" type="button">Start Task</button>
+              <button id="btn-end" type="button" class="secondary">End Task</button>
+            </div>
+          </div>
+          <div id="next_action" class="next-action" aria-live="polite">Next: Enter participant and task, then start task.</div>
+          <div class="kbd-help" aria-label="Keyboard shortcuts">
+            Shortcuts: <kbd>Alt</kbd>+<kbd>S</kbd> Start, <kbd>Alt</kbd>+<kbd>E</kbd> End, <kbd>Alt</kbd>+<kbd>P</kbd> Page mark, <kbd>Alt</kbd>+<kbd>C</kbd> Score, <kbd>Alt</kbd>+<kbd>M</kbd> Submit criteria, <kbd>Alt</kbd>+<kbd>N</kbd> Note, <kbd>Alt</kbd>+<kbd>R</kbd> Error
           </div>
         </div>
 
@@ -185,6 +196,14 @@
       const criteriaSectionEl = el('criteria_section');
       const criteriaSubtitleEl = el('criteria_subtitle');
       const criteriaTableWrapEl = el('criteria_table_wrap');
+      const nextActionEl = el('next_action');
+      const startButton = el('btn-start');
+      const endButton = el('btn-end');
+      const pageButton = el('btn-page');
+      const scoreButton = el('btn-score');
+      const noteButton = el('btn-note');
+      const errorButton = el('btn-error');
+      const submitCriteriaButton = el('btn-submit-criteria');
       const statusEl = el('status');
       const metaEl = el('meta');
       const CUSTOM_TASK_VALUE = '__custom__';
@@ -251,6 +270,7 @@
       const setStatus = (text, ok) => {
         statusEl.textContent = text;
         statusEl.className = ok ? 'ok' : 'err';
+        updateActionState();
       };
 
       const formatDuration = (durationMs) => {
@@ -427,8 +447,81 @@
               submitted: false
             });
             renderCriteriaSection();
+            updateActionState();
           });
         });
+      };
+
+      const getNextActionHint = () => {
+        const participantId = String(participantInput.value || '').trim();
+        const taskId = getTaskIdValue();
+        if (!participantId) return 'Next: Enter participant ID.';
+        if (!taskId) return 'Next: Select task ID and label.';
+
+        const active = getActiveTaskState();
+        const currentKey = getCurrentTaskKey();
+        const taskActive = active.key && active.key === currentKey;
+
+        if (!taskActive) return 'Next: Start task timer.';
+
+        if (isScenarioTaskId(taskId)) {
+          const criteria = getCriteriaDefinition(taskId);
+          const criteriaState = getCriteriaStateForCurrentTask();
+          const notMarked = criteria.some((criterion) => {
+            const mark = criteriaState[criterion.id] && typeof criteriaState[criterion.id] === 'object' ? criteriaState[criterion.id] : null;
+            const outcome = String(mark && mark.outcome || '').trim().toLowerCase();
+            return !['correct', 'incorrect'].includes(outcome);
+          });
+          if (notMarked) return 'Next: Mark all scenario criteria (Correct/Incorrect).';
+
+          const notSubmitted = criteria.some((criterion) => {
+            const mark = criteriaState[criterion.id] && typeof criteriaState[criterion.id] === 'object' ? criteriaState[criterion.id] : null;
+            return !mark || !mark.submitted;
+          });
+          if (notSubmitted) return 'Next: Submit criteria marks.';
+        }
+
+        if (requiresScoreForTaskId(taskId) && !active.scenario_score_logged) {
+          return 'Next: Enter scenario score (0/1/2).';
+        }
+
+        return 'Next: End task when finished.';
+      };
+
+      const updateActionState = () => {
+        const participantId = String(participantInput.value || '').trim();
+        const taskId = getTaskIdValue();
+        const manualPage = String(manualPageInput.value || '').trim();
+        const notes = String(notesInput.value || '').trim();
+        const errorText = String(errorTextInput.value || '').trim();
+        const errorSeverity = String(errorSeveritySelect.value || '').trim().toLowerCase();
+
+        const hasCommon = Boolean(participantId && taskId);
+        const active = getActiveTaskState();
+        const currentKey = getCurrentTaskKey();
+        const taskActive = Boolean(active.key && active.key === currentKey);
+
+        startButton.disabled = !hasCommon || taskActive;
+        pageButton.disabled = !hasCommon || !manualPage;
+        noteButton.disabled = !hasCommon || !notes;
+        errorButton.disabled = !hasCommon || !errorText || !['minor', 'major'].includes(errorSeverity);
+        scoreButton.disabled = !hasCommon || !requiresScoreForTaskId(taskId);
+
+        const criteria = getCriteriaDefinition(taskId);
+        const isScenario = isScenarioTaskId(taskId) && criteria.length > 0;
+        const criteriaState = getCriteriaStateForCurrentTask();
+        const hasMissingCriteria = isScenario && criteria.some((criterion) => {
+          const mark = criteriaState[criterion.id] && typeof criteriaState[criterion.id] === 'object' ? criteriaState[criterion.id] : null;
+          const outcome = String(mark && mark.outcome || '').trim().toLowerCase();
+          return !['correct', 'incorrect'].includes(outcome) || !Number.isFinite(Number(mark.step_time_ms));
+        });
+
+        submitCriteriaButton.disabled = !hasCommon || !taskActive || !isScenario || hasMissingCriteria;
+        endButton.disabled = !hasCommon || !taskActive;
+
+        if (nextActionEl) {
+          nextActionEl.textContent = getNextActionHint();
+        }
       };
 
       const updateTaskTimer = () => {
@@ -452,6 +545,7 @@
         const matchingLabel = labelById[taskIdSelect.value] || '';
         if (matchingLabel) taskLabelSelect.value = matchingLabel;
         syncCustomTaskVisibility();
+        updateActionState();
       };
 
       const syncFromTaskLabel = () => {
@@ -463,6 +557,7 @@
         const matchingId = idByLabel[taskLabelSelect.value] || '';
         if (matchingId) taskIdSelect.value = matchingId;
         syncCustomTaskVisibility();
+        updateActionState();
       };
 
       const validateCommon = () => {
@@ -636,6 +731,7 @@
       const startTask = async () => {
         if (!validateCommon()) return;
         await submitObservation('task_start');
+        updateActionState();
       };
 
       const endTask = async () => {
@@ -658,11 +754,13 @@
         if (isScenarioTaskId(taskId)) {
           const criteriaSubmitted = await submitCriteriaMarks();
           if (!criteriaSubmitted) {
+            updateActionState();
             return;
           }
         }
 
         await submitObservation('task_end');
+        updateActionState();
       };
 
       const logPageMarkAndClear = async () => {
@@ -671,6 +769,7 @@
           manualPageInput.value = '';
           manualPageInput.focus();
         }
+        updateActionState();
       };
 
       const logNoteAndClear = async () => {
@@ -679,6 +778,7 @@
           notesInput.value = '';
           notesInput.focus();
         }
+        updateActionState();
       };
 
       const logErrorAndClear = async () => {
@@ -688,6 +788,7 @@
           errorTextInput.value = '';
           errorTextInput.focus();
         }
+        updateActionState();
       };
 
       const submitCriteriaMarks = async () => {
@@ -744,6 +845,7 @@
           setStatus(`All criteria marks already submitted for ${taskId}.`, true);
         }
         renderCriteriaSection();
+        updateActionState();
         return true;
       };
 
@@ -759,10 +861,19 @@
       taskLabelSelect.addEventListener('change', syncFromTaskLabel);
       participantInput.addEventListener('input', updateTaskTimer);
       participantInput.addEventListener('input', renderCriteriaSection);
+      participantInput.addEventListener('input', updateActionState);
       taskIdSelect.addEventListener('change', updateTaskTimer);
       taskIdSelect.addEventListener('change', renderCriteriaSection);
+      taskIdSelect.addEventListener('change', updateActionState);
       taskIdCustomInput.addEventListener('input', updateTaskTimer);
       taskIdCustomInput.addEventListener('input', renderCriteriaSection);
+      taskIdCustomInput.addEventListener('input', updateActionState);
+      taskLabelCustomInput.addEventListener('input', updateActionState);
+      manualPageInput.addEventListener('input', updateActionState);
+      notesInput.addEventListener('input', updateActionState);
+      errorTextInput.addEventListener('input', updateActionState);
+      errorSeveritySelect.addEventListener('change', updateActionState);
+      scenarioScoreSelect.addEventListener('change', updateActionState);
       manualPageInput.addEventListener('keydown', async (event) => {
         if (event.key !== 'Enter') return;
         event.preventDefault();
@@ -774,10 +885,27 @@
         await logNoteAndClear();
       });
 
+      document.addEventListener('keydown', async (event) => {
+        if (!event.altKey || event.shiftKey || event.ctrlKey || event.metaKey) return;
+        const key = String(event.key || '').toLowerCase();
+        if (!['s', 'e', 'p', 'c', 'm', 'n', 'r'].includes(key)) return;
+        event.preventDefault();
+
+        if (key === 's') await startTask();
+        if (key === 'e') await endTask();
+        if (key === 'p') await logPageMarkAndClear();
+        if (key === 'c') await submitObservation('scenario_score');
+        if (key === 'm') await submitCriteriaMarks();
+        if (key === 'n') await logNoteAndClear();
+        if (key === 'r') await logErrorAndClear();
+        updateActionState();
+      });
+
       metaEl.textContent = `Session: ${getSessionId()}`;
       syncCustomTaskVisibility();
       updateTaskTimer();
       renderCriteriaSection();
+      updateActionState();
       window.setInterval(updateTaskTimer, 1000);
     })();
   </script>
