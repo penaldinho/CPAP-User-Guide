@@ -424,6 +424,12 @@
           return;
         }
 
+        const resetPassword = window.prompt('Enter password to reset session statuses');
+        if (resetPassword === null) {
+          setStatus('Reset cancelled.', false);
+          return;
+        }
+
         refreshButton.disabled = true;
         resetSelectedButton.disabled = true;
         resetAllButton.disabled = true;
@@ -431,7 +437,10 @@
         try {
           const response = await fetchParticipantApi('/reset-statuses', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Reset-Password': String(resetPassword || '')
+            },
             body: JSON.stringify({
               reset_all: resetAll,
               participant_ids: participantIds

@@ -77,6 +77,7 @@ const physicalTrialFilePath = path.join(telemetryDir, 'physical-trial-events.ndj
 const observerNotesFilePath = path.join(telemetryDir, 'observer-notes.ndjson');
 const participantAllocationFilePath = path.join(telemetryDir, 'participant-allocation.json');
 const participantAllocationPassword = process.env.PARTICIPANT_ALLOCATION_PASSWORD || 'edfred';
+const participantAllocationResetPassword = process.env.PARTICIPANT_ALLOCATION_RESET_PASSWORD || participantAllocationPassword;
 
 const excludedHtmlFiles = new Set(['chat.html', 'chat-setup.html', 'search.html']);
 
@@ -134,7 +135,7 @@ app.use((req, res, next) => {
 
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Reset-Password');
 
   if (req.method === 'OPTIONS') {
     return res.status(204).end();
@@ -2714,6 +2715,11 @@ app.post('/api/participant-allocation/reset-statuses', async (req, res) => {
   withTelemetryCors(res);
 
   try {
+    const providedResetPassword = String(req.headers['x-reset-password'] || '').trim();
+    if (!providedResetPassword || providedResetPassword !== participantAllocationResetPassword) {
+      return res.status(403).json({ error: 'Reset password is required' });
+    }
+
     const payload = req.body && typeof req.body === 'object' ? req.body : {};
     const resetAll = parseBooleanSafely(payload.reset_all) === true;
     const participantIds = Array.isArray(payload.participant_ids) ? payload.participant_ids : [];
