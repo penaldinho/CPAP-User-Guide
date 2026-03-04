@@ -1219,52 +1219,40 @@
       title: 'Short-Form Q1 – Cleaning frequency (Routine Use)',
       preamble: 'You have just finished your first week using CPAP at home and want to make sure your routine keeps the equipment clean and safe.',
       steps: [
-        '(a) What is the recommended cleaning frequency for the CPAP device and humidifier?',
-        '(b) What is the recommended cleaning frequency for the F&P Vitera mask (excluding headgear)?',
-        '(c) What is the recommended cleaning frequency for the headgear?',
-        '(d) What is the recommended cleaning frequency for ClimateLineAir tubing?'
+        'According to the user guide, how often should the AirSense 10 device itself be cleaned?'
       ],
       parts: [
-        { key: 'a', label: '(a) CPAP device and humidifier frequency' },
-        { key: 'b', label: '(b) F&P Vitera mask (excluding headgear) frequency' },
-        { key: 'c', label: '(c) Headgear frequency' },
-        { key: 'd', label: '(d) ClimateLineAir tubing frequency' }
+        { key: 'a', label: 'Answer' }
       ]
     },
     short_form_q2: {
       title: 'Short-Form Q2 – Error message safety escalation (Error 006)',
       preamble: 'You switch on your device before bed and see “System fault – refer to user guide – Error 006”. Therapy has not started, so you need to decide the safest next action.',
       steps: [
-        '(a) What should be done next?',
-        '(b) What should not be done with the device?'
+        'If the device shows “System fault – refer to user guide – Error 006” before therapy starts, what is the appropriate immediate action?'
       ],
       parts: [
-        { key: 'a', label: '(a) Next action' },
-        { key: 'b', label: '(b) What should not be done' }
+        { key: 'a', label: 'Answer' }
       ]
     },
     short_form_q3: {
       title: 'Short-Form Q3 – Spare F&P Vitera mask storage (Routine Use / Safety)',
       preamble: 'You receive a spare F&P Vitera mask and need to store it until your current one wears out, while keeping it in good condition for future use.',
       steps: [
-        '(a) How should a spare F&P Vitera mask be stored?',
-        '(b) What is the recommended storage temperature range (in °C)?'
+        'What storage temperature range is recommended for keeping a spare F&P Vitera mask?'
       ],
       parts: [
-        { key: 'a', label: '(a) F&P Vitera mask storage method/conditions' },
-        { key: 'b', label: '(b) Storage temperature range (°C)' }
+        { key: 'a', label: 'Answer' }
       ]
     },
     short_form_q4: {
       title: 'Short-Form Q4 – Tubing length check (Setup)',
-      preamble: 'Your bedroom layout means the machine sits about 7 feet from where your mask connects, so you need to check whether ClimateLineAir Oxy tubing will reach comfortably.',
+      preamble: 'Your bedroom layout means the machine sits 7ft from where your mask connects, so you need to check whether ClimateLineAir tubing will reach comfortably.',
       steps: [
-        '(a) Is ClimateLineAir Oxy tubing long enough for 7 feet?',
-        '(b) What is the length of ClimateLineAir Oxy tubing (in feet)?'
+        'If the CPAP device is 7ft from the bed connection point, is ClimateLineAir tubing length sufficient?'
       ],
       parts: [
-        { key: 'a', label: '(a) Long enough for 7 feet? (yes/no)' },
-        { key: 'b', label: '(b) Tubing length (feet)' }
+        { key: 'a', label: 'Answer' }
       ]
     }
   };
@@ -1477,7 +1465,7 @@
         Task timings, completion outcomes, and task responses/interactions will be recorded for research purposes only.<br />
         Tasks have recommended pacing targets (scenarios ~5:00 and questions ~1:30), but you can continue if you need more time.<br />
         Timing is used for research analysis only and is not used to judge your performance.<br />
-        Question tasks have multiple sections; type each section answer as soon as you find it so it is logged.<br />
+        Question tasks use a single answer box; type your answer as soon as you find it so it is logged.<br />
         When you finish a task, click “I have completed this task”.<br />
         Once a task is marked complete, you cannot return to it and it is treated as finished.<br />
         Work through the tasks in order using the on-screen buttons.<br />
@@ -1843,7 +1831,7 @@
     shortFormPrompt.style.color = '#334155';
     shortFormPrompt.style.marginBottom = '8px';
     shortFormPrompt.style.lineHeight = '1.35';
-    shortFormPrompt.textContent = 'Answer all parts below.';
+    shortFormPrompt.textContent = 'Provide your answer below.';
 
     const shortFormFields = document.createElement('div');
     shortFormFields.id = 'mtg-short-form-answer-fields';
@@ -1911,9 +1899,10 @@
       const completion = getShortFormCompletionSummary(taskId, answerParts);
       const hasAnyAnswer = Object.values(answerParts).some((value) => String(value || '').trim().length > 0);
       if (completion.isIncomplete) {
-        const confirmed = window.confirm(
-          `You have answered ${completion.answeredCount} of ${completion.totalCount} sections. Submit your answer anyway?`
-        );
+        const message = completion.totalCount <= 1
+          ? 'You have not entered an answer yet. Submit anyway?'
+          : `You have answered ${completion.answeredCount} of ${completion.totalCount} sections. Submit your answer anyway?`;
+        const confirmed = window.confirm(message);
         if (!confirmed) {
           return;
         }
@@ -2243,7 +2232,7 @@
             data-short-form-part="1"
             data-part-key="${escapeHtml(String(part.key || '').trim())}"
             rows="2"
-            placeholder="Type your answer for part ${escapeHtml(String(part.key || '').toUpperCase())}…"
+            placeholder="Type your answer…"
             style="width:100%; box-sizing:border-box; padding:8px 10px; border:1px solid #cbd5e1; border-radius:8px; font-family:inherit; font-size:14px; resize:vertical; min-height:64px;"
           ></textarea>
         </label>
