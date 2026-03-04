@@ -76,9 +76,18 @@
   <script>
     (function () {
       const apiBaseOverride = new URLSearchParams(window.location.search).get('api_base');
+      const host = String(window.location.hostname || '').trim().toLowerCase();
+      const isLocalHost = host === 'localhost' || host === '127.0.0.1';
+      const isChatHost = /(^|\.)chat\.medtechguides\.uk$/i.test(host);
+      const isGitHubPagesHost = /(^|\.)github\.io$/i.test(host);
+      const defaultApiRoot = (isLocalHost || isChatHost)
+        ? '/api/participant-allocation'
+        : (isGitHubPagesHost
+          ? 'https://chat.medtechguides.uk/api/participant-allocation'
+          : '/api/participant-allocation');
       const endpointBase = apiBaseOverride
         ? `${String(apiBaseOverride).replace(/\/$/, '')}/api/participant-allocation`
-        : '/api/participant-allocation';
+        : defaultApiRoot;
 
       const el = (id) => document.getElementById(id);
       const rowsBody = el('allocation_rows');
@@ -92,6 +101,48 @@
       let rowsState = [];
       let savingParticipantId = '';
       let selectedForReset = new Set();
+      let apiBasicAuthHeader = '';
+
+      const attachApiAuthHeader = (requestOptions) => {
+        const options = requestOptions && typeof requestOptions === 'object'
+          ? { ...requestOptions }
+          : {};
+        const headers = options.headers && typeof options.headers === 'object'
+          ? { ...options.headers }
+          : {};
+
+        if (apiBasicAuthHeader) {
+          headers.Authorization = apiBasicAuthHeader;
+        }
+
+        options.headers = headers;
+        return options;
+      };
+
+      const promptForApiPassword = () => {
+        const password = window.prompt('Participant Allocation password');
+        if (password === null) {
+          return false;
+        }
+
+        const safePassword = String(password || '');
+        apiBasicAuthHeader = `Basic ${btoa(`participant:${safePassword}`)}`;
+        return true;
+      };
+
+      const fetchParticipantApi = async (urlSuffix, requestOptions) => {
+        const targetUrl = `${endpointBase}${String(urlSuffix || '')}`;
+        let response = await fetch(targetUrl, attachApiAuthHeader(requestOptions));
+
+        if (response.status === 401 && !apiBasicAuthHeader) {
+          const confirmed = promptForApiPassword();
+          if (confirmed) {
+            response = await fetch(targetUrl, attachApiAuthHeader(requestOptions));
+          }
+        }
+
+        return response;
+      };
 
       const setStatus = (text, ok) => {
         statusEl.textContent = text;
@@ -235,7 +286,7 @@
         setStatus('Loading participant allocation...', true);
 
         try {
-          const response = await fetch(endpointBase, { method: 'GET' });
+          const response = await fetchParticipantApi('', { method: 'GET' });
           if (!response.ok) {
             let details = '';
             try {
@@ -261,7 +312,7 @@
         renderRows();
 
         try {
-          const response = await fetch(endpointBase, {
+          const response = await fetchParticipantApi('', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ participant_id: participantId, action: 'set_completed', completed })
@@ -299,7 +350,7 @@
         renderRows();
 
         try {
-          const response = await fetch(endpointBase, {
+          const response = await fetchParticipantApi('', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ participant_id: participantId, action })
@@ -348,7 +399,7 @@
         resetAllButton.disabled = true;
 
         try {
-          const response = await fetch(`${endpointBase}/reset-statuses`, {
+          const response = await fetchParticipantApi('/reset-statuses', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
