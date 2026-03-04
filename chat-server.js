@@ -1896,14 +1896,9 @@ const getTaskCapMs = (taskId) => {
 };
 
 const buildStaleTaskResult = (participantId, taskId, taskLabel, startedAtIso, startedAtMs) => {
-  const capMs = getTaskCapMs(taskId);
   const nowMs = Date.now();
-  const durationMs = Number.isFinite(capMs)
-    ? capMs
-    : (Number.isFinite(startedAtMs) ? Math.max(0, nowMs - startedAtMs) : null);
-  const inferredEndedAtMs = Number.isFinite(capMs) && Number.isFinite(startedAtMs)
-    ? (startedAtMs + capMs)
-    : nowMs;
+  const durationMs = Number.isFinite(startedAtMs) ? Math.max(0, nowMs - startedAtMs) : null;
+  const inferredEndedAtMs = nowMs;
 
   return {
     participant_id: participantId,
@@ -1911,7 +1906,7 @@ const buildStaleTaskResult = (participantId, taskId, taskLabel, startedAtIso, st
     last_task: {
       task_id: String(taskId || '').trim(),
       task_label: String(taskLabel || '').trim(),
-      task_status: 'time_cap_reached_inferred',
+      task_status: 'inactive_inferred',
       duration_ms: Number.isFinite(durationMs) ? durationMs : null,
       ended_at: Number.isFinite(inferredEndedAtMs) ? new Date(inferredEndedAtMs).toISOString() : String(startedAtIso || '').trim()
     }
@@ -1922,10 +1917,7 @@ const coerceActiveTaskStateOrInferEnded = (participantId, taskId, taskLabel, sta
   const startedAtIso = startedAtValue ? new Date(startedAtValue).toISOString() : '';
   const startedAtMs = Date.parse(String(startedAtIso || ''));
   const nowMs = Date.now();
-  const capMs = getTaskCapMs(taskId);
-  const staleThresholdMs = Number.isFinite(capMs)
-    ? Math.max(capMs + 15000, capMs)
-    : defaultTaskStaleThresholdMs;
+  const staleThresholdMs = defaultTaskStaleThresholdMs;
 
   if (Number.isFinite(startedAtMs) && (nowMs - startedAtMs) > staleThresholdMs) {
     return buildStaleTaskResult(participantId, taskId, taskLabel, startedAtIso, startedAtMs);
