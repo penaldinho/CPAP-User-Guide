@@ -559,10 +559,13 @@
 
         const answerWrap = document.getElementById('answer-wrap');
         const parts = Array.isArray(task.parts) ? task.parts : [];
+        const questionLines = Array.isArray(task.steps) ? task.steps : [];
         const shouldDisableShortFormInputs = isCompleted && !isStarted;
-        answerWrap.innerHTML = parts.map((part) => `
+        answerWrap.innerHTML = parts.map((part, index) => {
+          const questionText = String(questionLines[index] || '').trim() || String(part.label || '').trim() || 'Question';
+          return `
           <label>
-            <span class="answer-label">${part.label}</span>
+            <span class="answer-label">${questionText}</span>
             <textarea
               data-part-key="${part.key}"
               placeholder="Type your answer…"
@@ -570,7 +573,8 @@
               style="${shouldDisableShortFormInputs ? 'background:#e5e7eb;color:#6b7280;cursor:not-allowed;' : ''}"
             >${draft[part.key] ? String(draft[part.key]) : ''}</textarea>
           </label>
-        `).join('');
+        `;
+        }).join('');
 
         if (shouldDisableShortFormInputs) {
           const warning = document.createElement('div');

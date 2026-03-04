@@ -1273,23 +1273,7 @@
   };
 
   const getShortFormSectionPrompt = (parts) => {
-    if (!Array.isArray(parts) || !parts.length) {
-      return 'Provide your response below.';
-    }
-
-    const keys = parts
-      .map((part) => String(part && part.key || '').trim().toLowerCase())
-      .filter(Boolean);
-
-    if (!keys.length) {
-      return 'Provide your response below.';
-    }
-
-    if (keys.length === 1) {
-      return `Provide your response for section (${keys[0]}) below.`;
-    }
-
-    return `Provide your response for each section (${keys[0]})-(${keys[keys.length - 1]}) below.`;
+    return 'Provide your answer below.';
   };
 
   const getShortFormCompletionSummary = (taskId, rawParts) => {
@@ -2082,8 +2066,11 @@
     }
 
     if (shortFormLabel) {
-      const questionLabel = presetTaskDescriptions[taskId] ? presetTaskDescriptions[taskId].title : 'Short-form question';
-      shortFormLabel.textContent = `Answer: ${questionLabel}`;
+      const stepLines = presetTaskDescriptions[taskId] && Array.isArray(presetTaskDescriptions[taskId].steps)
+        ? presetTaskDescriptions[taskId].steps
+        : [];
+      const primaryQuestion = stepLines.length ? String(stepLines[0] || '').trim() : '';
+      shortFormLabel.textContent = primaryQuestion || 'Question';
     }
 
     if (shortFormWrap) {
@@ -2221,13 +2208,18 @@
 
     if (shortFormRenderedTaskId !== taskId) {
       const parts = definition && Array.isArray(definition.parts) ? definition.parts : [];
+      const questionLines = definition && Array.isArray((presetTaskDescriptions[taskId] || {}).steps)
+        ? (presetTaskDescriptions[taskId] || {}).steps
+        : [];
       if (shortFormPrompt) {
         shortFormPrompt.textContent = getShortFormSectionPrompt(parts);
       }
 
-      shortFormFields.innerHTML = parts.map((part) => `
+      shortFormFields.innerHTML = parts.map((part, index) => {
+        const questionText = String(questionLines[index] || '').trim() || String(part.label || '').trim() || 'Question';
+        return `
         <label style="display:grid; gap:4px;">
-          <span style="font-size:12px; color:#0f172a; font-weight:600;">${escapeHtml(String(part.label || '').trim())}</span>
+          <span style="font-size:12px; color:#0f172a; font-weight:600;">${escapeHtml(questionText)}</span>
           <textarea
             data-short-form-part="1"
             data-part-key="${escapeHtml(String(part.key || '').trim())}"
@@ -2236,7 +2228,8 @@
             style="width:100%; box-sizing:border-box; padding:8px 10px; border:1px solid #cbd5e1; border-radius:8px; font-family:inherit; font-size:14px; resize:vertical; min-height:64px;"
           ></textarea>
         </label>
-      `).join('');
+      `;
+      }).join('');
 
       const draft = getShortFormDraft(taskId) || {};
       const draftInputs = Array.from(shortFormFields.querySelectorAll('[data-short-form-part="1"]'));
