@@ -25,6 +25,14 @@
     .err { color: #991b1b; }
     .meta { font-size: 12px; color: #6b7280; margin-top: 8px; }
     .hidden { display: none; }
+    .criteria-card { border: 1px solid #dbe2ef; border-radius: 8px; padding: 10px; background: #f8fafc; }
+    .criteria-title { font-weight: 700; color: #0f172a; margin-bottom: 6px; font-size: 14px; }
+    .criteria-subtitle { font-size: 12px; color: #475569; margin-bottom: 8px; }
+    .criteria-table-wrap { overflow-x: auto; }
+    .criteria-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .criteria-table th, .criteria-table td { border: 1px solid #dbe2ef; padding: 7px 8px; vertical-align: middle; }
+    .criteria-table th { background: #eef2ff; color: #1f2937; text-align: left; }
+    .criteria-table td.center { text-align: center; }
     @media (max-width: 720px) {
       .grid { grid-template-columns: 1fr; }
       .row-action { grid-template-columns: 1fr; }
@@ -108,6 +116,15 @@
           <button id="btn-score" type="button">Enter Score</button>
         </div>
 
+        <div id="criteria_section" class="full hidden criteria-card">
+          <div class="criteria-title">Scenario Marking Criteria</div>
+          <div id="criteria_subtitle" class="criteria-subtitle"></div>
+          <div id="criteria_table_wrap" class="criteria-table-wrap"></div>
+          <div style="margin-top:8px; display:flex; justify-content:flex-end;">
+            <button id="btn-submit-criteria" type="button" class="secondary">Submit Criteria Marks</button>
+          </div>
+        </div>
+
         <label class="full">
           Error Description
           <textarea id="error_text" placeholder="Describe the observed error"></textarea>
@@ -165,9 +182,13 @@
       const taskTimerEl = el('task_timer');
       const notesInput = el('notes');
       const errorTextInput = el('error_text');
+      const criteriaSectionEl = el('criteria_section');
+      const criteriaSubtitleEl = el('criteria_subtitle');
+      const criteriaTableWrapEl = el('criteria_table_wrap');
       const statusEl = el('status');
       const metaEl = el('meta');
       const CUSTOM_TASK_VALUE = '__custom__';
+      const criteriaMarksKey = 'observer-notes-criteria-marks';
       const presetTaskPairs = [
         ['scenario_card_1', 'Scenario Card 1 – First-Time Setup (Setup)'],
         ['scenario_card_2', 'Scenario Card 2 – Fit and Start Therapy (Routine Use)'],
@@ -179,6 +200,43 @@
       ];
       const labelById = Object.fromEntries(presetTaskPairs);
       const idByLabel = Object.fromEntries(presetTaskPairs.map(([id, label]) => [label, id]));
+      const scenarioCriteria = {
+        scenario_card_1: [
+          { id: 's1_surface', label: 'Places the device on a stable, level surface.' },
+          { id: 's1_power_connector', label: 'Connects power connector to rear of device.' },
+          { id: 's1_power_wall', label: 'Connects power cord to power supply and wall outlet.' },
+          { id: 's1_tubing_rear', label: 'Connects air tubing firmly to rear air outlet.' },
+          { id: 's1_fill_max', label: 'Opens humidifier and fills to max water line (not above).' },
+          { id: 's1_humidifier_insert', label: 'Closes humidifier and inserts into side of device.' },
+          { id: 's1_tubing_mask', label: 'Connects free tubing end to assembled mask.' }
+        ],
+        scenario_card_2: [
+          { id: 's2_unhook_clip', label: 'One headgear clip is unhooked to position the mask.' },
+          { id: 's2_seal_positioned', label: 'Seal is positioned on dummy face.' },
+          { id: 's2_headgear_over_dummy', label: 'Headgear is placed over dummy.' },
+          { id: 's2_rehook_clip', label: 'Headgear clip is rehooked onto the frame.' },
+          { id: 's2_bottom_straps', label: 'Bottom straps are tightened.' },
+          { id: 's2_top_straps', label: 'Top straps are tightened.' },
+          { id: 's2_run_mask_fit', label: 'Runs Mask Fit from My Options.' },
+          { id: 's2_adjust_fit', label: 'Adjusts mask/cushion/headgear until good fit is achieved.' },
+          { id: 's2_start_therapy', label: 'Starts therapy using Start/Stop.' }
+        ],
+        scenario_card_3: [
+          { id: 's3_remove_mask', label: 'Removes the mask.' },
+          { id: 's3_press_start_stop', label: 'Presses Start/Stop.' },
+          { id: 's3_open_my_options', label: 'Opens My Options.' },
+          { id: 's3_climate_manual', label: 'Sets Climate Ctrl to Manual.' },
+          { id: 's3_increase_humidity', label: 'Increases Humidity Level by at least 1.' },
+          { id: 's3_save_dial', label: 'Saves by pressing the dial.' }
+        ]
+      };
+
+      const escapeHtml = (value) => String(value || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
 
       const makeSessionId = () => `obs_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
       const getSessionId = () => {
@@ -251,6 +309,128 @@
         localStorage.removeItem(activeTaskKey);
       };
 
+      const getCriteriaMarksState = () => {
+        try {
+          const parsed = JSON.parse(sessionStorage.getItem(criteriaMarksKey) || '{}');
+          return parsed && typeof parsed === 'object' ? parsed : {};
+        } catch {
+          return {};
+        }
+      };
+
+      const setCriteriaMarksState = (state) => {
+        sessionStorage.setItem(criteriaMarksKey, JSON.stringify(state || {}));
+      };
+
+      const getCriteriaStateKey = () => {
+        const participantId = String(participantInput.value || '').trim();
+        const taskId = getTaskIdValue();
+        return `${participantId}::${taskId}`;
+      };
+
+      const getCriteriaDefinition = (taskId) => {
+        const key = String(taskId || '').trim();
+        return Array.isArray(scenarioCriteria[key]) ? scenarioCriteria[key] : [];
+      };
+
+      const getCriteriaStateForCurrentTask = () => {
+        const marksState = getCriteriaMarksState();
+        const stateKey = getCriteriaStateKey();
+        return marksState[stateKey] && typeof marksState[stateKey] === 'object' ? marksState[stateKey] : {};
+      };
+
+      const setCriteriaMark = (criterionId, markState) => {
+        const marksState = getCriteriaMarksState();
+        const stateKey = getCriteriaStateKey();
+        const existing = marksState[stateKey] && typeof marksState[stateKey] === 'object' ? marksState[stateKey] : {};
+        marksState[stateKey] = {
+          ...existing,
+          [criterionId]: {
+            ...(existing[criterionId] && typeof existing[criterionId] === 'object' ? existing[criterionId] : {}),
+            ...(markState && typeof markState === 'object' ? markState : {})
+          }
+        };
+        setCriteriaMarksState(marksState);
+      };
+
+      const renderCriteriaSection = () => {
+        const taskId = getTaskIdValue();
+        const criteria = getCriteriaDefinition(taskId);
+        const show = isScenarioTaskId(taskId) && criteria.length > 0;
+
+        if (!criteriaSectionEl || !criteriaSubtitleEl || !criteriaTableWrapEl) {
+          return;
+        }
+
+        criteriaSectionEl.classList.toggle('hidden', !show);
+        if (!show) {
+          criteriaSubtitleEl.textContent = '';
+          criteriaTableWrapEl.innerHTML = '';
+          return;
+        }
+
+        const taskLabel = getTaskLabelValue() || labelById[taskId] || taskId;
+        criteriaSubtitleEl.textContent = taskLabel;
+
+        const criteriaState = getCriteriaStateForCurrentTask();
+        const rows = criteria.map((criterion) => {
+          const mark = criteriaState[criterion.id] && typeof criteriaState[criterion.id] === 'object' ? criteriaState[criterion.id] : {};
+          const outcome = String(mark.outcome || '').trim().toLowerCase();
+          const stepTimeMs = Number.isFinite(Number(mark.step_time_ms)) ? Number(mark.step_time_ms) : null;
+          const submitted = Boolean(mark.submitted);
+          return `
+            <tr>
+              <td>${escapeHtml(criterion.label)}</td>
+              <td class="center"><input type="radio" name="criterion_${escapeHtml(criterion.id)}" value="correct" data-criterion-id="${escapeHtml(criterion.id)}" ${outcome === 'correct' ? 'checked' : ''}></td>
+              <td class="center"><input type="radio" name="criterion_${escapeHtml(criterion.id)}" value="incorrect" data-criterion-id="${escapeHtml(criterion.id)}" ${outcome === 'incorrect' ? 'checked' : ''}></td>
+              <td class="center">${Number.isFinite(stepTimeMs) ? escapeHtml(formatDuration(stepTimeMs)) : '-'}</td>
+              <td class="center">${submitted ? 'Yes' : 'No'}</td>
+            </tr>
+          `;
+        }).join('');
+
+        criteriaTableWrapEl.innerHTML = `
+          <table class="criteria-table">
+            <thead>
+              <tr>
+                <th>Marking Criteria</th>
+                <th>Correct</th>
+                <th>Incorrect</th>
+                <th>Time on Task</th>
+                <th>Submitted</th>
+              </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+        `;
+
+        Array.from(criteriaTableWrapEl.querySelectorAll('input[type="radio"][data-criterion-id]')).forEach((input) => {
+          input.addEventListener('change', () => {
+            const criterionId = String(input.getAttribute('data-criterion-id') || '').trim();
+            const outcome = String(input.value || '').trim().toLowerCase();
+            if (!criterionId || !['correct', 'incorrect'].includes(outcome)) {
+              return;
+            }
+
+            const active = getActiveTaskState();
+            const currentKey = getCurrentTaskKey();
+            const startedAtMs = Date.parse(String(active.started_at || ''));
+            if (!active.key || active.key !== currentKey || !Number.isFinite(startedAtMs)) {
+              setStatus('Start the task timer before marking criteria.', false);
+              renderCriteriaSection();
+              return;
+            }
+
+            setCriteriaMark(criterionId, {
+              outcome,
+              step_time_ms: Math.max(0, Date.now() - startedAtMs),
+              submitted: false
+            });
+            renderCriteriaSection();
+          });
+        });
+      };
+
       const updateTaskTimer = () => {
         if (!taskTimerEl) return;
         const active = getActiveTaskState();
@@ -306,15 +486,21 @@
         return true;
       };
 
-      const submitObservation = async (actionType) => {
+      const submitObservation = async (actionType, overrides = {}) => {
         if (!validateCommon()) return false;
 
         const taskId = getTaskIdValue();
         const manualPage = String(manualPageInput.value || '').trim();
-        const notes = String(notesInput.value || '').trim();
+        const notes = String((overrides && overrides.notes) ?? notesInput.value || '').trim();
         const errorText = String(errorTextInput.value || '').trim();
         const scenarioScoreRaw = String(scenarioScoreSelect.value || '').trim();
         const errorSeverityRaw = String(errorSeveritySelect.value || '').trim().toLowerCase();
+        const criterionId = String((overrides && overrides.criterion_id) || '').trim();
+        const criterionLabel = String((overrides && overrides.criterion_label) || '').trim();
+        const criterionOutcome = String((overrides && overrides.criterion_outcome) || '').trim().toLowerCase();
+        const criterionStepTimeMs = Number.isFinite(Number(overrides && overrides.criterion_step_time_ms))
+          ? Math.max(0, Number(overrides.criterion_step_time_ms))
+          : null;
 
         if (actionType === 'page_mark' && !manualPage) {
           setStatus('Enter a manual page before logging a page mark.', false);
@@ -355,6 +541,21 @@
           }
         }
 
+        if (actionType === 'step_mark') {
+          if (!criterionId || !criterionLabel) {
+            setStatus('Criterion ID and label are required for step mark.', false);
+            return false;
+          }
+          if (!['correct', 'incorrect'].includes(criterionOutcome)) {
+            setStatus('Criterion outcome must be correct or incorrect.', false);
+            return false;
+          }
+          if (!Number.isFinite(criterionStepTimeMs) || criterionStepTimeMs < 0) {
+            setStatus('Step time must be recorded before submitting criteria marks.', false);
+            return false;
+          }
+        }
+
         const active = getActiveTaskState();
         const currentKey = getCurrentTaskKey();
         const startedAtMs = Date.parse(String(active.started_at || ''));
@@ -371,6 +572,10 @@
           manual_page: manualPage,
           scenario_score: actionType === 'scenario_score' ? Number.parseInt(scenarioScoreRaw, 10) : null,
           task_length_ms: taskLengthMs,
+          criterion_id: actionType === 'step_mark' ? criterionId : null,
+          criterion_label: actionType === 'step_mark' ? criterionLabel : null,
+          criterion_outcome: actionType === 'step_mark' ? criterionOutcome : null,
+          criterion_step_time_ms: actionType === 'step_mark' ? criterionStepTimeMs : null,
           error_severity: actionType === 'error' ? errorSeverityRaw : null,
           error_text: actionType === 'error' ? errorText : '',
           notes,
@@ -450,6 +655,13 @@
           return;
         }
 
+        if (isScenarioTaskId(taskId)) {
+          const criteriaSubmitted = await submitCriteriaMarks();
+          if (!criteriaSubmitted) {
+            return;
+          }
+        }
+
         await submitObservation('task_end');
       };
 
@@ -478,18 +690,79 @@
         }
       };
 
+      const submitCriteriaMarks = async () => {
+        if (!validateCommon()) return false;
+
+        const taskId = getTaskIdValue();
+        const criteria = getCriteriaDefinition(taskId);
+        if (!isScenarioTaskId(taskId) || !criteria.length) {
+          setStatus('Criteria marks are only available for scenario tasks.', false);
+          return false;
+        }
+
+        const criteriaState = getCriteriaStateForCurrentTask();
+        const missing = criteria.filter((criterion) => {
+          const mark = criteriaState[criterion.id] && typeof criteriaState[criterion.id] === 'object' ? criteriaState[criterion.id] : null;
+          const outcome = String(mark && mark.outcome || '').trim().toLowerCase();
+          return !['correct', 'incorrect'].includes(outcome) || !Number.isFinite(Number(mark.step_time_ms));
+        });
+
+        if (missing.length) {
+          setStatus('Mark all scenario criteria as Correct or Incorrect before submitting.', false);
+          return false;
+        }
+
+        let submittedCount = 0;
+        for (const criterion of criteria) {
+          const mark = criteriaState[criterion.id];
+          if (mark && mark.submitted) {
+            continue;
+          }
+
+          const ok = await submitObservation('step_mark', {
+            criterion_id: criterion.id,
+            criterion_label: criterion.label,
+            criterion_outcome: mark.outcome,
+            criterion_step_time_ms: mark.step_time_ms,
+            notes: String(notesInput.value || '').trim()
+          });
+
+          if (!ok) {
+            return false;
+          }
+
+          setCriteriaMark(criterion.id, {
+            submitted: true,
+            submitted_at: new Date().toISOString()
+          });
+          submittedCount += 1;
+        }
+
+        if (submittedCount > 0) {
+          setStatus(`Submitted ${submittedCount} criteria marks for ${taskId}.`, true);
+        } else {
+          setStatus(`All criteria marks already submitted for ${taskId}.`, true);
+        }
+        renderCriteriaSection();
+        return true;
+      };
+
       el('btn-start').addEventListener('click', startTask);
       el('btn-end').addEventListener('click', endTask);
       el('btn-page').addEventListener('click', logPageMarkAndClear);
       el('btn-score').addEventListener('click', () => submitObservation('scenario_score'));
       el('btn-note').addEventListener('click', logNoteAndClear);
       el('btn-error').addEventListener('click', logErrorAndClear);
+      el('btn-submit-criteria').addEventListener('click', submitCriteriaMarks);
 
       taskIdSelect.addEventListener('change', syncFromTaskId);
       taskLabelSelect.addEventListener('change', syncFromTaskLabel);
       participantInput.addEventListener('input', updateTaskTimer);
+      participantInput.addEventListener('input', renderCriteriaSection);
       taskIdSelect.addEventListener('change', updateTaskTimer);
+      taskIdSelect.addEventListener('change', renderCriteriaSection);
       taskIdCustomInput.addEventListener('input', updateTaskTimer);
+      taskIdCustomInput.addEventListener('input', renderCriteriaSection);
       manualPageInput.addEventListener('keydown', async (event) => {
         if (event.key !== 'Enter') return;
         event.preventDefault();
@@ -504,6 +777,7 @@
       metaEl.textContent = `Session: ${getSessionId()}`;
       syncCustomTaskVisibility();
       updateTaskTimer();
+      renderCriteriaSection();
       window.setInterval(updateTaskTimer, 1000);
     })();
   </script>

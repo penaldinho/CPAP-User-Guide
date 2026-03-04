@@ -223,6 +223,53 @@ CREATE INDEX IF NOT EXISTS idx_observer_notes_task_time
 CREATE INDEX IF NOT EXISTS idx_observer_notes_action_type_time
   ON observer_notes (action_type, received_at DESC);
 
+CREATE TABLE IF NOT EXISTS observer_step_marks (
+  id BIGSERIAL PRIMARY KEY,
+  received_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  timestamp TIMESTAMPTZ,
+  session_id TEXT,
+  participant_id TEXT NOT NULL,
+  task_id TEXT NOT NULL,
+  task_label TEXT,
+  criterion_id TEXT NOT NULL,
+  criterion_label TEXT NOT NULL,
+  criterion_outcome TEXT NOT NULL,
+  criterion_step_time_ms INTEGER,
+  observer_note TEXT,
+  source TEXT NOT NULL DEFAULT 'observations_logger',
+  trial_mode TEXT NOT NULL DEFAULT 'physical',
+  raw_payload JSONB,
+  CONSTRAINT observer_step_marks_outcome_check CHECK (criterion_outcome IN ('correct', 'incorrect'))
+);
+
+ALTER TABLE observer_step_marks
+  ADD COLUMN IF NOT EXISTS criterion_step_time_ms INTEGER;
+
+ALTER TABLE observer_step_marks
+  ADD COLUMN IF NOT EXISTS observer_note TEXT;
+
+ALTER TABLE observer_step_marks
+  ADD COLUMN IF NOT EXISTS trial_mode TEXT;
+
+ALTER TABLE observer_step_marks
+  ADD COLUMN IF NOT EXISTS raw_payload JSONB;
+
+ALTER TABLE observer_step_marks
+  ALTER COLUMN trial_mode SET DEFAULT 'physical';
+
+UPDATE observer_step_marks
+SET trial_mode = 'physical'
+WHERE trial_mode IS NULL;
+
+CREATE INDEX IF NOT EXISTS idx_observer_step_marks_participant_time
+  ON observer_step_marks (participant_id, received_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_observer_step_marks_task_time
+  ON observer_step_marks (participant_id, task_id, received_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_observer_step_marks_outcome_time
+  ON observer_step_marks (criterion_outcome, received_at DESC);
+
 CREATE TABLE IF NOT EXISTS pre_trial_questionnaire (
   id BIGSERIAL PRIMARY KEY,
   received_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),

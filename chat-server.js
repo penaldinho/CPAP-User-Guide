@@ -836,6 +836,52 @@ const insertObserverNoteRecordPostgres = async (record) => {
   await pool.query(queryText, values);
 };
 
+const insertObserverStepMarkRecordPostgres = async (record) => {
+  const pool = getTelemetryPgPool();
+  const payload = record && typeof record === 'object' ? record : {};
+
+  const queryText = `
+    INSERT INTO observer_step_marks (
+      received_at,
+      timestamp,
+      session_id,
+      participant_id,
+      task_id,
+      task_label,
+      criterion_id,
+      criterion_label,
+      criterion_outcome,
+      criterion_step_time_ms,
+      observer_note,
+      source,
+      trial_mode,
+      raw_payload
+    )
+    VALUES (
+      $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14
+    )
+  `;
+
+  const values = [
+    parseDateSafely(payload.received_at || new Date().toISOString()),
+    parseDateSafely(payload.timestamp),
+    String(payload.session_id || '').trim(),
+    String(payload.participant_id || '').trim(),
+    String(payload.task_id || '').trim(),
+    String(payload.task_label || '').trim(),
+    String(payload.criterion_id || '').trim(),
+    String(payload.criterion_label || '').trim(),
+    String(payload.criterion_outcome || '').trim().toLowerCase(),
+    parseBoundedIntegerSafely(payload.criterion_step_time_ms, 0, 24 * 60 * 60 * 1000),
+    String(payload.observer_note || '').trim(),
+    String(payload.source || 'observations_logger').trim() || 'observations_logger',
+    String(payload.trial_mode || 'physical').trim().toLowerCase() === 'digital' ? 'digital' : 'physical',
+    JSON.stringify(payload)
+  ];
+
+  await pool.query(queryText, values);
+};
+
 const insertQuestionnaireRecordPostgres = async (record) => {
   const pool = getTelemetryPgPool();
   const normalized = normalizePhysicalTrialRecordForSql(record);
@@ -1164,6 +1210,24 @@ const storeObserverNoteRecord = async (record) => {
         throw error;
       }
       console.error('Postgres observer notes write failed, falling back to file store:', error.message);
+      writeObserverNoteRecordToFiles(record);
+      return;
+    }
+  }
+
+  writeObserverNoteRecordToFiles(record);
+};
+
+const storeObserverStepMarkRecord = async (record) => {
+  if (telemetryUsePostgres) {
+    try {
+      await insertObserverStepMarkRecordPostgres(record);
+      return;
+    } catch (error) {
+      if (!telemetryFallbackToFile) {
+        throw error;
+      }
+      console.error('Postgres observer step mark write failed, falling back to file store:', error.message);
       writeObserverNoteRecordToFiles(record);
       return;
     }
@@ -2104,6 +2168,10 @@ app.post('/api/observer-notes', async (req, res) => {
     const notes = String(payload && payload.notes || '').trim();
     const errorSeverity = String(payload && payload.error_severity || '').trim().toLowerCase();
     const errorText = String(payload && payload.error_text || '').trim();
+    const criterionId = String(payload && payload.criterion_id || '').trim();
+    const criterionLabel = String(payload && payload.criterion_label || '').trim();
+    const criterionOutcome = String(payload && payload.criterion_outcome || '').trim().toLowerCase();
+    const criterionStepTimeMs = parseIntegerSafely(payload && payload.criterion_step_time_ms);
     const scenarioScore = parseIntegerSafely(payload && payload.scenario_score);
     const taskLengthMs = parseIntegerSafely(payload && payload.task_length_ms);
 
@@ -2111,9 +2179,9 @@ app.post('/api/observer-notes', async (req, res) => {
       return res.status(400).json({ error: 'participant_id, task_id, and action_type are required' });
     }
 
-    const allowedActionTypes = new Set(['task_start', 'task_end', 'page_mark', 'scenario_score', 'note', 'error']);
+    const allowedActionTypes = new Set(['task_start', 'task_end', 'page_mark', 'scenario_score', 'note', 'error', 'step_mark']);
     if (!allowedActionTypes.has(actionType)) {
-      return res.status(400).json({ error: 'action_type must be one of task_start, task_end, page_mark, scenario_score, note, error' });
+      return res.status(400).json({ error: 'action_type must be one of task_start, task_end, page_mark, scenario_score, note, error, step_mark' });
     }
 
     if (actionType === 'page_mark' && !manualPage) {
@@ -2143,6 +2211,24 @@ app.post('/api/observer-notes', async (req, res) => {
       }
     }
 
+    if (actionType === 'step_mark') {
+      if (!/^scenario_card_[1-3]$/i.test(taskId)) {
+        return res.status(400).json({ error: 'step_mark is only valid for scenario_card_1 to scenario_card_3 tasks' });
+      }
+
+      if (!criterionId || !criterionLabel) {
+        return res.status(400).json({ error: 'criterion_id and criterion_label are required for step_mark action_type' });
+      }
+
+      if (!['correct', 'incorrect'].includes(criterionOutcome)) {
+        return res.status(400).json({ error: 'criterion_outcome is required for step_mark action_type and must be correct or incorrect' });
+      }
+
+      if (criterionStepTimeMs === null || criterionStepTimeMs < 0) {
+        return res.status(400).json({ error: 'criterion_step_time_ms is required for step_mark action_type and must be >= 0' });
+      }
+    }
+
     if (actionType === 'task_end' && (taskLengthMs === null || taskLengthMs < 0)) {
       return res.status(400).json({ error: 'task_length_ms is required for task_end and must be >= 0' });
     }
@@ -2164,7 +2250,27 @@ app.post('/api/observer-notes', async (req, res) => {
       timestamp: payload.timestamp || new Date().toISOString()
     });
 
-    await storeObserverNoteRecord(record);
+    if (actionType === 'step_mark') {
+      await storeObserverStepMarkRecord({
+        ...payload,
+        received_at: new Date().toISOString(),
+        timestamp: payload.timestamp || new Date().toISOString(),
+        session_id: String(payload.session_id || '').trim(),
+        participant_id: participantId,
+        task_id: taskId,
+        task_label: String(payload.task_label || '').trim(),
+        criterion_id: criterionId,
+        criterion_label: criterionLabel,
+        criterion_outcome: criterionOutcome,
+        criterion_step_time_ms: criterionStepTimeMs,
+        observer_note: notes,
+        source: 'observations_logger',
+        trial_mode: 'physical',
+        action_type: actionType
+      });
+    } else {
+      await storeObserverNoteRecord(record);
+    }
     res.status(204).end();
   } catch (error) {
     console.error('Observer notes write error:', error);
