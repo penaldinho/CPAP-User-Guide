@@ -2018,7 +2018,7 @@
     const researchMode = isResearchMode();
     const hasPendingNextTask = !taskId && String(participantNextState.next_task_id || '').trim();
     const hasCompletedSequence = !taskId && String(participantNextState.status || '').trim() === 'completed';
-    const showCompletedSequenceCard = hasCompletedSequence && researchMode;
+    const showCompletedSequenceCard = hasCompletedSequence;
 
     wrap.style.display = ((isShortFormTask && taskId) || hasPendingNextTask || showCompletedSequenceCard) ? 'block' : 'none';
 
@@ -2056,9 +2056,15 @@
       if (hasPendingNextTask) {
         participantNextLabel.textContent = timedOut ? 'Time limit reached for this task.' : '';
       } else if (showCompletedSequenceCard) {
-        participantNextLabel.textContent = timedOut
-          ? 'Time limit reached for the final task. All participant tasks are complete. Press Ctrl+Alt+R to open Research Controls.'
-          : 'All participant tasks are complete. Press Ctrl+Alt+R to open Research Controls.';
+        if (researchMode) {
+          participantNextLabel.textContent = timedOut
+            ? 'Time limit reached for the final task. All participant tasks are complete. Press Ctrl+Alt+R to open Research Controls.'
+            : 'All participant tasks are complete. Press Ctrl+Alt+R to open Research Controls.';
+        } else {
+          participantNextLabel.textContent = timedOut
+            ? 'Time limit reached for the final task. Trial complete.'
+            : 'All participant tasks are complete. Trial complete.';
+        }
       } else {
         participantNextLabel.textContent = '';
       }
