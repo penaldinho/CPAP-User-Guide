@@ -539,6 +539,11 @@
 
     const existing = getParticipantId();
     if (existing === participantId) return;
+
+    if (existing && existing !== participantId) {
+      clearParticipantNextTaskState();
+    }
+
     setParticipantIdRaw(participantId);
   };
 
@@ -2061,6 +2066,7 @@
     const wrap = ensureParticipantEndButton();
     const taskState = getTaskState();
     const taskId = String(taskState.task_id || '').trim();
+    const trialIntroVisible = Boolean(document.getElementById('mtg-trial-intro-overlay-card'));
     const isShortFormTask = /^short_form_q[1-4]$/i.test(taskId);
     const endBtn = document.getElementById('mtg-participant-end-task-btn');
     const participantNextWrap = document.getElementById('mtg-participant-next-task-wrap');
@@ -2088,7 +2094,7 @@
     const hasCompletedSequence = !taskId && String(participantNextState.status || '').trim() === 'completed';
     const showCompletedSequenceCard = hasCompletedSequence;
 
-    wrap.style.display = ((isShortFormTask && taskId) || hasPendingNextTask || showCompletedSequenceCard) ? 'block' : 'none';
+    wrap.style.display = (trialIntroVisible || !((isShortFormTask && taskId) || hasPendingNextTask || showCompletedSequenceCard)) ? 'none' : 'block';
 
     if (!taskId) {
       setTaskPromptExpanded(false);
@@ -2109,7 +2115,7 @@
     }
 
     if (participantNextWrap) {
-      participantNextWrap.style.display = !taskId && (hasPendingNextTask || showCompletedSequenceCard) ? 'block' : 'none';
+      participantNextWrap.style.display = (!trialIntroVisible && !taskId && (hasPendingNextTask || showCompletedSequenceCard)) ? 'block' : 'none';
     }
 
     if (participantNextClose) {
