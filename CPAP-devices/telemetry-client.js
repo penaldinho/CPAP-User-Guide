@@ -2312,7 +2312,9 @@
   };
 
   const renderResearchPanel = (forceOpen = false, allowDuringActiveTask = false) => {
-    removeTrialIntroOverlayCard();
+    if (forceOpen) {
+      removeTrialIntroOverlayCard();
+    }
 
     const presetTasks = [
       { id: 'scenario_card_1', label: 'Scenario Card 1 – First-Time Setup (Setup)' },
