@@ -137,8 +137,24 @@
       ? '/api/physical-trial'
       : 'https://chat.medtechguides.uk/api/physical-trial';
     const questionnaireStartedAtMs = Date.now();
+    const queryParams = new URLSearchParams(window.location.search);
+    const presetParticipant = String(queryParams.get('participant') || '').trim();
+    const lockParticipant = ['1', 'true', 'yes'].includes(String(queryParams.get('lock_participant') || '').trim().toLowerCase());
 
     const statusEl = document.getElementById('status');
+    const participantInput = document.getElementById('participant_id');
+
+    if (participantInput && presetParticipant) {
+      participantInput.value = presetParticipant;
+    }
+
+    if (participantInput && lockParticipant) {
+      participantInput.readOnly = true;
+      participantInput.style.background = '#e5e7eb';
+      participantInput.style.color = '#6b7280';
+      participantInput.style.cursor = 'not-allowed';
+      participantInput.setAttribute('aria-readonly', 'true');
+    }
 
     const radioValue = (name) => {
       const selected = document.querySelector(`input[name="${name}"]:checked`);

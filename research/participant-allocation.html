@@ -213,6 +213,26 @@
         return formatDuration(Math.max(0, endMs - openedAtMs));
       };
 
+      const buildPreTrialUrl = (participantId, allocationGroup) => {
+        const url = new URL('/research/pre-trial-questionnaire.html', window.location.origin);
+        url.searchParams.set('participant', String(participantId || '').trim());
+        url.searchParams.set('lock_participant', '1');
+        url.searchParams.set('mode', String(allocationGroup || '').trim().toLowerCase() === 'physical' ? 'physical' : 'digital');
+        return `${url.pathname}${url.search}${url.hash}`;
+      };
+
+      const proceedToTrial = (participantId) => {
+        const row = rowsState.find((entry) => String(entry && entry.participant_id || '').trim() === String(participantId || '').trim());
+        if (!row) {
+          setStatus('Unable to find participant allocation row.', false);
+          return;
+        }
+
+        const allocationGroup = String(row.allocation_group || '').trim().toLowerCase() === 'physical' ? 'physical' : 'digital';
+        const target = buildPreTrialUrl(participantId, allocationGroup);
+        window.location.href = target;
+      };
+
       const renderSummary = () => {
         const total = rowsState.length;
         const completed = rowsState.filter((row) => row.completed).length;
@@ -241,6 +261,7 @@
           const isSaving = savingParticipantId && savingParticipantId === participantId;
           const openDisabled = isSaving || sessionStatus === 'in_progress';
           const closeDisabled = isSaving || sessionStatus !== 'in_progress';
+          const showProceedButton = sessionStatus === 'in_progress';
           const isSelectedForReset = selectedForReset.has(participantId);
           return `
             <tr>
@@ -255,6 +276,7 @@
                 <div style="display:flex; gap:6px; flex-wrap:wrap;">
                   <button type="button" class="secondary small" data-participant-id="${participantId}" data-action="open_session" ${openDisabled ? 'disabled' : ''}>Open Session</button>
                   <button type="button" class="secondary small" data-participant-id="${participantId}" data-action="close_session" ${closeDisabled ? 'disabled' : ''}>Close Session</button>
+                  ${showProceedButton ? `<button type="button" class="small" data-participant-id="${participantId}" data-action="proceed_to_trial">Proceed to trial</button>` : ''}
                 </div>
               </td>
               <td class="center"><input type="checkbox" data-participant-id="${participantId}" ${row.completed ? 'checked' : ''} ${isSaving ? 'disabled' : ''}></td>
@@ -290,6 +312,10 @@
             const participantId = String(button.getAttribute('data-participant-id') || '').trim();
             const action = String(button.getAttribute('data-action') || '').trim().toLowerCase();
             if (!participantId || !action) return;
+            if (action === 'proceed_to_trial') {
+              proceedToTrial(participantId);
+              return;
+            }
             await updateSessionAction(participantId, action);
           });
         });

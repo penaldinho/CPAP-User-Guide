@@ -234,10 +234,40 @@
       const actionBtn = el('btn-action');
       const nextBtn = el('btn-next');
 
+      const queryParams = new URLSearchParams(window.location.search);
+      const presetParticipant = String(queryParams.get('participant') || '').trim();
+      const lockParticipant = ['1', 'true', 'yes'].includes(String(queryParams.get('lock_participant') || '').trim().toLowerCase());
+      const postTrialUrlParam = String(queryParams.get('post_trial_url') || '').trim();
+      const buildPostTrialUrl = (participantId) => {
+        if (postTrialUrlParam) {
+          try {
+            return new URL(postTrialUrlParam, window.location.origin).toString();
+          } catch {}
+        }
+        const fallback = new URL('post-trial-questionnaire.html', window.location.href);
+        fallback.searchParams.set('participant', String(participantId || '').trim());
+        fallback.searchParams.set('lock_participant', '1');
+        fallback.searchParams.set('mode', 'physical');
+        return fallback.toString();
+      };
+
       let state = getRunnerState();
+
+      if (presetParticipant && !state.participantId) {
+        state.participantId = presetParticipant;
+        setRunnerState(state);
+      }
 
       if (state.participantId && participantInput) {
         participantInput.value = state.participantId;
+      }
+
+      if (participantInput && lockParticipant) {
+        participantInput.readOnly = true;
+        participantInput.style.background = '#e5e7eb';
+        participantInput.style.color = '#6b7280';
+        participantInput.style.cursor = 'not-allowed';
+        participantInput.setAttribute('aria-readonly', 'true');
       }
 
       const setStatus = (text, ok) => {
@@ -515,8 +545,8 @@
 
           if (isTrialFinished) {
             actionBtn.style.display = 'inline-block';
-            actionBtn.dataset.mode = 'complete_trial';
-            actionBtn.textContent = 'Complete trial';
+            actionBtn.dataset.mode = 'proceed_post_trial';
+            actionBtn.textContent = 'Proceed to post-trial questionnaire';
             actionBtn.className = 'success';
             if (nextBtn) {
               nextBtn.style.display = 'none';
@@ -740,9 +770,14 @@
             return;
           }
 
-          if (mode === 'complete_trial') {
+          if (mode === 'proceed_post_trial') {
             await submitEvent('task_end', 'participant_completed_all_tasks');
-            const lastParticipantId = state.participantId;
+            const lastParticipantId = String(state.participantId || '').trim();
+            if (lastParticipantId) {
+              window.location.href = buildPostTrialUrl(lastParticipantId);
+              return;
+            }
+
             state = makeFreshRunnerState();
             setRunnerState(state);
             startNewSession();
@@ -751,7 +786,7 @@
               participantInput.focus();
             }
             renderTask();
-            setStatus(`Trial complete for ${lastParticipantId}.`, true);
+            setStatus('Trial complete.', true);
             return;
           }
         } catch (error) {

@@ -563,6 +563,25 @@
     window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
   };
 
+  const buildPostTrialQuestionnaireUrl = () => {
+    const currentUrl = new URL(window.location.href);
+    const explicit = String(currentUrl.searchParams.get('mtg_post_trial_url') || '').trim();
+    if (explicit) {
+      try {
+        return new URL(explicit, window.location.origin).toString();
+      } catch {}
+    }
+
+    const participantId = String(getParticipantId() || '').trim();
+    const postUrl = new URL('/research/post-trial-questionnaire.html', window.location.origin);
+    if (participantId) {
+      postUrl.searchParams.set('participant', participantId);
+      postUrl.searchParams.set('lock_participant', '1');
+    }
+    postUrl.searchParams.set('mode', 'digital');
+    return postUrl.toString();
+  };
+
   const markTaskClearedInUrl = () => {
     const url = new URL(window.location.href);
     url.searchParams.delete('mtg_task_id');
@@ -1972,6 +1991,9 @@
       const nextState = getParticipantNextTaskState();
       const nextTaskId = String(nextState.next_task_id || '').trim();
       if (!nextTaskId) {
+        if (String(nextState.status || '').trim() === 'completed') {
+          window.location.href = buildPostTrialQuestionnaireUrl();
+        }
         return;
       }
 
@@ -2077,7 +2099,10 @@
     }
 
     if (participantNextButton) {
-      participantNextButton.style.display = hasPendingNextTask ? 'inline-block' : 'none';
+      participantNextButton.style.display = (hasPendingNextTask || showCompletedSequenceCard) ? 'inline-block' : 'none';
+      participantNextButton.textContent = hasPendingNextTask
+        ? 'Proceed to next task'
+        : 'Proceed to post-trial questionnaire';
     }
 
     if (!isShortFormTask || !taskId) {
