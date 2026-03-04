@@ -598,7 +598,9 @@
     window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
   };
 
-  const reconcileSharedTaskState = () => {
+  const reconcileSharedTaskState = (options) => {
+    const opts = options && typeof options === 'object' ? options : {};
+    const allowPanelAutoOpen = opts.allowPanelAutoOpen !== false;
     const url = new URL(window.location.href);
     const shouldClearTask = String(url.searchParams.get('mtg_task_clear') || '').trim() === '1';
     const sharedState = getSharedTaskState();
@@ -616,8 +618,10 @@
         setTaskSubscribedInTab(true);
       }
       markTaskActiveInUrl(sharedState);
-      enableResearchModeInUrl();
-      renderResearchPanel();
+      if (allowPanelAutoOpen) {
+        enableResearchModeInUrl();
+        renderResearchPanel();
+      }
       syncParticipantEndButton();
       syncTaskPromptCard();
       return;
@@ -641,8 +645,10 @@
         setTaskSubscribedInTab(true);
       }
       markTaskActiveInUrl(sharedState);
-      enableResearchModeInUrl();
-      renderResearchPanel();
+      if (allowPanelAutoOpen) {
+        enableResearchModeInUrl();
+        renderResearchPanel();
+      }
       syncParticipantEndButton();
       syncTaskPromptCard();
       return;
@@ -2706,7 +2712,7 @@
 
     window.addEventListener('storage', (event) => {
       if (event.key === taskStateKey) {
-        reconcileSharedTaskState();
+        reconcileSharedTaskState({ allowPanelAutoOpen: false });
         syncTaskPromptCard();
       }
 
@@ -2715,7 +2721,9 @@
       }
     });
 
-    window.addEventListener('focus', reconcileSharedTaskState);
+    window.addEventListener('focus', () => {
+      reconcileSharedTaskState({ allowPanelAutoOpen: false });
+    });
     window.addEventListener('focus', () => {
       reconcileTaskStateFromServer('focus');
     });
@@ -2728,7 +2736,7 @@
             referrer: ''
           });
         }
-        reconcileSharedTaskState();
+        reconcileSharedTaskState({ allowPanelAutoOpen: false });
         reconcileTaskStateFromServer('visible');
         syncTaskPromptCard();
         return;
