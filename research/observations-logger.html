@@ -224,6 +224,7 @@
       ];
       const labelById = Object.fromEntries(presetTaskPairs);
       const idByLabel = Object.fromEntries(presetTaskPairs.map(([id, label]) => [label, id]));
+      let pendingNextTask = null;
       const scenarioCriteria = {
         scenario_card_1: [
           { id: 's1_surface', label: 'Places the device on a stable, level surface.' },
@@ -476,6 +477,10 @@
         const currentKey = getCurrentTaskKey();
         const taskActive = active.key && active.key === currentKey;
 
+        if (!taskActive && pendingNextTask && pendingNextTask.task_id === taskId) {
+          return `Next: Click Start Next Task to begin ${taskId}.`;
+        }
+
         if (!taskActive) return 'Next: Start task timer.';
 
         if (isScenarioTaskId(taskId)) {
@@ -502,7 +507,39 @@
         return 'Next: End task when finished.';
       };
 
+      const getNextPresetTask = (taskId) => {
+        const currentIndex = presetTaskPairs.findIndex(([id]) => id === String(taskId || '').trim());
+        if (currentIndex < 0 || currentIndex >= presetTaskPairs.length - 1) {
+          return null;
+        }
+        const [nextTaskId, nextTaskLabel] = presetTaskPairs[currentIndex + 1];
+        return { task_id: nextTaskId, task_label: nextTaskLabel };
+      };
+
+      const queueNextTask = (completedTaskId) => {
+        const nextTask = getNextPresetTask(completedTaskId);
+        if (!nextTask) {
+          pendingNextTask = null;
+          return false;
+        }
+
+        pendingNextTask = nextTask;
+        taskIdSelect.value = nextTask.task_id;
+        taskLabelSelect.value = nextTask.task_label;
+        syncCustomTaskVisibility();
+        return true;
+      };
+
+      const clearPendingNextTaskIfTaskChanged = () => {
+        if (!pendingNextTask) return;
+        if (getTaskIdValue() !== pendingNextTask.task_id) {
+          pendingNextTask = null;
+        }
+      };
+
       const updateActionState = () => {
+        clearPendingNextTaskIfTaskChanged();
+
         const participantId = String(participantInput.value || '').trim();
         const taskId = getTaskIdValue();
         const manualPage = String(manualPageInput.value || '').trim();
@@ -514,6 +551,7 @@
         const active = getActiveTaskState();
         const currentKey = getCurrentTaskKey();
         const taskActive = Boolean(active.key && active.key === currentKey);
+        const readyToStartNextTask = Boolean(!taskActive && pendingNextTask && pendingNextTask.task_id === taskId && participantId);
 
         startButton.disabled = !hasCommon || taskActive;
         pageButton.disabled = !hasCommon || !manualPage;
@@ -531,7 +569,15 @@
         });
 
         submitCriteriaButton.disabled = !hasCommon || !taskActive || !isScenario || hasMissingCriteria;
-        endButton.disabled = !hasCommon || !taskActive;
+        if (readyToStartNextTask) {
+          endButton.textContent = 'Start Next Task';
+          endButton.classList.remove('secondary');
+          endButton.disabled = false;
+        } else {
+          endButton.textContent = 'End Task';
+          endButton.classList.add('secondary');
+          endButton.disabled = !hasCommon || !taskActive;
+        }
 
         if (nextActionEl) {
           nextActionEl.textContent = getNextActionHint();
@@ -755,7 +801,29 @@
 
       const startTask = async () => {
         if (!validateCommon()) return;
-        await submitObservation('task_start');
+        const ok = await submitObservation('task_start');
+        if (ok) {
+          pendingNextTask = null;
+        }
+        updateActionState();
+      };
+
+      const startNextTask = async () => {
+        if (!pendingNextTask) {
+          setStatus('No next task is queued. End a task first.', false);
+          return;
+        }
+
+        taskIdSelect.value = pendingNextTask.task_id;
+        taskLabelSelect.value = pendingNextTask.task_label;
+        syncCustomTaskVisibility();
+
+        const ok = await submitObservation('task_start');
+        if (ok) {
+          pendingNextTask = null;
+          renderCriteriaSection();
+          updateTaskTimer();
+        }
         updateActionState();
       };
 
@@ -784,7 +852,13 @@
           }
         }
 
-        await submitObservation('task_end');
+        const endedTaskId = taskId;
+        const ended = await submitObservation('task_end');
+        if (ended) {
+          queueNextTask(endedTaskId);
+          renderCriteriaSection();
+          updateTaskTimer();
+        }
         updateActionState();
       };
 
@@ -841,8 +915,27 @@
           return;
         }
 
-        await submitObservation('task_end');
+        const endedTaskId = taskId;
+        const ended = await submitObservation('task_end');
+        if (ended) {
+          queueNextTask(endedTaskId);
+          renderCriteriaSection();
+          updateTaskTimer();
+        }
         updateActionState();
+      };
+
+      const handleEndButtonAction = async () => {
+        const active = getActiveTaskState();
+        const currentKey = getCurrentTaskKey();
+        const taskActive = Boolean(active.key && active.key === currentKey);
+
+        if (!taskActive && pendingNextTask) {
+          await startNextTask();
+          return;
+        }
+
+        await endTask();
       };
 
       const submitCriteriaMarks = async () => {
@@ -904,7 +997,7 @@
       };
 
       el('btn-start').addEventListener('click', startTask);
-      el('btn-end').addEventListener('click', endTask);
+      el('btn-end').addEventListener('click', handleEndButtonAction);
       el('btn-page').addEventListener('click', logPageMarkAndClear);
       el('btn-score').addEventListener('click', logScoreAndEndTask);
       el('btn-note').addEventListener('click', logNoteAndClear);
@@ -946,7 +1039,7 @@
         event.preventDefault();
 
         if (key === 's') await startTask();
-        if (key === 'e') await endTask();
+        if (key === 'e') await handleEndButtonAction();
         if (key === 'p') await logPageMarkAndClear();
         if (key === 'c') await logScoreAndEndTask();
         if (key === 'm') await submitCriteriaMarks();
