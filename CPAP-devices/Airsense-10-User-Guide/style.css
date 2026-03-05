@@ -1162,6 +1162,48 @@ details.card[open] > summary h2::after {
   margin: 12px 0;
 }
 
+.about-control-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 24px 10px;
+  table-layout: fixed;
+}
+
+.about-control-table td {
+  vertical-align: top;
+}
+
+.about-control-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+@media (max-width: 640px) {
+  .about-control-table {
+    border-spacing: 8px 8px;
+  }
+
+  .about-control-table tr {
+    display: block;
+  }
+
+  .about-control-table td {
+    display: block;
+    width: 100%;
+    padding: 0 0 8px 0;
+  }
+
+  .about-control-table td:empty {
+    display: none;
+  }
+
+  .about-control-item img {
+    width: 56px !important;
+    height: 56px !important;
+  }
+}
+
 /* Search highlight styling */
 .search-highlight {
   background-color: #ffeb3b;
