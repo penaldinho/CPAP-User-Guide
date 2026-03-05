@@ -1214,13 +1214,16 @@ const insertQuestionnaireRecordPostgres = async (record) => {
         q5_confidence_setup,
         q6_confidence_troubleshooting,
         q7_mental_effort,
-        q8_format_preference,
-        q8_format_mix_details,
+        q8_tlx_frustration,
+        q9_tlx_perceived_performance,
+        q10_tlx_temporal_demand,
+        q11_format_preference,
+        q11_format_mix_details,
         free_text_notes,
         raw_response
       )
       VALUES (
-        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17
+        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20
       )
     `;
 
@@ -1238,6 +1241,9 @@ const insertQuestionnaireRecordPostgres = async (record) => {
       parseLikertSafely(response.post_q5_1_to_5),
       parseLikertSafely(response.post_q6_1_to_5),
       parseLikertSafely(response.post_q7_1_to_5),
+      parseLikertSafely(response.post_q8_frustration_1_to_5),
+      parseLikertSafely(response.post_q9_performance_1_to_5),
+      parseLikertSafely(response.post_q10_temporal_1_to_5),
       String(response.format_preference || '').trim(),
       String(response.format_mix_details || '').trim(),
       String(response.free_text_notes || '').trim(),

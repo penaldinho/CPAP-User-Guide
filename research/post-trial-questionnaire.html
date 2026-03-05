@@ -38,7 +38,7 @@
   <div class="wrap"><div class="card">
     <h1>Post-trial Questionnaire</h1>
     <p class="hint">Thinking about the instructions you just used for the CPAP device and the tasks you completed, please answer these questions.</p>
-    <p class="hint">For statements 1–7: 1 = Strongly disagree, 5 = Strongly agree.</p>
+    <p class="hint">For statements 1–10: 1 = Strongly disagree, 5 = Strongly agree.</p>
     <div class="hint" style="margin-bottom:6px;">Fields marked <span class="req">*</span> are required.</div>
 
     <div class="grid">
@@ -100,8 +100,23 @@
             <div class="likert"><span class="likert-anchor">Strongly disagree</span><label><input type="radio" name="post_q7" value="1" /> 1</label><label><input type="radio" name="post_q7" value="2" /> 2</label><label><input type="radio" name="post_q7" value="3" /> 3</label><label><input type="radio" name="post_q7" value="4" /> 4</label><label><input type="radio" name="post_q7" value="5" /> 5</label><span class="likert-anchor right">Strongly agree</span></div>
             <div class="error-hint"></div>
           </div>
+          <div class="q" id="q-post-q8">
+            <div>8. I felt frustrated while using these instructions.<span class="req">*</span></div>
+            <div class="likert"><span class="likert-anchor">Strongly disagree</span><label><input type="radio" name="post_q8" value="1" /> 1</label><label><input type="radio" name="post_q8" value="2" /> 2</label><label><input type="radio" name="post_q8" value="3" /> 3</label><label><input type="radio" name="post_q8" value="4" /> 4</label><label><input type="radio" name="post_q8" value="5" /> 5</label><span class="likert-anchor right">Strongly agree</span></div>
+            <div class="error-hint"></div>
+          </div>
+          <div class="q" id="q-post-q9">
+            <div>9. I felt I performed successfully on the tasks using these instructions.<span class="req">*</span></div>
+            <div class="likert"><span class="likert-anchor">Strongly disagree</span><label><input type="radio" name="post_q9" value="1" /> 1</label><label><input type="radio" name="post_q9" value="2" /> 2</label><label><input type="radio" name="post_q9" value="3" /> 3</label><label><input type="radio" name="post_q9" value="4" /> 4</label><label><input type="radio" name="post_q9" value="5" /> 5</label><span class="likert-anchor right">Strongly agree</span></div>
+            <div class="error-hint"></div>
+          </div>
+          <div class="q" id="q-post-q10">
+            <div>10. I felt time pressure while completing the tasks.<span class="req">*</span></div>
+            <div class="likert"><span class="likert-anchor">Strongly disagree</span><label><input type="radio" name="post_q10" value="1" /> 1</label><label><input type="radio" name="post_q10" value="2" /> 2</label><label><input type="radio" name="post_q10" value="3" /> 3</label><label><input type="radio" name="post_q10" value="4" /> 4</label><label><input type="radio" name="post_q10" value="5" /> 5</label><span class="likert-anchor right">Strongly agree</span></div>
+            <div class="error-hint"></div>
+          </div>
           <div class="q" id="q-format-preference">
-            <div>8. If you had to learn to use a similar medical device at home in the future, which format would you prefer?<span class="req">*</span></div>
+            <div>11. If you had to learn to use a similar medical device at home in the future, which format would you prefer?<span class="req">*</span></div>
             <div class="grid">
               <label><input type="radio" name="format_preference" value="printed_instructions" /> Printed instructions</label>
               <label><input type="radio" name="format_preference" value="online_website" /> Online interactive website</label>
@@ -228,6 +243,9 @@
       const postQ5 = radioValue('post_q5');
       const postQ6 = radioValue('post_q6');
       const postQ7 = radioValue('post_q7');
+      const postQ8 = radioValue('post_q8');
+      const postQ9 = radioValue('post_q9');
+      const postQ10 = radioValue('post_q10');
       const formatPreference = radioValue('format_preference');
       const formatMixDetails = String(document.getElementById('post_format_mix_details').value || '').trim();
       const questionnaireDurationMs = Math.max(0, Date.now() - questionnaireStartedAtMs);
@@ -240,6 +258,9 @@
       if (!postQ5) { setQuestionError('q-post-q5', 'Please select a rating.'); hasErrors = true; }
       if (!postQ6) { setQuestionError('q-post-q6', 'Please select a rating.'); hasErrors = true; }
       if (!postQ7) { setQuestionError('q-post-q7', 'Please select a rating.'); hasErrors = true; }
+      if (!postQ8) { setQuestionError('q-post-q8', 'Please select a rating.'); hasErrors = true; }
+      if (!postQ9) { setQuestionError('q-post-q9', 'Please select a rating.'); hasErrors = true; }
+      if (!postQ10) { setQuestionError('q-post-q10', 'Please select a rating.'); hasErrors = true; }
       if (!formatPreference) { setQuestionError('q-format-preference', 'Please select one option.'); hasErrors = true; }
       if (formatPreference === 'mix_of_formats' && !formatMixDetails) { setQuestionError('q-format-preference', 'Please specify which formats were mixed.'); hasErrors = true; }
 
@@ -256,6 +277,9 @@
         post_q5_1_to_5: postQ5,
         post_q6_1_to_5: postQ6,
         post_q7_1_to_5: postQ7,
+        post_q8_frustration_1_to_5: postQ8,
+        post_q9_performance_1_to_5: postQ9,
+        post_q10_temporal_1_to_5: postQ10,
         format_preference: formatPreference,
         format_mix_details: formatMixDetails,
         questionnaire_duration_ms: questionnaireDurationMs,

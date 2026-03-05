@@ -464,8 +464,11 @@ CREATE TABLE IF NOT EXISTS post_trial_questionnaire (
   q5_confidence_setup INTEGER,
   q6_confidence_troubleshooting INTEGER,
   q7_mental_effort INTEGER,
-  q8_format_preference TEXT,
-  q8_format_mix_details TEXT,
+  q8_tlx_frustration INTEGER,
+  q9_tlx_perceived_performance INTEGER,
+  q10_tlx_temporal_demand INTEGER,
+  q11_format_preference TEXT,
+  q11_format_mix_details TEXT,
   free_text_notes TEXT,
   raw_response JSONB
 );
@@ -495,10 +498,77 @@ ALTER TABLE post_trial_questionnaire
   ADD COLUMN IF NOT EXISTS q7_mental_effort INTEGER;
 
 ALTER TABLE post_trial_questionnaire
-  ADD COLUMN IF NOT EXISTS q8_format_preference TEXT;
+  ADD COLUMN IF NOT EXISTS q8_tlx_frustration INTEGER;
 
 ALTER TABLE post_trial_questionnaire
-  ADD COLUMN IF NOT EXISTS q8_format_mix_details TEXT;
+  ADD COLUMN IF NOT EXISTS q9_tlx_perceived_performance INTEGER;
+
+ALTER TABLE post_trial_questionnaire
+  ADD COLUMN IF NOT EXISTS q10_tlx_temporal_demand INTEGER;
+
+ALTER TABLE post_trial_questionnaire
+  ADD COLUMN IF NOT EXISTS q11_format_preference TEXT;
+
+ALTER TABLE post_trial_questionnaire
+  ADD COLUMN IF NOT EXISTS q11_format_mix_details TEXT;
+
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_name = 'post_trial_questionnaire'
+      AND column_name = 'q9_tlx_frustration'
+  ) THEN
+    ALTER TABLE post_trial_questionnaire RENAME COLUMN q9_tlx_frustration TO q8_tlx_frustration;
+  END IF;
+
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_name = 'post_trial_questionnaire'
+      AND column_name = 'q10_tlx_perceived_performance'
+  ) THEN
+    ALTER TABLE post_trial_questionnaire RENAME COLUMN q10_tlx_perceived_performance TO q9_tlx_perceived_performance;
+  END IF;
+
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_name = 'post_trial_questionnaire'
+      AND column_name = 'q8_format_preference'
+  ) THEN
+    ALTER TABLE post_trial_questionnaire RENAME COLUMN q8_format_preference TO q11_format_preference;
+  END IF;
+
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_name = 'post_trial_questionnaire'
+      AND column_name = 'q8_format_mix_details'
+  ) THEN
+    ALTER TABLE post_trial_questionnaire RENAME COLUMN q8_format_mix_details TO q11_format_mix_details;
+  END IF;
+
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_name = 'post_trial_questionnaire'
+      AND column_name = 'q10_format_preference'
+  ) THEN
+    ALTER TABLE post_trial_questionnaire RENAME COLUMN q10_format_preference TO q11_format_preference;
+  END IF;
+
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_name = 'post_trial_questionnaire'
+      AND column_name = 'q10_format_mix_details'
+  ) THEN
+    ALTER TABLE post_trial_questionnaire RENAME COLUMN q10_format_mix_details TO q11_format_mix_details;
+  END IF;
+END
+$$;
 
 CREATE INDEX IF NOT EXISTS idx_post_trial_questionnaire_participant_time
   ON post_trial_questionnaire (participant_id, received_at DESC);
