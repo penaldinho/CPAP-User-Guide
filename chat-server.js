@@ -2810,7 +2810,7 @@ app.post('/api/observer-notes', async (req, res) => {
     }
 
     if (actionType === 'page_mark' && !manualPage) {
-      return res.status(400).json({ error: 'manual_page is required for page_mark' });
+      return res.status(400).json({ error: 'manual_page (page/section) is required for page_mark' });
     }
 
     if (actionType === 'scenario_score') {

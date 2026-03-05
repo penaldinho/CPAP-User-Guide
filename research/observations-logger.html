@@ -108,8 +108,8 @@
 
         <div class="row-action full">
           <label style="margin:0;">
-            Manual Page (optional)
-            <input id="manual_page" type="text" placeholder="e.g. 23" />
+            Manual Page/Section (optional)
+            <input id="manual_page" type="text" placeholder="e.g. 23 or Setup/Power" />
           </label>
           <button id="btn-page" type="button" class="secondary">Log Page Mark</button>
         </div>
@@ -660,7 +660,7 @@
           : null;
 
         if (actionType === 'page_mark' && !manualPage) {
-          setStatus('Enter a manual page before logging a page mark.', false);
+          setStatus('Enter a manual page/section before logging a page mark.', false);
           manualPageInput.focus();
           return false;
         }
