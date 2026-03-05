@@ -315,6 +315,7 @@ const observerNotesSqlColumns = [
   'manual_page',
   'scenario_score',
   'task_length_ms',
+  'help_instances_count',
   'error_severity',
   'error_text',
   'notes',
@@ -466,6 +467,7 @@ const projectObserverNoteRecord = (record) => ({
   manual_page: record.manual_page || '',
   scenario_score: Number.isFinite(parseIntegerSafely(record.scenario_score)) ? parseIntegerSafely(record.scenario_score) : null,
   task_length_ms: Number.isFinite(parseIntegerSafely(record.task_length_ms)) ? parseIntegerSafely(record.task_length_ms) : null,
+  help_instances_count: Number.isFinite(parseIntegerSafely(record.help_instances_count)) ? parseIntegerSafely(record.help_instances_count) : 0,
   error_severity: record.error_severity || '',
   error_text: record.error_text || '',
   notes: record.notes || '',
@@ -864,6 +866,7 @@ const normalizePhysicalTrialRecordForSql = (record) => {
 const normalizeObserverNoteRecordForSql = (record) => {
   const projected = projectObserverNoteRecord(record);
   const actionType = String(projected.action_type || '').trim().toLowerCase();
+  const helpInstancesCount = parseBoundedIntegerSafely(projected.help_instances_count, 0, 1000000);
   return {
     ...projected,
     action_type: actionType,
@@ -875,6 +878,7 @@ const normalizeObserverNoteRecordForSql = (record) => {
     trial_mode: String(projected.trial_mode || 'physical').trim().toLowerCase() === 'digital' ? 'digital' : 'physical',
     scenario_score: parseIntegerSafely(projected.scenario_score),
     task_length_ms: parseIntegerSafely(projected.task_length_ms),
+    help_instances_count: Number.isFinite(helpInstancesCount) ? helpInstancesCount : 0,
     received_at: parseDateSafely(record.received_at || projected.received_at || new Date().toISOString()),
     timestamp: parseDateSafely(record.timestamp || projected.timestamp)
   };
@@ -2788,6 +2792,7 @@ app.post('/api/observer-notes', async (req, res) => {
     const criterionStepTimeMs = parseIntegerSafely(payload && payload.criterion_step_time_ms);
     const scenarioScore = parseIntegerSafely(payload && payload.scenario_score);
     const taskLengthMs = parseIntegerSafely(payload && payload.task_length_ms);
+    const helpInstancesCount = parseIntegerSafely(payload && payload.help_instances_count);
 
     if (!payload || !participantId || !taskId || !actionType) {
       return res.status(400).json({ error: 'participant_id, task_id, and action_type are required' });
@@ -2847,6 +2852,10 @@ app.post('/api/observer-notes', async (req, res) => {
       return res.status(400).json({ error: 'task_length_ms is required for task_end and must be >= 0' });
     }
 
+    if (helpInstancesCount !== null && helpInstancesCount < 0) {
+      return res.status(400).json({ error: 'help_instances_count must be >= 0 when provided' });
+    }
+
     ensureTelemetryStorage();
 
     const record = projectObserverNoteRecord({
@@ -2858,6 +2867,7 @@ app.post('/api/observer-notes', async (req, res) => {
       error_text: actionType === 'error' ? errorText : '',
       scenario_score: actionType === 'scenario_score' ? scenarioScore : null,
       task_length_ms: actionType === 'task_end' ? taskLengthMs : null,
+      help_instances_count: helpInstancesCount !== null ? helpInstancesCount : 0,
       source: 'observations_logger',
       trial_mode: 'physical',
       received_at: new Date().toISOString(),

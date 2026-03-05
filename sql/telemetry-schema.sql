@@ -183,13 +183,15 @@ CREATE TABLE IF NOT EXISTS observer_notes (
   manual_page TEXT,
   scenario_score INTEGER,
   task_length_ms INTEGER,
+  help_instances_count INTEGER NOT NULL DEFAULT 0,
   error_severity TEXT,
   error_text TEXT,
   notes TEXT,
   action_type TEXT NOT NULL,
   source TEXT NOT NULL DEFAULT 'observations_logger',
   trial_mode TEXT NOT NULL DEFAULT 'physical',
-  CONSTRAINT observer_notes_scenario_score_range CHECK (scenario_score IS NULL OR (scenario_score >= 0 AND scenario_score <= 2))
+  CONSTRAINT observer_notes_scenario_score_range CHECK (scenario_score IS NULL OR (scenario_score >= 0 AND scenario_score <= 2)),
+  CONSTRAINT observer_notes_help_instances_nonnegative CHECK (help_instances_count >= 0)
 );
 
 ALTER TABLE observer_notes
@@ -199,10 +201,30 @@ ALTER TABLE observer_notes
   ADD COLUMN IF NOT EXISTS task_length_ms INTEGER;
 
 ALTER TABLE observer_notes
+  ADD COLUMN IF NOT EXISTS help_instances_count INTEGER;
+
+ALTER TABLE observer_notes
   ADD COLUMN IF NOT EXISTS error_severity TEXT;
 
 ALTER TABLE observer_notes
   ADD COLUMN IF NOT EXISTS error_text TEXT;
+
+ALTER TABLE observer_notes
+  ALTER COLUMN help_instances_count SET DEFAULT 0;
+
+UPDATE observer_notes
+SET help_instances_count = 0
+WHERE help_instances_count IS NULL;
+
+ALTER TABLE observer_notes
+  ALTER COLUMN help_instances_count SET NOT NULL;
+
+ALTER TABLE observer_notes
+  DROP CONSTRAINT IF EXISTS observer_notes_help_instances_nonnegative;
+
+ALTER TABLE observer_notes
+  ADD CONSTRAINT observer_notes_help_instances_nonnegative
+  CHECK (help_instances_count >= 0);
 
 ALTER TABLE observer_notes
   ALTER COLUMN trial_mode SET DEFAULT 'physical';
