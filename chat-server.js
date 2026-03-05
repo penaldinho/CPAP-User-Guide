@@ -473,7 +473,7 @@ const projectObserverNoteRecord = (record) => ({
   notes: record.notes || '',
   action_type: record.action_type || '',
   source: record.source || 'observations_logger',
-  trial_mode: record.trial_mode || 'physical'
+  trial_mode: record.trial_mode ?? null
 });
 
 const readTelemetryRecordsFromNdjson = (filePath) => {
@@ -867,6 +867,7 @@ const normalizeObserverNoteRecordForSql = (record) => {
   const projected = projectObserverNoteRecord(record);
   const actionType = String(projected.action_type || '').trim().toLowerCase();
   const helpInstancesCount = parseBoundedIntegerSafely(projected.help_instances_count, 0, 1000000);
+  const trialModeRaw = String(projected.trial_mode || '').trim().toLowerCase();
   return {
     ...projected,
     action_type: actionType,
@@ -875,7 +876,7 @@ const normalizeObserverNoteRecordForSql = (record) => {
       : null,
     error_text: String(projected.error_text || '').trim(),
     source: String(projected.source || 'observations_logger').trim() || 'observations_logger',
-    trial_mode: String(projected.trial_mode || 'physical').trim().toLowerCase() === 'digital' ? 'digital' : 'physical',
+    trial_mode: trialModeRaw === 'digital' ? 'digital' : (trialModeRaw === 'physical' ? 'physical' : null),
     scenario_score: parseIntegerSafely(projected.scenario_score),
     task_length_ms: parseIntegerSafely(projected.task_length_ms),
     help_instances_count: Number.isFinite(helpInstancesCount) ? helpInstancesCount : 0,
@@ -1064,7 +1065,12 @@ const insertObserverStepMarkRecordPostgres = async (record) => {
     parseBoundedIntegerSafely(payload.criterion_step_time_ms, 0, 24 * 60 * 60 * 1000),
     String(payload.observer_note || '').trim(),
     String(payload.source || 'observations_logger').trim() || 'observations_logger',
-    String(payload.trial_mode || 'physical').trim().toLowerCase() === 'digital' ? 'digital' : 'physical',
+    (() => {
+      const trialModeRaw = String(payload.trial_mode || '').trim().toLowerCase();
+      if (trialModeRaw === 'digital') return 'digital';
+      if (trialModeRaw === 'physical') return 'physical';
+      return null;
+    })(),
     JSON.stringify(payload)
   ];
 
@@ -2799,6 +2805,8 @@ app.post('/api/observer-notes', async (req, res) => {
     const scenarioScore = parseIntegerSafely(payload && payload.scenario_score);
     const taskLengthMs = parseIntegerSafely(payload && payload.task_length_ms);
     const helpInstancesCount = parseIntegerSafely(payload && payload.help_instances_count);
+    const trialModeRaw = String(payload && payload.trial_mode || '').trim().toLowerCase();
+    const trialMode = trialModeRaw === 'digital' ? 'digital' : (trialModeRaw === 'physical' ? 'physical' : null);
 
     if (!payload || !participantId || !taskId || !actionType) {
       return res.status(400).json({ error: 'participant_id, task_id, and action_type are required' });
@@ -2807,6 +2815,10 @@ app.post('/api/observer-notes', async (req, res) => {
     const allowedActionTypes = new Set(['task_start', 'task_end', 'page_mark', 'scenario_score', 'note', 'error', 'step_mark']);
     if (!allowedActionTypes.has(actionType)) {
       return res.status(400).json({ error: 'action_type must be one of task_start, task_end, page_mark, scenario_score, note, error, step_mark' });
+    }
+
+    if (!trialMode) {
+      return res.status(400).json({ error: 'trial_mode is required and must be physical or digital' });
     }
 
     if (actionType === 'page_mark' && !manualPage) {
@@ -2875,7 +2887,7 @@ app.post('/api/observer-notes', async (req, res) => {
       task_length_ms: actionType === 'task_end' ? taskLengthMs : null,
       help_instances_count: helpInstancesCount !== null ? helpInstancesCount : 0,
       source: 'observations_logger',
-      trial_mode: 'physical',
+      trial_mode: trialMode,
       received_at: new Date().toISOString(),
       timestamp: payload.timestamp || new Date().toISOString()
     });
@@ -2895,7 +2907,7 @@ app.post('/api/observer-notes', async (req, res) => {
         criterion_step_time_ms: criterionStepTimeMs,
         observer_note: notes,
         source: 'observations_logger',
-        trial_mode: 'physical',
+        trial_mode: trialMode,
         action_type: actionType
       });
     } else {

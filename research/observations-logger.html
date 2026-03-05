@@ -48,9 +48,17 @@
   <div class="wrap">
     <div class="card">
       <h1>Observations Logger</h1>
-      <p>Log observer page marks, scenario scores, and notes during physical-manual trials.</p>
+      <p>Log observer page marks, scenario scores, and notes during manual trials.</p>
 
       <div class="grid">
+        <label>
+          Trial Mode
+          <select id="trial_mode">
+            <option value="" selected>Not set</option>
+            <option value="physical">Physical</option>
+            <option value="digital">Digital</option>
+          </select>
+        </label>
         <label>
           Participant ID
           <input id="participant_id" type="text" placeholder="e.g. P01" required />
@@ -185,6 +193,7 @@
 
       const el = (id) => document.getElementById(id);
       const participantInput = el('participant_id');
+      const trialModeSelect = el('trial_mode');
       const taskIdSelect = el('task_id');
       const taskLabelSelect = el('task_label');
       const taskIdCustomInput = el('task_id_custom');
@@ -469,8 +478,10 @@
 
       const getNextActionHint = () => {
         const participantId = String(participantInput.value || '').trim();
+        const trialModeRaw = String(trialModeSelect && trialModeSelect.value || '').trim().toLowerCase();
         const taskId = getTaskIdValue();
         if (!participantId) return 'Next: Enter participant ID.';
+        if (!['physical', 'digital'].includes(trialModeRaw)) return 'Next: Select trial mode (physical or digital).';
         if (!taskId) return 'Next: Select task ID and label.';
 
         const active = getActiveTaskState();
@@ -541,13 +552,15 @@
         clearPendingNextTaskIfTaskChanged();
 
         const participantId = String(participantInput.value || '').trim();
+        const trialModeRaw = String(trialModeSelect && trialModeSelect.value || '').trim().toLowerCase();
+        const hasTrialMode = ['physical', 'digital'].includes(trialModeRaw);
         const taskId = getTaskIdValue();
         const manualPage = String(manualPageInput.value || '').trim();
         const notes = String(notesInput.value || '').trim();
         const errorText = String(errorTextInput.value || '').trim();
         const errorSeverity = String(errorSeveritySelect.value || '').trim().toLowerCase();
 
-        const hasCommon = Boolean(participantId && taskId);
+        const hasCommon = Boolean(participantId && taskId && hasTrialMode);
         const active = getActiveTaskState();
         const currentKey = getCurrentTaskKey();
         const taskActive = Boolean(active.key && active.key === currentKey);
@@ -624,6 +637,13 @@
         if (!String(participantInput.value || '').trim()) {
           setStatus('Participant ID is required.', false);
           participantInput.focus();
+          return false;
+        }
+
+        const trialModeRaw = String(trialModeSelect && trialModeSelect.value || '').trim().toLowerCase();
+        if (!['physical', 'digital'].includes(trialModeRaw)) {
+          setStatus('Trial mode is required. Select physical or digital.', false);
+          trialModeSelect.focus();
           return false;
         }
 
@@ -745,7 +765,7 @@
           notes,
           action_type: actionType,
           source: 'observations_logger',
-          trial_mode: 'physical'
+          trial_mode: String(trialModeSelect && trialModeSelect.value || '').trim().toLowerCase()
         };
 
         try {
@@ -1021,6 +1041,7 @@
       errorTextInput.addEventListener('input', updateActionState);
       errorSeveritySelect.addEventListener('change', updateActionState);
       scenarioScoreSelect.addEventListener('change', updateActionState);
+      trialModeSelect.addEventListener('change', updateActionState);
       manualPageInput.addEventListener('keydown', async (event) => {
         if (event.key !== 'Enter') return;
         event.preventDefault();

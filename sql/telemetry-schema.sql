@@ -189,7 +189,7 @@ CREATE TABLE IF NOT EXISTS observer_notes (
   notes TEXT,
   action_type TEXT NOT NULL,
   source TEXT NOT NULL DEFAULT 'observations_logger',
-  trial_mode TEXT NOT NULL DEFAULT 'physical',
+  trial_mode TEXT,
   CONSTRAINT observer_notes_scenario_score_range CHECK (scenario_score IS NULL OR (scenario_score >= 0 AND scenario_score <= 2)),
   CONSTRAINT observer_notes_help_instances_nonnegative CHECK (help_instances_count >= 0)
 );
@@ -227,11 +227,10 @@ ALTER TABLE observer_notes
   CHECK (help_instances_count >= 0);
 
 ALTER TABLE observer_notes
-  ALTER COLUMN trial_mode SET DEFAULT 'physical';
+  ALTER COLUMN trial_mode DROP DEFAULT;
 
-UPDATE observer_notes
-SET trial_mode = 'physical'
-WHERE trial_mode IS NULL;
+ALTER TABLE observer_notes
+  ALTER COLUMN trial_mode DROP NOT NULL;
 
 CREATE INDEX IF NOT EXISTS idx_observer_notes_participant_time
   ON observer_notes (participant_id, received_at DESC);
@@ -256,7 +255,7 @@ CREATE TABLE IF NOT EXISTS observer_step_marks (
   criterion_step_time_ms INTEGER,
   observer_note TEXT,
   source TEXT NOT NULL DEFAULT 'observations_logger',
-  trial_mode TEXT NOT NULL DEFAULT 'physical',
+  trial_mode TEXT,
   raw_payload JSONB,
   CONSTRAINT observer_step_marks_outcome_check CHECK (criterion_outcome IN ('correct', 'incorrect'))
 );
@@ -274,11 +273,10 @@ ALTER TABLE observer_step_marks
   ADD COLUMN IF NOT EXISTS raw_payload JSONB;
 
 ALTER TABLE observer_step_marks
-  ALTER COLUMN trial_mode SET DEFAULT 'physical';
+  ALTER COLUMN trial_mode DROP DEFAULT;
 
-UPDATE observer_step_marks
-SET trial_mode = 'physical'
-WHERE trial_mode IS NULL;
+ALTER TABLE observer_step_marks
+  ALTER COLUMN trial_mode DROP NOT NULL;
 
 CREATE INDEX IF NOT EXISTS idx_observer_step_marks_participant_time
   ON observer_step_marks (participant_id, received_at DESC);
