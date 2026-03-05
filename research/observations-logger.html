@@ -122,6 +122,11 @@
           <button id="btn-note" type="button" class="secondary">Log Note</button>
         </div>
 
+        <label>
+          Help Instances Count (optional)
+          <input id="help_instances_count" type="number" min="0" step="1" placeholder="0" />
+        </label>
+
         <label class="full">
           Error Description
           <textarea id="error_text" placeholder="Describe the observed error"></textarea>
@@ -191,6 +196,7 @@
       const errorSeveritySelect = el('error_severity');
       const taskTimerEl = el('task_timer');
       const notesInput = el('notes');
+      const helpInstancesInput = el('help_instances_count');
       const errorTextInput = el('error_text');
       const criteriaSectionEl = el('criteria_section');
       const criteriaSubtitleEl = el('criteria_subtitle');
@@ -595,6 +601,8 @@
         const taskId = getTaskIdValue();
         const manualPage = String(manualPageInput.value || '').trim();
         const notes = String((overrides && overrides.notes) ?? (notesInput.value || '')).trim();
+        const helpInstancesRaw = String(helpInstancesInput.value || '').trim();
+        const helpInstancesCount = helpInstancesRaw === '' ? 0 : Number.parseInt(helpInstancesRaw, 10);
         const errorText = String(errorTextInput.value || '').trim();
         const scenarioScoreRaw = String(scenarioScoreSelect.value || '').trim();
         const errorSeverityRaw = String(errorSeveritySelect.value || '').trim().toLowerCase();
@@ -644,6 +652,12 @@
           }
         }
 
+        if (!Number.isFinite(helpInstancesCount) || helpInstancesCount < 0) {
+          setStatus('Help instances count must be a whole number of 0 or greater.', false);
+          helpInstancesInput.focus();
+          return false;
+        }
+
         if (actionType === 'step_mark') {
           if (!criterionId || !criterionLabel) {
             setStatus('Criterion ID and label are required for step mark.', false);
@@ -679,6 +693,7 @@
           criterion_label: actionType === 'step_mark' ? criterionLabel : null,
           criterion_outcome: actionType === 'step_mark' ? criterionOutcome : null,
           criterion_step_time_ms: actionType === 'step_mark' ? criterionStepTimeMs : null,
+          help_instances_count: helpInstancesCount,
           error_severity: actionType === 'error' ? errorSeverityRaw : null,
           error_text: actionType === 'error' ? errorText : '',
           notes,
