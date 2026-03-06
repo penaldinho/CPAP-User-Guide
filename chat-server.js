@@ -2373,6 +2373,9 @@ Rules:
 3) If the required distance is greater than the stated tubing length, answer "insufficient" and quantify the shortfall.
 4) Only cite section titles that contain the supporting fact (for example cite "Technical Specifications" for tubing length if that is where it appears).
 5) Do not infer facts that are not stated in the manual.
+6) For imperial outputs, prefer feet and inches format (for example 6 ft 6 in) instead of decimal feet unless the user explicitly asks for decimal values.
+7) Keep conversions readable and concise; avoid unnecessary precision.
+8) Preserve the manual's original measurement wording when it already answers the question; do not restate the same value in another unit unless needed for comparison clarity or explicitly requested by the user.
 
 Manual Content:
 ${manualContent}`;
