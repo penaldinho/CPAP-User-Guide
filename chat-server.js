@@ -2354,16 +2354,130 @@ const guideEntityAliases = {
 
 const escapeRegExp = (value) => String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
+const containsAlias = (text, aliases) => {
+  const normalized = String(text || '').toLowerCase();
+  if (!normalized || !Array.isArray(aliases) || !aliases.length) {
+    return false;
+  }
+
+  return aliases.some((alias) => {
+    const pattern = new RegExp(`(^|[^a-z0-9])${escapeRegExp(alias)}([^a-z0-9]|$)`, 'i');
+    return pattern.test(normalized);
+  });
+};
+
+const scopeAnalysisStopwords = new Set([
+  'a', 'an', 'and', 'are', 'as', 'at', 'be', 'before', 'by', 'can', 'could', 'do', 'for', 'from', 'get', 'good',
+  'guide', 'help', 'how', 'i', 'if', 'in', 'into', 'is', 'it', 'its', 'make', 'manual', 'me', 'my', 'of', 'on',
+  'or', 'outlined', 'please', 'the', 'their', 'them', 'then', 'this', 'to', 'use', 'user', 'using', 'what',
+  'when', 'with', 'would', 'you', 'your'
+]);
+
+const normalizeForComparison = (value) => String(value || '')
+  .toLowerCase()
+  .replace(/[^a-z0-9]+/g, ' ')
+  .replace(/\s+/g, ' ')
+  .trim();
+
+const getMeaningfulSearchTokens = (text) => {
+  const normalized = normalizeForComparison(text);
+  if (!normalized) {
+    return [];
+  }
+
+  return [...new Set(
+    normalized
+      .split(' ')
+      .map((token) => token.trim())
+      .filter((token) => token.length >= 3)
+      .filter((token) => !scopeAnalysisStopwords.has(token))
+  )];
+};
+
+const extractRequestedNamedPhrases = (message) => {
+  const text = String(message || '');
+  const phrases = new Set();
+  const patterns = [
+    /["“]([^"”]{2,60})["”]\s+(?:option|function|feature|setting|mode)/gi,
+    /(?:use|using|run|check|enable|open|select|adjust|set|turn on|turn off)\s+(?:the\s+)?([a-z][a-z0-9]*(?:\s+[a-z0-9][a-z0-9/-]*){0,4})\s+(?:option|function|feature|setting|mode)\b/gi
+  ];
+
+  for (const pattern of patterns) {
+    let match;
+    while ((match = pattern.exec(text)) !== null) {
+      const phrase = normalizeForComparison(match[1]);
+      if (phrase && phrase.split(' ').length >= 2) {
+        phrases.add(phrase);
+      }
+    }
+  }
+
+  return [...phrases];
+};
+
+const splitMessageIntoClauses = (message) => String(message || '')
+  .split(/(?:,|;|\?|\.|\band then\b|\bthen\b|\band\b|\bwhile\b|\bbefore\b|\bafter\b)/i)
+  .map((part) => part.trim())
+  .filter((part) => part.length >= 12);
+
+const assessClauseSupport = (clause, manualContent) => {
+  const normalizedManual = normalizeForComparison(manualContent);
+  const tokens = getMeaningfulSearchTokens(clause);
+  if (!tokens.length) {
+    return {
+      clause,
+      tokens: [],
+      matchedTokens: [],
+      coverage: 0,
+      supported: false,
+      unsupported: false
+    };
+  }
+
+  const matchedTokens = tokens.filter((token) => {
+    const pattern = new RegExp(`(^|[^a-z0-9])${escapeRegExp(token)}([^a-z0-9]|$)`);
+    return pattern.test(normalizedManual);
+  });
+  const coverage = matchedTokens.length / tokens.length;
+
+  return {
+    clause,
+    tokens,
+    matchedTokens,
+    coverage,
+    supported: matchedTokens.length >= Math.max(2, Math.ceil(tokens.length * 0.45)),
+    unsupported: matchedTokens.length === 0 || coverage < 0.25
+  };
+};
+
+const getRequestScopeSignals = (message, manualContent) => {
+  const normalizedManual = normalizeForComparison(manualContent);
+  const namedPhrases = extractRequestedNamedPhrases(message);
+  const unsupportedNamedPhrases = namedPhrases.filter((phrase) => !normalizedManual.includes(phrase));
+  const clauseAssessments = splitMessageIntoClauses(message)
+    .map((clause) => assessClauseSupport(clause, manualContent))
+    .filter((entry) => entry.tokens.length);
+
+  const supportedClauses = clauseAssessments.filter((entry) => entry.supported);
+  const unsupportedClauses = clauseAssessments.filter((entry) => entry.unsupported);
+  const hasMixedScopeRisk = unsupportedNamedPhrases.length > 0
+    || (supportedClauses.length > 0 && unsupportedClauses.length > 0);
+
+  return {
+    unsupportedNamedPhrases,
+    supportedClauses,
+    unsupportedClauses,
+    hasMixedScopeRisk
+  };
+};
+
 const getMentionedGuideKeys = (text) => {
   const normalized = String(text || '').toLowerCase();
   if (!normalized) return [];
 
   const mentioned = [];
   for (const [guideKey, aliases] of Object.entries(guideEntityAliases)) {
-    const hasAlias = aliases.some((alias) => {
-      const pattern = new RegExp(`(^|[^a-z0-9])${escapeRegExp(alias)}([^a-z0-9]|$)`, 'i');
-      return pattern.test(normalized);
-    });
+    const hasAlias = containsAlias(normalized, aliases);
 
     if (hasAlias) {
       mentioned.push(guideKey);
@@ -2371,6 +2485,80 @@ const getMentionedGuideKeys = (text) => {
   }
 
   return mentioned;
+};
+
+const buildAdaptiveScopePromptNote = (scopeSignals) => {
+  if (!scopeSignals || !scopeSignals.hasMixedScopeRisk) {
+    return '';
+  }
+
+  const lines = ['Question-specific scope notes:'];
+  lines.push('- This question appears to mix parts that are supported by this guide with parts that may not be supported explicitly.');
+  lines.push('- Answer only the parts directly supported by this guide, and clearly separate any unsupported part.');
+  lines.push('- Do not invent or substitute similar features, settings, options, or steps from other guides or from general device knowledge.');
+
+  if (Array.isArray(scopeSignals.unsupportedNamedPhrases) && scopeSignals.unsupportedNamedPhrases.length) {
+    lines.push(`- Requested named items not found in this guide: ${scopeSignals.unsupportedNamedPhrases.map((phrase) => `"${phrase}"`).join(', ')}.`);
+  }
+
+  if (Array.isArray(scopeSignals.supportedClauses) && scopeSignals.supportedClauses.length) {
+    lines.push(`- Likely supported parts of the question: ${scopeSignals.supportedClauses.map((entry) => `"${entry.clause}"`).join('; ')}.`);
+  }
+
+  if (Array.isArray(scopeSignals.unsupportedClauses) && scopeSignals.unsupportedClauses.length) {
+    lines.push(`- Lower-confidence parts that may not be covered directly: ${scopeSignals.unsupportedClauses.map((entry) => `"${entry.clause}"`).join('; ')}.`);
+  }
+
+  return lines.join('\n');
+};
+
+const responseAcknowledgesMixedScope = (response, scopeSignals) => {
+  const text = String(response || '').toLowerCase();
+  if (!text || !scopeSignals || !scopeSignals.hasMixedScopeRisk) {
+    return false;
+  }
+
+  const hasNegativeFraming = /\bdoes not\b|\bdoesn't\b|\bnot\s+(?:described|covered|included|available|present|documented|mentioned|in\s+this\s+guide)\b|\bnot in this guide\b|\bmanual does not\b|\bguide does not\b|\bnot provided\b|\bnot specified\b|\bnot explained\b|\bnot covered here\b|\bi can only answer\b/.test(text);
+  const mentionsUnsupportedNamedPhrase = Array.isArray(scopeSignals.unsupportedNamedPhrases)
+    && scopeSignals.unsupportedNamedPhrases.some((phrase) => text.includes(phrase));
+
+  if (mentionsUnsupportedNamedPhrase && hasNegativeFraming) {
+    return true;
+  }
+
+  if (scopeSignals.unsupportedClauses.length > 0 && hasNegativeFraming) {
+    return true;
+  }
+
+  return false;
+};
+
+const shouldRegenerateForMixedScope = (response, scopeSignals) => {
+  if (!scopeSignals || !scopeSignals.hasMixedScopeRisk) {
+    return false;
+  }
+
+  return !responseAcknowledgesMixedScope(response, scopeSignals);
+};
+
+const getAdaptiveScopeValidationFallback = (response, guideKeys, scopeSignals) => {
+  if (!scopeSignals || !scopeSignals.hasMixedScopeRisk) {
+    return null;
+  }
+
+  if (responseAcknowledgesMixedScope(response, scopeSignals)) {
+    return null;
+  }
+
+  const activeGuideKey = Array.isArray(guideKeys) && guideKeys[0] ? guideKeys[0] : '';
+  const activeGuideName = guideConfigs[activeGuideKey] && guideConfigs[activeGuideKey].name
+    ? guideConfigs[activeGuideKey].name
+    : activeGuideKey;
+  const unsupportedNamedText = Array.isArray(scopeSignals.unsupportedNamedPhrases) && scopeSignals.unsupportedNamedPhrases.length
+    ? ` Some requested items do not appear in this guide, including ${scopeSignals.unsupportedNamedPhrases.map((phrase) => `"${phrase}"`).join(', ')}.`
+    : '';
+
+  return `I can only answer the parts of your question that are directly supported by ${activeGuideName}.${unsupportedNamedText} Please ask about the supported part of the task and I will keep the answer within this guide.`;
 };
 
 const getOutOfScopeGuideResponse = (message, guideKeys) => {
@@ -2500,7 +2688,7 @@ try {
 
 const CHAT_TEMPERATURE = Number.parseFloat(process.env.CHAT_TEMPERATURE || '0.2');
 
-const buildSystemPrompt = (guideName, manualContent) => `You are a helpful assistant for the ${guideName} user manual.
+const buildSystemPrompt = (guideName, manualContent, scopePromptNote = '') => `You are a helpful assistant for the ${guideName} user manual.
 Answer questions using only the manual content below. Be concise, accurate, and cite the exact manual section title(s) that support your answer.
 If the manual does not contain the needed information, say so clearly.
 
@@ -2513,15 +2701,16 @@ Rules:
 6) For imperial outputs, prefer feet and inches format (for example 6 ft 6 in) instead of decimal feet unless the user explicitly asks for decimal values.
 7) Keep conversions readable and concise; avoid unnecessary precision.
 8) Preserve the manual's original measurement wording when it already answers the question; do not restate the same value in another unit unless needed for comparison clarity or explicitly requested by the user.
+9) If a question mixes answerable and unanswerable parts, answer the supported part from the manual and explicitly separate any unsupported part instead of treating the whole question as fully answerable.
 
-Manual Content:
+${scopePromptNote ? `${scopePromptNote}\n\n` : ''}Manual Content:
 ${manualContent}`;
 
 /**
  * Call Hugging Face Inference API
  */
-async function callHuggingFace(userMessage, manualContent, guideName) {
-  const systemPrompt = buildSystemPrompt(guideName, manualContent);
+async function callHuggingFace(userMessage, manualContent, guideName, scopePromptNote = '') {
+  const systemPrompt = buildSystemPrompt(guideName, manualContent, scopePromptNote);
 
   const hfChatModel = process.env.HF_CHAT_MODEL || 'HuggingFaceH4/zephyr-7b-beta';
   const hfTextModel = process.env.HF_TEXT_MODEL || 'mistralai/Mistral-7B-Instruct-v0.3';
@@ -2692,8 +2881,8 @@ async function callHuggingFaceCompletionFallback(prompt, model, hfBaseUrl) {
 /**
  * Call OpenAI API
  */
-async function callOpenAI(userMessage, manualContent, guideName) {
-  const systemPrompt = buildSystemPrompt(guideName, manualContent);
+async function callOpenAI(userMessage, manualContent, guideName, scopePromptNote = '') {
+  const systemPrompt = buildSystemPrompt(guideName, manualContent, scopePromptNote);
 
   try {
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -2763,17 +2952,39 @@ app.post('/api/chat', async (req, res) => {
     }
 
     const { manualContent, guideName } = loadManualBundle(guideKeys);
+    const scopeSignals = getRequestScopeSignals(message, manualContent);
+    const adaptiveScopePromptNote = buildAdaptiveScopePromptNote(scopeSignals);
 
     let response;
     if (LLM_PROVIDER === 'openai') {
-      response = await callOpenAI(message, manualContent, guideName);
+      response = await callOpenAI(message, manualContent, guideName, adaptiveScopePromptNote);
     } else {
-      response = await callHuggingFace(message, manualContent, guideName);
+      response = await callHuggingFace(message, manualContent, guideName, adaptiveScopePromptNote);
+    }
+
+    if (shouldRegenerateForMixedScope(response, scopeSignals)) {
+      const strictScopePromptNote = [
+        adaptiveScopePromptNote,
+        'Strict handling instruction:',
+        '- Your answer must explicitly separate supported and unsupported parts of the request.',
+        '- If a named feature, option, setting, or step is not present in this guide, say that clearly and do not replace it with a similar idea from another guide.'
+      ].filter(Boolean).join('\n');
+
+      if (LLM_PROVIDER === 'openai') {
+        response = await callOpenAI(message, manualContent, guideName, strictScopePromptNote);
+      } else {
+        response = await callHuggingFace(message, manualContent, guideName, strictScopePromptNote);
+      }
     }
 
     const scopeValidationFallback = getScopeValidationFallback(message, response, guideKeys, manualContent);
     if (scopeValidationFallback) {
       response = scopeValidationFallback;
+    }
+
+    const adaptiveScopeFallback = getAdaptiveScopeValidationFallback(response, guideKeys, scopeSignals);
+    if (adaptiveScopeFallback) {
+      response = adaptiveScopeFallback;
     }
 
     console.log(`[${new Date().toISOString()}] Guides: ${guideKeys.join(', ')}`);

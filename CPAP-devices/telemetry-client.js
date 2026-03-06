@@ -1192,9 +1192,9 @@
     },
     scenario_card_2: {
       title: 'Scenario Card 2 – Fit and Start Therapy (Routine Use)',
-      collapsedDescription: 'Fit the mask to the mannequin as outlined in the user guide, check and ensure mask fit is good using the Check Mask Fit option, and start therapy.',
+      collapsedDescription: 'Fit the mask to the mannequin as outlined in the user guide, make sure the fit is good, and start therapy.',
       steps: [
-        'Fit the mask to the mannequin as outlined in the user guide, check and ensure mask fit is good using the Check Mask Fit option, and start therapy.',
+        'Fit the mask to the mannequin as outlined in the user guide, make sure the fit is good, and start therapy.',
         'You may use the instructions at any time.'
       ]
     },
