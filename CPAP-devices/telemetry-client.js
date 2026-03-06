@@ -1184,9 +1184,9 @@
   const presetTaskDescriptions = {
     scenario_card_1: {
       title: 'Scenario Card 1 – First-Time Setup (Setup)',
-      collapsedDescription: 'Assemble and set up the CPAP device and mask ready for first use, stopping before fitting the mask.',
+      collapsedDescription: 'Assemble the CPAP device and mask ready for first use, stopping before fitting the mask.',
       steps: [
-        'Assemble and set up the CPAP device and mask ready for first use, stopping before fitting the mask.',
+        'Assemble the CPAP device and mask ready for first use, stopping before fitting the mask.',
         'You may use the instructions at any time.'
       ]
     },

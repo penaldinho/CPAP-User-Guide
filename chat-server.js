@@ -2332,6 +2332,143 @@ const parseExplicitErrorCode = (message) => {
   return null;
 };
 
+const guideEntityAliases = {
+  'airsense-10': [
+    'airsense',
+    'airsense 10',
+    'resmed airsense',
+    'resmed airsense 10'
+  ],
+  'fp-vitera': [
+    'vitera',
+    'f&p vitera',
+    'fisher & paykel vitera',
+    'fisher and paykel vitera'
+  ],
+  climatelineair: [
+    'climatelineair',
+    'climateline air',
+    'resmed climatelineair'
+  ]
+};
+
+const escapeRegExp = (value) => String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const getMentionedGuideKeys = (text) => {
+  const normalized = String(text || '').toLowerCase();
+  if (!normalized) return [];
+
+  const mentioned = [];
+  for (const [guideKey, aliases] of Object.entries(guideEntityAliases)) {
+    const hasAlias = aliases.some((alias) => {
+      const pattern = new RegExp(`(^|[^a-z0-9])${escapeRegExp(alias)}([^a-z0-9]|$)`, 'i');
+      return pattern.test(normalized);
+    });
+
+    if (hasAlias) {
+      mentioned.push(guideKey);
+    }
+  }
+
+  return mentioned;
+};
+
+const getOutOfScopeGuideResponse = (message, guideKeys) => {
+  if (!Array.isArray(guideKeys) || guideKeys.length !== 1) {
+    return null;
+  }
+
+  const activeGuideKey = guideKeys[0];
+  const mentionedGuideKeys = getMentionedGuideKeys(message);
+  const conflictingGuide = mentionedGuideKeys.find((key) => key !== activeGuideKey);
+  if (!conflictingGuide) {
+    return null;
+  }
+
+  const activeGuideName = guideConfigs[activeGuideKey] && guideConfigs[activeGuideKey].name
+    ? guideConfigs[activeGuideKey].name
+    : activeGuideKey;
+  const conflictingGuideName = guideConfigs[conflictingGuide] && guideConfigs[conflictingGuide].name
+    ? guideConfigs[conflictingGuide].name
+    : conflictingGuide;
+
+  return `Your question mentions ${conflictingGuideName}, but this chat is currently scoped to ${activeGuideName}. I can only answer from the selected guide. Please switch guides or ask a ${activeGuideName} question.`;
+};
+
+const isSpecOrNumericQuestion = (message) => {
+  const text = String(message || '').toLowerCase();
+  if (!text) return false;
+
+  return /temperature|storage|transport|spec|specification|range|length|pressure|compatib|sufficient|long enough|cm\b|mm\b|\bm\b|ft\b|feet|inch|inches|°c|°f|hpa|cmh\s*2o/.test(text);
+};
+
+const extractSectionTitlesFromManualContent = (manualContent) => {
+  const titles = [];
+  const matches = String(manualContent || '').matchAll(/^#\s+(.+)$/gm);
+  for (const match of matches) {
+    const title = String(match[1] || '').trim();
+    if (title) {
+      titles.push(title);
+    }
+  }
+  return [...new Set(titles)];
+};
+
+const extractQuotedSectionCitations = (response) => {
+  const text = String(response || '');
+  const citations = [];
+  const patterns = [
+    /["“]([^"”]{2,120})["”]\s+section/gi,
+    /section\s+["“]([^"”]{2,120})["”]/gi
+  ];
+
+  for (const pattern of patterns) {
+    let match;
+    while ((match = pattern.exec(text)) !== null) {
+      const title = String(match[1] || '').trim();
+      if (title) {
+        citations.push(title);
+      }
+    }
+  }
+
+  return [...new Set(citations)];
+};
+
+const getScopeValidationFallback = (message, response, guideKeys, manualContent) => {
+  if (!Array.isArray(guideKeys) || guideKeys.length !== 1) {
+    return null;
+  }
+
+  const activeGuideKey = guideKeys[0];
+  const activeGuideName = guideConfigs[activeGuideKey] && guideConfigs[activeGuideKey].name
+    ? guideConfigs[activeGuideKey].name
+    : activeGuideKey;
+
+  const responseMentionedGuideKeys = getMentionedGuideKeys(response);
+  const responseConflict = responseMentionedGuideKeys.find((key) => key !== activeGuideKey);
+  if (responseConflict) {
+    return `I couldn't verify that answer strictly within ${activeGuideName}. Please rephrase your question for this guide or switch to the relevant guide.`;
+  }
+
+  if (!isSpecOrNumericQuestion(message)) {
+    return null;
+  }
+
+  const sectionTitles = extractSectionTitlesFromManualContent(manualContent);
+  const quotedCitations = extractQuotedSectionCitations(response);
+  const hasInvalidCitation = quotedCitations.some((citation) => {
+    const normalizedCitation = citation.toLowerCase();
+    return !sectionTitles.some((title) => title.toLowerCase() === normalizedCitation);
+  });
+
+  if (hasInvalidCitation) {
+    return `I couldn't verify that section citation in ${activeGuideName}. Please ask again and I will answer only with section titles that appear in this guide.`;
+  }
+
+  return null;
+};
+
 const getDeterministicErrorCodeResponse = (message, guideKeys) => {
   const errorCode = parseExplicitErrorCode(message);
   if (!errorCode) return null;
@@ -2611,6 +2748,13 @@ app.post('/api/chat', async (req, res) => {
     const familyKey = String(family || '').trim().toLowerCase();
     const guideKeys = normalizeGuideKeys(primaryGuide, guides, familyKey);
 
+    const outOfScopeGuideResponse = getOutOfScopeGuideResponse(message, guideKeys);
+    if (outOfScopeGuideResponse) {
+      console.log(`[${new Date().toISOString()}] Guides: ${guideKeys.join(', ')}`);
+      console.log(`[${new Date().toISOString()}] Assistant: ${outOfScopeGuideResponse.substring(0, 100)}...`);
+      return res.json({ response: outOfScopeGuideResponse });
+    }
+
     const deterministicResponse = getDeterministicErrorCodeResponse(message, guideKeys);
     if (deterministicResponse) {
       console.log(`[${new Date().toISOString()}] Guides: ${guideKeys.join(', ')}`);
@@ -2625,6 +2769,11 @@ app.post('/api/chat', async (req, res) => {
       response = await callOpenAI(message, manualContent, guideName);
     } else {
       response = await callHuggingFace(message, manualContent, guideName);
+    }
+
+    const scopeValidationFallback = getScopeValidationFallback(message, response, guideKeys, manualContent);
+    if (scopeValidationFallback) {
+      response = scopeValidationFallback;
     }
 
     console.log(`[${new Date().toISOString()}] Guides: ${guideKeys.join(', ')}`);
