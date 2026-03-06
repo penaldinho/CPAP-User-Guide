@@ -1192,9 +1192,9 @@
     },
     scenario_card_2: {
       title: 'Scenario Card 2 – Fit and Start Therapy (Routine Use)',
-      collapsedDescription: 'Fit the mask to the mannequin as outlined in the user guide, make sure the fit is good, and start therapy.',
+      collapsedDescription: 'Fit the mask to the mannequin as outlined in the user guide, check and ensure mask fit is good using the Check Mask Fit option, and start therapy.',
       steps: [
-        'Fit the mask to the mannequin as outlined in the user guide, make sure the fit is good, and start therapy.',
+        'Fit the mask to the mannequin as outlined in the user guide, check and ensure mask fit is good using the Check Mask Fit option, and start therapy.',
         'You may use the instructions at any time.'
       ]
     },
@@ -1230,7 +1230,7 @@
       title: 'Short-Form Q3 – Spare F&P Vitera mask storage (Routine Use / Safety)',
       preamble: 'You receive a spare F&P Vitera mask and need to store it until your current one wears out, while keeping it in good condition for future use.',
       steps: [
-        'What storage temperature range is recommended for keeping a spare F&P Vitera mask?'
+        'What storage temperature range is recommended for keeping a spare F&P Vitera mask in degrees Celsius?'
       ],
       parts: [
         { key: 'a', label: 'Answer' }
@@ -1496,6 +1496,11 @@
     const state = getTaskState();
     const currentTaskId = String(state.task_id || '').trim();
     const nextTaskId = getNextTaskIdInSequence(currentTaskId);
+
+    const confirmed = window.confirm('Are you sure you want to mark this task as complete?');
+    if (!confirmed) {
+      return;
+    }
 
     if (nextTaskId) {
       setParticipantNextTaskState({

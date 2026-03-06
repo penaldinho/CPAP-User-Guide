@@ -3037,6 +3037,10 @@ app.post('/api/observer-notes', async (req, res) => {
       return res.status(400).json({ error: 'task_length_ms is required for task_end and must be >= 0' });
     }
 
+    if (actionType === 'task_end' && (helpInstancesCount === null || helpInstancesCount < 0)) {
+      return res.status(400).json({ error: 'help_instances_count is required for task_end and must be >= 0' });
+    }
+
     if (helpInstancesCount !== null && helpInstancesCount < 0) {
       return res.status(400).json({ error: 'help_instances_count must be >= 0 when provided' });
     }

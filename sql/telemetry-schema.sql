@@ -227,6 +227,9 @@ ALTER TABLE observer_notes
   CHECK (help_instances_count >= 0);
 
 ALTER TABLE observer_notes
+  DROP COLUMN IF EXISTS error_count;
+
+ALTER TABLE observer_notes
   ALTER COLUMN trial_mode DROP DEFAULT;
 
 ALTER TABLE observer_notes

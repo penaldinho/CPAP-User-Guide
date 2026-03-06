@@ -131,7 +131,7 @@
         </div>
 
         <label>
-          Help Instances Count (optional)
+          Help Instances Count (required per task)
           <input id="help_instances_count" type="number" min="0" step="1" placeholder="0" />
         </label>
 
@@ -342,6 +342,12 @@
 
       const clearActiveTaskState = () => {
         localStorage.removeItem(activeTaskKey);
+      };
+
+      const resetPerTaskCountInputs = () => {
+        if (helpInstancesInput) {
+          helpInstancesInput.value = '';
+        }
       };
 
       const getCriteriaMarksState = () => {
@@ -559,18 +565,20 @@
         const notes = String(notesInput.value || '').trim();
         const errorText = String(errorTextInput.value || '').trim();
         const errorSeverity = String(errorSeveritySelect.value || '').trim().toLowerCase();
+        const helpInstancesRaw = String(helpInstancesInput.value || '').trim();
 
         const hasCommon = Boolean(participantId && taskId && hasTrialMode);
         const active = getActiveTaskState();
         const currentKey = getCurrentTaskKey();
         const taskActive = Boolean(active.key && active.key === currentKey);
         const readyToStartNextTask = Boolean(!taskActive && pendingNextTask && pendingNextTask.task_id === taskId && participantId);
+        const hasValidHelpInstancesCount = helpInstancesRaw !== '' && Number.isFinite(Number.parseInt(helpInstancesRaw, 10)) && Number.parseInt(helpInstancesRaw, 10) >= 0;
 
         startButton.disabled = !hasCommon || taskActive;
         pageButton.disabled = !hasCommon || !manualPage;
         noteButton.disabled = !hasCommon || !notes;
         errorButton.disabled = !hasCommon || !errorText || !['minor', 'major'].includes(errorSeverity);
-        scoreButton.disabled = !hasCommon || !requiresScoreForTaskId(taskId);
+        scoreButton.disabled = !hasCommon || !requiresScoreForTaskId(taskId) || !hasValidHelpInstancesCount;
 
         const criteria = getCriteriaDefinition(taskId);
         const isScenario = isScenarioTaskId(taskId) && criteria.length > 0;
@@ -589,7 +597,7 @@
         } else {
           endButton.textContent = 'End Task';
           endButton.classList.add('secondary');
-          endButton.disabled = !hasCommon || !taskActive;
+          endButton.disabled = !hasCommon || !taskActive || !hasValidHelpInstancesCount;
         }
 
         if (nextActionEl) {
@@ -668,7 +676,7 @@
         const manualPage = String(manualPageInput.value || '').trim();
         const notes = String((overrides && overrides.notes) ?? (notesInput.value || '')).trim();
         const helpInstancesRaw = String(helpInstancesInput.value || '').trim();
-        const helpInstancesCount = helpInstancesRaw === '' ? 0 : Number.parseInt(helpInstancesRaw, 10);
+        const helpInstancesCount = helpInstancesRaw === '' ? null : Number.parseInt(helpInstancesRaw, 10);
         const errorText = String(errorTextInput.value || '').trim();
         const scenarioScoreRaw = String(scenarioScoreSelect.value || '').trim();
         const errorSeverityRaw = String(errorSeveritySelect.value || '').trim().toLowerCase();
@@ -718,7 +726,13 @@
           }
         }
 
-        if (!Number.isFinite(helpInstancesCount) || helpInstancesCount < 0) {
+        if (actionType === 'task_end' && (!Number.isFinite(helpInstancesCount) || helpInstancesCount < 0)) {
+          setStatus('Enter a help instances count of 0 or greater before ending this task.', false);
+          helpInstancesInput.focus();
+          return false;
+        }
+
+        if (helpInstancesRaw !== '' && (!Number.isFinite(helpInstancesCount) || helpInstancesCount < 0)) {
           setStatus('Help instances count must be a whole number of 0 or greater.', false);
           helpInstancesInput.focus();
           return false;
@@ -759,7 +773,7 @@
           criterion_label: actionType === 'step_mark' ? criterionLabel : null,
           criterion_outcome: actionType === 'step_mark' ? criterionOutcome : null,
           criterion_step_time_ms: actionType === 'step_mark' ? criterionStepTimeMs : null,
-          help_instances_count: helpInstancesCount,
+          help_instances_count: Number.isFinite(helpInstancesCount) ? helpInstancesCount : 0,
           error_severity: actionType === 'error' ? errorSeverityRaw : null,
           error_text: actionType === 'error' ? errorText : '',
           notes,
@@ -795,6 +809,7 @@
               started_at: payload.timestamp,
               scenario_score_logged: !requiresScoreForTaskId(payload.task_id)
             });
+            resetPerTaskCountInputs();
           }
 
           if (actionType === 'scenario_score' && active.key === currentKey) {
@@ -808,6 +823,7 @@
           if (actionType === 'task_end') {
             clearActiveTaskState();
             clearCriteriaStateForCurrentTask();
+            resetPerTaskCountInputs();
             renderCriteriaSection();
           }
 
@@ -1032,9 +1048,12 @@
       taskIdSelect.addEventListener('change', updateTaskTimer);
       taskIdSelect.addEventListener('change', renderCriteriaSection);
       taskIdSelect.addEventListener('change', updateActionState);
+      taskIdSelect.addEventListener('change', resetPerTaskCountInputs);
       taskIdCustomInput.addEventListener('input', updateTaskTimer);
       taskIdCustomInput.addEventListener('input', renderCriteriaSection);
       taskIdCustomInput.addEventListener('input', updateActionState);
+      taskIdCustomInput.addEventListener('input', resetPerTaskCountInputs);
+      helpInstancesInput.addEventListener('input', updateActionState);
       taskLabelCustomInput.addEventListener('input', updateActionState);
       manualPageInput.addEventListener('input', updateActionState);
       notesInput.addEventListener('input', updateActionState);
