@@ -2361,16 +2361,27 @@ try {
   process.exit(1);
 }
 
+const CHAT_TEMPERATURE = Number.parseFloat(process.env.CHAT_TEMPERATURE || '0.2');
+
+const buildSystemPrompt = (guideName, manualContent) => `You are a helpful assistant for the ${guideName} user manual.
+Answer questions using only the manual content below. Be concise, accurate, and cite the exact manual section title(s) that support your answer.
+If the manual does not contain the needed information, say so clearly.
+
+Rules:
+1) For questions that include measurements (for example ft, feet, inches, m, cm), do explicit unit conversion and comparison before concluding.
+2) If asked whether something is sufficient/long enough/compatible, state "sufficient" or "insufficient" and include the compared values.
+3) If the required distance is greater than the stated tubing length, answer "insufficient" and quantify the shortfall.
+4) Only cite section titles that contain the supporting fact (for example cite "Technical Specifications" for tubing length if that is where it appears).
+5) Do not infer facts that are not stated in the manual.
+
+Manual Content:
+${manualContent}`;
+
 /**
  * Call Hugging Face Inference API
  */
 async function callHuggingFace(userMessage, manualContent, guideName) {
-  const systemPrompt = `You are a helpful assistant for the ${guideName} user manual. 
-Answer questions based on the following manual content. Be concise, helpful, and always cite which section of the manual you're referring to.
-If the manual doesn't contain information about the question, say so clearly.
-
-Manual Content:
-${manualContent}`;
+  const systemPrompt = buildSystemPrompt(guideName, manualContent);
 
   const hfChatModel = process.env.HF_CHAT_MODEL || 'HuggingFaceH4/zephyr-7b-beta';
   const hfTextModel = process.env.HF_TEXT_MODEL || 'mistralai/Mistral-7B-Instruct-v0.3';
@@ -2392,7 +2403,7 @@ ${manualContent}`;
         model: hfChatModel,
         messages,
         max_tokens: 500,
-        temperature: 0.7
+        temperature: CHAT_TEMPERATURE
       })
     });
 
@@ -2444,7 +2455,7 @@ async function callHuggingFaceChatRetry(systemPrompt, userMessage, chatModel, te
       model: chatModel,
       messages,
       max_tokens: 500,
-      temperature: 0.7
+      temperature: CHAT_TEMPERATURE
     })
   });
 
@@ -2484,7 +2495,7 @@ async function callHuggingFaceCompletion(systemPrompt, userMessage, model, hfBas
       model,
       prompt,
       max_tokens: 500,
-      temperature: 0.7
+      temperature: CHAT_TEMPERATURE
     })
   });
 
@@ -2518,7 +2529,7 @@ async function callHuggingFaceCompletionFallback(prompt, model, hfBaseUrl) {
       model,
       prompt,
       max_tokens: 500,
-      temperature: 0.7
+      temperature: CHAT_TEMPERATURE
     })
   });
 
@@ -2542,12 +2553,7 @@ async function callHuggingFaceCompletionFallback(prompt, model, hfBaseUrl) {
  * Call OpenAI API
  */
 async function callOpenAI(userMessage, manualContent, guideName) {
-  const systemPrompt = `You are a helpful assistant for the ${guideName} user manual. 
-Answer questions based on the following manual content. Be concise, helpful, and always cite which section of the manual you're referring to.
-If the manual doesn't contain information about the question, say so clearly.
-
-Manual Content:
-${manualContent}`;
+  const systemPrompt = buildSystemPrompt(guideName, manualContent);
 
   try {
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -2569,7 +2575,7 @@ ${manualContent}`;
           }
         ],
         max_tokens: 500,
-        temperature: 0.7
+        temperature: CHAT_TEMPERATURE
       })
     });
 

@@ -72,3 +72,29 @@ ORDER BY received_at DESC;
 - Comprehensive technical specifications
 - Troubleshooting guides
 - Device care and maintenance instructions 
+
+## On-demand ETL + statistical report
+
+You can generate participant-level ETL outputs and a markdown stats report on demand (no timer) from your PostgreSQL trial database.
+
+### Prerequisites
+
+- `DATABASE_URL` environment variable set to your telemetry PostgreSQL database.
+- Node dependencies installed (`npm install`).
+
+### Run
+
+```bash
+npm run stats:report
+```
+
+### Outputs
+
+Generated files are written to:
+
+- `analysis-output/reports/stats-report-latest.md`
+- `analysis-output/tables/participant-level-latest.csv`
+- `analysis-output/tables/outcome-tests-latest.csv`
+- `analysis-output/tables/group-summary-latest.csv`
+
+Timestamped versions are also created on each run.

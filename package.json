@@ -4,7 +4,8 @@
   "description": "AirSense 10 User Guide - Interactive training materials",
   "scripts": {
     "build-index": "node build-search-index.js",
-    "chat": "node chat-server.js"
+    "chat": "node chat-server.js",
+    "stats:report": "node analysis/run-stats-report.js"
   },
   "keywords": ["airsense", "cpap", "user guide", "training"],
   "author": "",
