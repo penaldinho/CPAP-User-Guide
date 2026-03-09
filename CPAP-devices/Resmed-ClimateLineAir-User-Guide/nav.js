@@ -185,7 +185,7 @@ function injectNav(currentPageFile) {
         <button class="nav-text-size-btn" data-size="large" aria-label="Large text">A</button>
       </div>
       <div class="nav-list">
-        <a class="nav-link-primary nav-link-home" href="${landingHref}"><span class="nav-link-icon" aria-hidden="true">🏠</span>MedTech Guides</a>
+        <a class="nav-link-primary nav-link-home" href="${landingHref}"><span class="nav-link-icon" aria-hidden="true">🏠</span>Return to Home</a>
         <a class="nav-link-primary" href="${guideHref('index.html')}"><span class="nav-link-icon" aria-hidden="true">📚</span>Contents</a>
         <a class="nav-link-primary nav-link-primary-chat" href="${chatHref}"${chatCurrent}><span class="nav-link-icon" aria-hidden="true">💬</span>Chat Assistant</a>
         <a class="nav-link-primary" href="${guideHref('search.html')}"${searchCurrent}><span class="nav-link-icon" aria-hidden="true">🔍</span>Search</a>
@@ -199,9 +199,9 @@ function injectNav(currentPageFile) {
         }).filter(Boolean).join('\n        ')}
       </div>
       <div class="nav-actions" aria-label="Quick actions">
-        <a class="nav-action-btn nav-action-home" href="${landingHref}" aria-label="MedTech Guides">
+        <a class="nav-action-btn nav-action-home" href="${landingHref}" aria-label="Return to Home">
           <span class="nav-action-icon" aria-hidden="true">🏠</span>
-          <span class="tooltip" role="tooltip">MedTech Guides</span>
+          <span class="tooltip" role="tooltip">Return to Home</span>
         </a>
         <a class="nav-action-btn nav-action-contents" href="${guideHref('index.html')}" aria-label="Contents">
           <span class="nav-action-icon" aria-hidden="true">📚</span>
@@ -539,8 +539,8 @@ function injectNav(currentPageFile) {
       const homeButton = document.createElement('a');
       homeButton.className = 'home-button';
       homeButton.href = 'https://medtechguides.uk/index.html';
-      homeButton.setAttribute('aria-label', 'Back to MedTech Guides');
-      homeButton.innerHTML = '<span class="home-icon" aria-hidden="true">🏠</span><span class="visually-hidden">Back to MedTech Guides</span><span class="tooltip" role="tooltip">Back to MedTech Guides</span>';
+      homeButton.setAttribute('aria-label', 'Return to Home');
+      homeButton.innerHTML = '<span class="home-icon" aria-hidden="true">🏠</span><span class="visually-hidden">Return to Home</span><span class="tooltip" role="tooltip">Return to Home</span>';
       header.appendChild(homeButton);
     }
 
