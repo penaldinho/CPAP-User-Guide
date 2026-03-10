@@ -3,6 +3,7 @@ class ChatBot {
   constructor() {
     this.chatContainer = document.getElementById('chat-container');
     this.messagesContainer = document.getElementById('chat-messages');
+    this.inputArea = document.getElementById('chat-input-area');
     this.inputField = document.getElementById('chat-input');
     this.sendBtn = document.getElementById('chat-send-btn');
     this.loadingDiv = document.getElementById('chat-loading');
@@ -30,7 +31,21 @@ class ChatBot {
 
   updateInputLayout() {
     if (!this.chatContainer) return;
-    this.chatContainer.classList.toggle('chat-pristine', !this.hasUserAskedQuestion);
+    const isPristine = !this.hasUserAskedQuestion;
+    this.chatContainer.classList.toggle('chat-pristine', isPristine);
+
+    if (this.messagesContainer) {
+      this.messagesContainer.style.flex = isPristine ? '0 0 auto' : '1 1 auto';
+      this.messagesContainer.style.overflowY = isPristine ? 'visible' : 'auto';
+    }
+
+    if (this.inputArea) {
+      this.inputArea.style.marginTop = isPristine ? '4px' : 'auto';
+    }
+
+    if (this.loadingDiv) {
+      this.loadingDiv.style.marginTop = isPristine ? '4px' : '0';
+    }
   }
 
   getCurrentGuide() {
