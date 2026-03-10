@@ -142,7 +142,7 @@ function injectNav(currentPageFile) {
     const getLandingHref = () => 'https://medtechguides.uk/index.html';
     const landingHref = getLandingHref();
     const buildChatHref = () => {
-      const localBase = 'chat.html?guide=climatelineair&family=cpap&guides=climatelineair';
+      const localBase = '/CPAP-devices/Resmed-ClimateLineAir-User-Guide/chat.html?guide=climatelineair&family=cpap&guides=climatelineair';
       const base = isHostedChat ? hostedGuideChatHref : localBase;
       return appendContextToHref(base, true);
     };
@@ -540,7 +540,7 @@ function injectNav(currentPageFile) {
         }
 
         if (!hasUrlContext && !hasActiveTask) {
-          return isHostedChat ? hostedGuideChatHref : 'chat.html?guide=climatelineair&family=cpap&guides=climatelineair';
+          return isHostedChat ? hostedGuideChatHref : '/CPAP-devices/Resmed-ClimateLineAir-User-Guide/chat.html?guide=climatelineair&family=cpap&guides=climatelineair';
         }
 
         const participantId = String(localStorage.getItem('mtg-telemetry-participant-id') || '').trim();
@@ -568,7 +568,7 @@ function injectNav(currentPageFile) {
           // Ignore task read errors
         }
         const contextQuery = params.toString();
-        const base = isHostedChat ? hostedGuideChatHref : 'chat.html?guide=climatelineair&family=cpap&guides=climatelineair';
+        const base = isHostedChat ? hostedGuideChatHref : '/CPAP-devices/Resmed-ClimateLineAir-User-Guide/chat.html?guide=climatelineair&family=cpap&guides=climatelineair';
         const url = new URL(base, window.location.origin);
         const contextParams = new URLSearchParams(contextQuery);
         contextParams.forEach((value, key) => {

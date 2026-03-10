@@ -151,7 +151,7 @@ function injectNav(currentPageFile) {
     const getLandingHref = () => 'https://medtechguides.uk/index.html';
     const landingHref = getLandingHref();
     const buildChatHref = () => {
-      const localBase = 'chat.html?guide=airsense-10&family=cpap&guides=airsense-10';
+      const localBase = '/CPAP-devices/Airsense-10-User-Guide/chat.html?guide=airsense-10&family=cpap&guides=airsense-10';
       const base = isHostedChat ? hostedGuideChatHref : localBase;
       return appendContextToHref(base, true);
     };
@@ -565,7 +565,7 @@ function injectNav(currentPageFile) {
         }
 
         if (!hasUrlContext && !hasActiveTask) {
-          return isHostedChat ? hostedGuideChatHref : 'chat.html?guide=airsense-10&family=cpap&guides=airsense-10';
+          return isHostedChat ? hostedGuideChatHref : '/CPAP-devices/Airsense-10-User-Guide/chat.html?guide=airsense-10&family=cpap&guides=airsense-10';
         }
 
         const participantId = String(localStorage.getItem('mtg-telemetry-participant-id') || '').trim();
@@ -593,7 +593,7 @@ function injectNav(currentPageFile) {
           // Ignore task read errors
         }
         const contextQuery = params.toString();
-        const base = isHostedChat ? hostedGuideChatHref : 'chat.html?guide=airsense-10&family=cpap&guides=airsense-10';
+        const base = isHostedChat ? hostedGuideChatHref : '/CPAP-devices/Airsense-10-User-Guide/chat.html?guide=airsense-10&family=cpap&guides=airsense-10';
         const url = new URL(base, window.location.origin);
         const contextParams = new URLSearchParams(contextQuery);
         contextParams.forEach((value, key) => {
