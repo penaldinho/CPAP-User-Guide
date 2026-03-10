@@ -117,15 +117,16 @@ class ChatBot {
 
   renderChatbotSwitcher() {
     const container = document.querySelector('.container');
+    const introCard = document.getElementById('chat-intro-copy')?.closest('.card') || null;
     const tipsSection = document.getElementById('chat-tips-title')?.closest('.card') || null;
     const footer = container ? container.querySelector('.footer') : null;
-    const anchor = tipsSection || footer;
+    const anchor = introCard || tipsSection || footer;
     if (!container || !anchor) return;
 
     const currentGuide = this.getCurrentGuide();
     const currentGuideName = this.guideNames[currentGuide] || 'selected device';
 
-    const switcherCard = document.createElement('div');
+    const switcherCard = introCard || document.createElement('div');
     switcherCard.className = 'card';
     switcherCard.id = 'chatbot-switcher';
     switcherCard.style.backgroundColor = '#e8f5e9';
@@ -141,7 +142,9 @@ class ChatBot {
       </div>
     `;
 
-    container.insertBefore(switcherCard, anchor);
+    if (!introCard) {
+      container.insertBefore(switcherCard, anchor);
+    }
 
     const select = document.getElementById('chatbot-switch-select');
     const link = document.getElementById('chatbot-switch-link');
