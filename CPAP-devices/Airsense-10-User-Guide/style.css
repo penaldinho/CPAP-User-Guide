@@ -1167,6 +1167,28 @@ details.card[open] > summary h2::after {
   transition: transform 0.18s ease, box-shadow 0.18s ease;
 }
 
+.expandable-image-wrap {
+  position: relative;
+  display: block;
+  width: 100%;
+}
+
+.expandable-image-hint {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  z-index: 1;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(18, 24, 38, 0.82);
+  color: #ffffff;
+  font-size: calc(0.8rem * var(--text-scale));
+  font-weight: 600;
+  line-height: 1;
+  pointer-events: none;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.18);
+}
+
 .expandable-image:hover {
   transform: translateY(-1px);
   box-shadow: 0 10px 24px rgba(18, 24, 38, 0.18);
@@ -1240,6 +1262,13 @@ body.image-lightbox-open {
 }
 
 @media (max-width: 640px) {
+  .expandable-image-hint {
+    top: 12px;
+    right: 12px;
+    padding: 5px 8px;
+    font-size: calc(0.72rem * var(--text-scale));
+  }
+
   .image-lightbox {
     padding: 16px;
   }

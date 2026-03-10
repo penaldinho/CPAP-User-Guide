@@ -972,6 +972,22 @@ function injectNav(currentPageFile) {
     const decorateImage = (image, openLightbox) => {
       if (!isExpandableImage(image) || image.dataset.mtgExpandableImage === 'true') return;
 
+      let wrapper = image.parentElement;
+      if (!wrapper || !wrapper.classList.contains('expandable-image-wrap')) {
+        wrapper = document.createElement('span');
+        wrapper.className = 'expandable-image-wrap';
+        image.parentNode.insertBefore(wrapper, image);
+        wrapper.appendChild(image);
+      }
+
+      if (!wrapper.querySelector('.expandable-image-hint')) {
+        const hint = document.createElement('span');
+        hint.className = 'expandable-image-hint';
+        hint.textContent = 'Click to expand';
+        hint.setAttribute('aria-hidden', 'true');
+        wrapper.appendChild(hint);
+      }
+
       image.dataset.mtgExpandableImage = 'true';
       image.classList.add('expandable-image');
       if (!image.hasAttribute('tabindex')) {
