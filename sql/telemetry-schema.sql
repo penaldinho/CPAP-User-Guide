@@ -784,9 +784,10 @@ WHERE page_closed_at IS NOT NULL
   AND page_opened_at IS NOT NULL;
 
 CREATE OR REPLACE VIEW telemetry_task_instances AS
-WITH task_bounds AS (
+WITH digital_task_bounds AS (
   SELECT
     MIN(session_id) AS session_id,
+    'digital'::TEXT AS trial_mode,
     participant_id,
     task_id,
     task_instance_seq,
@@ -798,14 +799,14 @@ WITH task_bounds AS (
   FROM telemetry_task_events_enriched
   GROUP BY participant_id, task_id, task_instance_seq
 ),
-task_page_counts AS (
+digital_task_page_counts AS (
   SELECT
     e.participant_id,
     e.task_id,
     e.task_instance_seq,
     COUNT(DISTINCT e.page_path)::BIGINT AS task_page_count
   FROM telemetry_task_events_enriched e
-  INNER JOIN task_bounds b
+  INNER JOIN digital_task_bounds b
     ON b.participant_id = e.participant_id
     AND b.task_id = e.task_id
     AND b.task_instance_seq = e.task_instance_seq
@@ -815,7 +816,7 @@ task_page_counts AS (
     AND (b.task_ended_at IS NULL OR e.event_at <= b.task_ended_at)
   GROUP BY e.participant_id, e.task_id, e.task_instance_seq
 ),
-task_page_totals AS (
+digital_task_page_totals AS (
   SELECT
     participant_id,
     task_id,
@@ -823,35 +824,127 @@ task_page_totals AS (
     SUM(page_time_spent_ms)::BIGINT AS task_total_page_dwell_ms
   FROM telemetry_task_page_dwell_segments
   GROUP BY participant_id, task_id, task_instance_seq
+),
+digital_task_instances AS (
+  SELECT
+    b.session_id,
+    b.participant_id,
+    b.task_id,
+    b.task_instance_seq,
+    b.task_label,
+    b.task_started_at,
+    b.task_ended_at,
+    COALESCE(
+      b.task_end_duration_ms,
+      CASE
+        WHEN b.task_started_at IS NOT NULL AND b.task_ended_at IS NOT NULL
+          THEN (EXTRACT(EPOCH FROM (b.task_ended_at - b.task_started_at)) * 1000)::BIGINT
+        ELSE NULL
+      END
+    ) AS task_total_duration_ms,
+    COALESCE(t.task_total_page_dwell_ms, 0) AS task_total_page_dwell_ms,
+    b.task_event_count,
+    COALESCE(p.task_page_count, 0) AS task_page_count,
+    b.trial_mode
+  FROM digital_task_bounds b
+  LEFT JOIN digital_task_page_totals t
+    ON t.participant_id = b.participant_id
+    AND t.task_id = b.task_id
+    AND t.task_instance_seq = b.task_instance_seq
+  LEFT JOIN digital_task_page_counts p
+    ON p.participant_id = b.participant_id
+    AND p.task_id = b.task_id
+    AND p.task_instance_seq = b.task_instance_seq
+),
+physical_ordered AS (
+  SELECT
+    id,
+    MIN(session_id) OVER (PARTITION BY participant_id, NULLIF(task_id, ''), COALESCE(NULLIF(trial_mode, ''), 'physical')) AS first_session_id,
+    COALESCE(NULLIF(trial_mode, ''), 'physical') AS trial_mode,
+    participant_id,
+    NULLIF(task_id, '') AS task_id,
+    task_label,
+    event_type,
+    manual_page,
+    duration_ms,
+    COALESCE("timestamp", received_at) AS event_at,
+    SUM(CASE WHEN event_type = 'task_start' THEN 1 ELSE 0 END)
+      OVER (
+        PARTITION BY participant_id, COALESCE(NULLIF(trial_mode, ''), 'physical'), NULLIF(task_id, '')
+        ORDER BY COALESCE("timestamp", received_at), id
+        ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+      ) AS task_instance_seq
+  FROM physical_trial_events
+  WHERE NULLIF(task_id, '') IS NOT NULL
+),
+physical_scoped AS (
+  SELECT *
+  FROM physical_ordered
+  WHERE task_instance_seq > 0
+),
+physical_task_bounds AS (
+  SELECT
+    MIN(first_session_id) AS session_id,
+    trial_mode,
+    participant_id,
+    task_id,
+    task_instance_seq,
+    MIN(task_label) FILTER (WHERE task_label IS NOT NULL AND task_label <> '') AS task_label,
+    MIN(event_at) FILTER (WHERE event_type = 'task_start') AS task_started_at,
+    MAX(event_at) FILTER (WHERE event_type = 'task_end') AS task_ended_at,
+    MAX(duration_ms) FILTER (WHERE event_type = 'task_end' AND duration_ms IS NOT NULL) AS task_end_duration_ms,
+    COUNT(*) AS task_event_count
+  FROM physical_scoped
+  GROUP BY trial_mode, participant_id, task_id, task_instance_seq
+),
+physical_task_page_counts AS (
+  SELECT
+    b.participant_id,
+    b.task_id,
+    b.task_instance_seq,
+    COUNT(*)::BIGINT AS task_page_count
+  FROM physical_task_bounds b
+  INNER JOIN observer_notes o
+    ON COALESCE(NULLIF(o.trial_mode, ''), 'physical') = b.trial_mode
+    AND o.participant_id = b.participant_id
+    AND o.task_id = b.task_id
+    AND COALESCE(NULLIF(o.manual_page, ''), '') <> ''
+    AND COALESCE(o."timestamp", o.received_at) >= b.task_started_at
+    AND (b.task_ended_at IS NULL OR COALESCE(o."timestamp", o.received_at) <= b.task_ended_at)
+  GROUP BY b.participant_id, b.task_id, b.task_instance_seq
+),
+physical_task_instances AS (
+  SELECT
+    b.session_id,
+    b.participant_id,
+    b.task_id,
+    b.task_instance_seq,
+    b.task_label,
+    b.task_started_at,
+    b.task_ended_at,
+    COALESCE(
+      b.task_end_duration_ms,
+      CASE
+        WHEN b.task_started_at IS NOT NULL AND b.task_ended_at IS NOT NULL
+          THEN (EXTRACT(EPOCH FROM (b.task_ended_at - b.task_started_at)) * 1000)::BIGINT
+        ELSE NULL
+      END
+    ) AS task_total_duration_ms,
+    0::BIGINT AS task_total_page_dwell_ms,
+    b.task_event_count,
+    COALESCE(p.task_page_count, 0) AS task_page_count,
+    b.trial_mode
+  FROM physical_task_bounds b
+  LEFT JOIN physical_task_page_counts p
+    ON p.participant_id = b.participant_id
+    AND p.task_id = b.task_id
+    AND p.task_instance_seq = b.task_instance_seq
 )
-SELECT
-  b.session_id,
-  b.participant_id,
-  b.task_id,
-  b.task_instance_seq,
-  b.task_label,
-  b.task_started_at,
-  b.task_ended_at,
-  COALESCE(
-    b.task_end_duration_ms,
-    CASE
-      WHEN b.task_started_at IS NOT NULL AND b.task_ended_at IS NOT NULL
-        THEN (EXTRACT(EPOCH FROM (b.task_ended_at - b.task_started_at)) * 1000)::BIGINT
-      ELSE NULL
-    END
-  ) AS task_total_duration_ms,
-  COALESCE(t.task_total_page_dwell_ms, 0) AS task_total_page_dwell_ms,
-  b.task_event_count,
-  COALESCE(p.task_page_count, 0) AS task_page_count
-FROM task_bounds b
-LEFT JOIN task_page_totals t
-  ON t.participant_id = b.participant_id
-  AND t.task_id = b.task_id
-  AND t.task_instance_seq = b.task_instance_seq
-LEFT JOIN task_page_counts p
-  ON p.participant_id = b.participant_id
-  AND p.task_id = b.task_id
-  AND p.task_instance_seq = b.task_instance_seq;
+SELECT *
+FROM digital_task_instances
+UNION ALL
+SELECT *
+FROM physical_task_instances;
 
 CREATE OR REPLACE VIEW telemetry_task_page_metrics AS
 WITH page_dwell AS (
@@ -1291,7 +1384,7 @@ VALUES
   ('short_form_q3', 'a', 'v1', TRUE, 10, 'Storage -20 to 50 C', 'regex', '(-?20\s*(to|-)\s*50\s*°?\s*c)', NULL, NULL, 1.000),
   ('short_form_q3', 'a', 'v1', TRUE, 20, 'Storage -4 to 122 F', 'regex', '(-?4\s*(to|-)\s*122\s*°?\s*f)', NULL, NULL, 1.000),
   ('short_form_q3', 'a', 'v1', TRUE, 30, 'Mentions both storage bounds with C', 'regex', '(-?20).*50.*(c|celsius)', NULL, NULL, 1.000),
-  ('short_form_q3', 'a', 'v1', TRUE, 40, 'Storage range no unit', 'regex', '(-?20\s*(to|-|–)\s*50)(\b|\s)', NULL, NULL, 1.000),
+  ('short_form_q3', 'a', 'v1', TRUE, 40, 'Storage range no unit', 'regex', '(^|[^0-9])[-−]20[[:space:]]*(to|-|–)[[:space:]]*50($|[^0-9])', NULL, NULL, 1.000),
   ('short_form_q3', 'a', 'v1', TRUE, 50, 'Storage between phrasing', 'regex', 'between\s*-?20\s*and\s*50', NULL, NULL, 1.000),
   ('short_form_q3', 'a', 'v1', TRUE, 60, 'Storage minus phrasing', 'regex', 'minus\s*20\s*(to|-|–)\s*50', NULL, NULL, 1.000),
 
