@@ -913,6 +913,118 @@ function injectNav(currentPageFile) {
     initCardTts();
   }
 
+  const initExpandableImages = () => {
+    if (window.__mtgExpandableImagesInitialized) return;
+
+    const looksInlineIcon = (image) => {
+      const style = String(image.getAttribute('style') || '').toLowerCase();
+      return /vertical-align|height:\s*1(?:\.\d+)?em|width:\s*(20|40|60|72|84|96)px|height:\s*(20|40|60|72|84|96)px/.test(style);
+    };
+
+    const candidateImages = Array.from(document.querySelectorAll('.card-body img, .manual-image, .media-image, .card > img'));
+    const expandableImages = candidateImages.filter((image) => {
+      if (!(image instanceof HTMLImageElement)) return false;
+      if (image.closest('a, button, summary, .image-lightbox')) return false;
+      if (looksInlineIcon(image)) return false;
+      if (image.classList.contains('manual-image') || image.classList.contains('media-image')) return true;
+
+      const rect = image.getBoundingClientRect();
+      const renderedWidth = Math.round(rect.width);
+      const renderedHeight = Math.round(rect.height);
+      const naturalWidth = image.naturalWidth || 0;
+      const naturalHeight = image.naturalHeight || 0;
+
+      return renderedWidth >= 160 || renderedHeight >= 160 || naturalWidth >= 320 || naturalHeight >= 240;
+    });
+
+    if (!expandableImages.length) return;
+    window.__mtgExpandableImagesInitialized = true;
+
+    let lastFocusedElement = null;
+
+    const overlay = document.createElement('div');
+    overlay.className = 'image-lightbox';
+    overlay.setAttribute('hidden', '');
+    overlay.innerHTML = `
+      <div class="image-lightbox-dialog" role="dialog" aria-modal="true" aria-label="Expanded image view">
+        <button type="button" class="image-lightbox-close" aria-label="Close expanded image">×</button>
+        <img class="image-lightbox-image" alt="" />
+        <div class="image-lightbox-caption" aria-live="polite"></div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    const modalImage = overlay.querySelector('.image-lightbox-image');
+    const closeButton = overlay.querySelector('.image-lightbox-close');
+    const caption = overlay.querySelector('.image-lightbox-caption');
+
+    const closeLightbox = () => {
+      if (overlay.hasAttribute('hidden')) return;
+      overlay.classList.remove('is-open');
+      overlay.setAttribute('hidden', '');
+      document.body.classList.remove('image-lightbox-open');
+      modalImage.removeAttribute('src');
+      modalImage.alt = '';
+      caption.textContent = '';
+
+      const focusTarget = lastFocusedElement;
+      lastFocusedElement = null;
+      if (focusTarget && typeof focusTarget.focus === 'function') {
+        focusTarget.focus();
+      }
+    };
+
+    const openLightbox = (image) => {
+      lastFocusedElement = document.activeElement instanceof HTMLElement ? document.activeElement : image;
+      modalImage.src = image.currentSrc || image.src;
+      modalImage.alt = image.alt || '';
+      caption.textContent = image.alt || 'Expanded image';
+      overlay.removeAttribute('hidden');
+      overlay.classList.add('is-open');
+      document.body.classList.add('image-lightbox-open');
+      closeButton.focus();
+    };
+
+    closeButton.addEventListener('click', closeLightbox);
+    overlay.addEventListener('click', (event) => {
+      if (event.target === overlay) {
+        closeLightbox();
+      }
+    });
+
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && overlay.classList.contains('is-open')) {
+        closeLightbox();
+      }
+    });
+
+    expandableImages.forEach((image) => {
+      image.classList.add('expandable-image');
+      image.tabIndex = 0;
+      image.setAttribute('role', 'button');
+      image.setAttribute('aria-haspopup', 'dialog');
+      image.setAttribute('aria-label', image.alt ? `Expand image: ${image.alt}` : 'Expand image');
+      image.title = image.alt ? `${image.alt} — click to expand` : 'Click to expand image';
+
+      image.addEventListener('click', () => {
+        openLightbox(image);
+      });
+
+      image.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          openLightbox(image);
+        }
+      });
+    });
+  };
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initExpandableImages, { once: true });
+  } else {
+    initExpandableImages();
+  }
+
   const stopTtsOnLeave = () => {
     if (typeof window.__stopAllTts === 'function') {
       window.__stopAllTts();
