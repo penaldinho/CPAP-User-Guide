@@ -10,6 +10,7 @@ class ChatBot {
     this.initialMessage = document.getElementById('chat-initial-message');
     this.isLoading = false;
     this.hasUserAskedQuestion = false;
+    this.defaultChatContainerHeight = this.chatContainer ? (this.chatContainer.style.height || '600px') : '600px';
     this.guideNames = {
       'airsense-10': 'AirSense 10',
       'fp-vitera': 'F&P Vitera Full Face Mask',
@@ -33,6 +34,9 @@ class ChatBot {
     if (!this.chatContainer) return;
     const isPristine = !this.hasUserAskedQuestion;
     this.chatContainer.classList.toggle('chat-pristine', isPristine);
+    this.chatContainer.style.height = isPristine ? 'auto' : this.defaultChatContainerHeight;
+    this.chatContainer.style.minHeight = isPristine ? '0' : this.defaultChatContainerHeight;
+    this.chatContainer.style.overflow = isPristine ? 'visible' : 'hidden';
 
     if (this.messagesContainer) {
       this.messagesContainer.style.flex = isPristine ? '0 0 auto' : '1 1 auto';
