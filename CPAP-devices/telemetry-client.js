@@ -1397,39 +1397,46 @@
   const showTrialIntroOverlayCard = ({ participantId, taskId, taskLabel }) => {
     removeTrialIntroOverlayCard();
 
+    const isDesktopViewport = window.matchMedia('(min-width: 900px)').matches;
+    const introItems = [
+      'You will complete 7 activities in total: 3 practical scenarios followed by 4 short questions.',
+      'Task timings, completion outcomes, and task responses/interactions will be recorded for research purposes only.',
+      'Tasks have recommended pacing targets (scenarios ~5:00 and questions ~1:30), but you can continue if you need more time.',
+      'Timing is used for research analysis only and is not used to judge your performance.',
+      'Question tasks use a single answer box; type your answer as soon as you find it so it is logged.',
+      'When you finish a task, click “I have completed this task”.',
+      'Once a task is marked complete, you cannot return to it and it is treated as finished.',
+      'Work through the tasks in order using the on-screen buttons.',
+      'Work at a steady pace and focus on the most relevant information for each task.'
+    ];
+
     const card = document.createElement('aside');
     card.id = 'mtg-trial-intro-overlay-card';
     card.style.position = 'fixed';
     card.style.left = '50%';
-    card.style.bottom = '96px';
+    card.style.bottom = isDesktopViewport ? '24px' : '96px';
     card.style.transform = 'translateX(-50%)';
-    card.style.width = 'min(720px, calc(100vw - 24px))';
+    card.style.width = isDesktopViewport ? 'min(940px, calc(100vw - 48px))' : 'min(720px, calc(100vw - 24px))';
     card.style.maxWidth = 'calc(100vw - 24px)';
-    card.style.maxHeight = '42vh';
-    card.style.overflow = 'auto';
+    card.style.maxHeight = isDesktopViewport ? 'min(560px, calc(100vh - 48px))' : '42vh';
+    card.style.overflow = isDesktopViewport ? 'hidden' : 'auto';
     card.style.background = '#ecfdf5';
     card.style.border = '1px solid #34d399';
     card.style.borderRadius = '10px';
     card.style.boxShadow = '0 10px 24px rgba(16, 185, 129, 0.18)';
-    card.style.padding = '12px';
+    card.style.padding = isDesktopViewport ? '16px 18px' : '12px';
     card.style.zIndex = '9700';
     card.style.fontFamily = 'system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif';
     card.style.color = '#1f2937';
 
     card.innerHTML = `
-      <div style="font-size:18px; font-weight:700; color:#0f172a; margin-bottom:6px; line-height:1.25;">About this trial</div>
-      <div style="font-size:16px; color:#334155; line-height:1.55;">
-        You will complete 7 activities in total: 3 practical scenarios followed by 4 short questions.<br />
-        Task timings, completion outcomes, and task responses/interactions will be recorded for research purposes only.<br />
-        Tasks have recommended pacing targets (scenarios ~5:00 and questions ~1:30), but you can continue if you need more time.<br />
-        Timing is used for research analysis only and is not used to judge your performance.<br />
-        Question tasks use a single answer box; type your answer as soon as you find it so it is logged.<br />
-        When you finish a task, click “I have completed this task”.<br />
-        Once a task is marked complete, you cannot return to it and it is treated as finished.<br />
-        Work through the tasks in order using the on-screen buttons.<br />
-        Work at a steady pace and focus on the most relevant information for each task.
+      <div style="font-size:${isDesktopViewport ? '20px' : '18px'}; font-weight:700; color:#0f172a; margin-bottom:8px; line-height:1.25;">About this trial</div>
+      <div style="font-size:${isDesktopViewport ? '15px' : '16px'}; color:#334155; line-height:${isDesktopViewport ? '1.45' : '1.55'};">
+        <ul style="margin:0; padding-left:20px; display:grid; gap:${isDesktopViewport ? '6px 18px' : '8px'}; ${isDesktopViewport ? 'grid-template-columns:repeat(2, minmax(0, 1fr)); align-items:start;' : ''}">
+          ${introItems.map((item) => `<li style="margin:0;">${escapeHtml(item)}</li>`).join('')}
+        </ul>
       </div>
-      <div style="display:flex; justify-content:flex-end; margin-top:10px;">
+      <div style="display:flex; justify-content:flex-end; margin-top:${isDesktopViewport ? '14px' : '10px'};">
         <button data-role="start-trial" type="button" style="padding:8px 12px; border:1px solid #0f766e; border-radius:999px; background:#0f766e; color:#fff; cursor:pointer; font-weight:600;">Start trial</button>
       </div>
     `;
