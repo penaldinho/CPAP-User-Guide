@@ -61,7 +61,7 @@ function injectNav(currentPageFile) {
     document.body.classList.toggle('nav-collapsed', persistedCollapsed);
     const isLocalHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
     const isHostedChat = /(^|\.)chat\.medtechguides\.uk$/i.test(window.location.hostname);
-    const hostedGuideChatHref = 'https://medtechguides.uk/CPAP-devices/Airsense-10-User-Guide/chat.html?guide=airsense-10&family=cpap&guides=airsense-10';
+    const hostedGuideChatHref = 'https://chat.medtechguides.uk/CPAP-devices/Airsense-10-User-Guide/chat.html?guide=airsense-10&family=cpap&guides=airsense-10';
     const guideBaseHref = isHostedChat ? 'https://medtechguides.uk/CPAP-devices/Airsense-10-User-Guide/' : '';
     const buildTelemetryContextParams = (includeTaskClear = false) => {
       const params = new URLSearchParams();
@@ -551,7 +551,7 @@ function injectNav(currentPageFile) {
 
     if (!header.querySelector('.chat-button')) {
       const isLocalHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-      const hostedGuideChatHref = 'https://medtechguides.uk/CPAP-devices/Airsense-10-User-Guide/chat.html?guide=airsense-10&family=cpap&guides=airsense-10';
+      const hostedGuideChatHref = 'https://chat.medtechguides.uk/CPAP-devices/Airsense-10-User-Guide/chat.html?guide=airsense-10&family=cpap&guides=airsense-10';
       const buildChatHref = () => {
         const params = new URLSearchParams(window.location.search);
         const hasUrlContext = Array.from(params.keys()).some((key) => key === 'research' || key.startsWith('mtg_'));
