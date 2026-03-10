@@ -596,6 +596,7 @@ WITH ordered AS (
       ) AS task_instance_seq
   FROM telemetry_events
   WHERE NULLIF(task_id, '') IS NOT NULL
+    AND UPPER(TRIM(COALESCE(participant_id, ''))) <> 'TEST'
 ),
 scoped AS (
   SELECT *
@@ -876,6 +877,7 @@ physical_ordered AS (
       ) AS task_instance_seq
   FROM physical_trial_events
   WHERE NULLIF(task_id, '') IS NOT NULL
+    AND UPPER(TRIM(COALESCE(participant_id, ''))) <> 'TEST'
 ),
 physical_scoped AS (
   SELECT *
@@ -1149,6 +1151,7 @@ WITH base_answers AS (
   FROM short_form_results s
   WHERE COALESCE(NULLIF(s.question_id, ''), NULLIF(s.task_id, '')) IS NOT NULL
     AND COALESCE(NULLIF(s.question_id, ''), NULLIF(s.task_id, '')) <> ''
+    AND UPPER(TRIM(COALESCE(s.participant_id, ''))) <> 'TEST'
 ),
 answers AS (
   SELECT
@@ -1273,6 +1276,7 @@ result_expected AS (
   FROM short_form_results s
   INNER JOIN expected_parts e
     ON e.question_id = COALESCE(NULLIF(s.question_id, ''), NULLIF(s.task_id, ''))
+  WHERE UPPER(TRIM(COALESCE(s.participant_id, ''))) <> 'TEST'
 ),
 joined AS (
   SELECT
@@ -1301,6 +1305,7 @@ metadata AS (
     s.duration_ms,
     COALESCE(NULLIF(s.part_a_answer_text, ''), NULLIF(s.answer_text, '')) AS entered_answer_text
   FROM short_form_results s
+  WHERE UPPER(TRIM(COALESCE(s.participant_id, ''))) <> 'TEST'
 )
 SELECT
   m.short_form_result_id,

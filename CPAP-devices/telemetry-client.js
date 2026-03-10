@@ -1564,7 +1564,7 @@
     card.innerHTML = `
       <div style="font-size:${isDesktopViewport ? '20px' : '18px'}; font-weight:700; color:#0f172a; margin-bottom:8px; line-height:1.25;">About this trial</div>
       <div style="font-size:${isDesktopViewport ? '15px' : '16px'}; color:#334155; line-height:${isDesktopViewport ? '1.45' : '1.55'};">
-        <ul style="margin:0; padding-left:20px; display:grid; gap:${isDesktopViewport ? '6px 18px' : '8px'}; ${isDesktopViewport ? 'grid-template-columns:repeat(2, minmax(0, 1fr)); align-items:start;' : ''}">
+        <ul style="margin:0; padding-left:20px; display:grid; gap:${isDesktopViewport ? '6px' : '8px'}; grid-template-columns:minmax(0, 1fr); align-items:start;">
           ${introItems.map((item) => `<li style="margin:0;">${escapeHtml(item)}</li>`).join('')}
         </ul>
       </div>
