@@ -912,15 +912,22 @@ function injectNav(currentPageFile) {
   const initExpandableImages = () => {
     if (window.__mtgExpandableImagesInitialized) return;
 
-    const looksInlineIcon = (image) => {
-      const style = String(image.getAttribute('style') || '').toLowerCase();
-      return /vertical-align|height:\s*1(?:\.\d+)?em|width:\s*(20|40|60|72|84|96)px|height:\s*(20|40|60|72|84|96)px/.test(style);
+    const getPixelValue = (value) => {
+      const match = String(value || '').match(/(\d+(?:\.\d+)?)/);
+      return match ? Number(match[1]) : 0;
     };
 
-    const candidateImages = Array.from(document.querySelectorAll('.card-body img, .manual-image, .media-image, .card > img'));
-    const expandableImages = candidateImages.filter((image) => {
+    const looksInlineIcon = (image) => {
+      const style = String(image.getAttribute('style') || '').toLowerCase();
+      const explicitWidth = getPixelValue(image.getAttribute('width')) || getPixelValue(style.match(/width:\s*([\d.]+)px/)?.[1]);
+      const explicitHeight = getPixelValue(image.getAttribute('height')) || getPixelValue(style.match(/height:\s*([\d.]+)px/)?.[1]);
+      const isExplicitlySmall = explicitWidth > 0 && explicitHeight > 0 && explicitWidth <= 120 && explicitHeight <= 120;
+      return /vertical-align|display:\s*inline|height:\s*1(?:\.\d+)?em/.test(style) || isExplicitlySmall;
+    };
+
+    const isExpandableImage = (image) => {
       if (!(image instanceof HTMLImageElement)) return false;
-      if (image.closest('a, button, summary, .image-lightbox')) return false;
+      if (image.closest('.image-lightbox, .header, .nav, .mobile-chat-dock, .search-drawer, button, summary')) return false;
       if (looksInlineIcon(image)) return false;
       if (image.classList.contains('manual-image') || image.classList.contains('media-image')) return true;
 
@@ -931,7 +938,38 @@ function injectNav(currentPageFile) {
       const naturalHeight = image.naturalHeight || 0;
 
       return renderedWidth >= 160 || renderedHeight >= 160 || naturalWidth >= 320 || naturalHeight >= 240;
-    });
+    };
+
+    const decorateImage = (image, openLightbox) => {
+      if (!isExpandableImage(image) || image.dataset.mtgExpandableImage === 'true') return;
+
+      image.dataset.mtgExpandableImage = 'true';
+      image.classList.add('expandable-image');
+      if (!image.hasAttribute('tabindex')) {
+        image.tabIndex = 0;
+      }
+      image.setAttribute('role', 'button');
+      image.setAttribute('aria-haspopup', 'dialog');
+      image.setAttribute('aria-label', image.alt ? `Expand image: ${image.alt}` : 'Expand image');
+      image.title = image.alt ? `${image.alt} — click to expand` : 'Click to expand image';
+
+      image.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        openLightbox(image);
+      });
+
+      image.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          event.stopPropagation();
+          openLightbox(image);
+        }
+      });
+    };
+
+    const candidateImages = Array.from(document.querySelectorAll('img'));
+    const expandableImages = candidateImages.filter(isExpandableImage);
 
     if (!expandableImages.length) return;
     window.__mtgExpandableImagesInitialized = true;
@@ -995,24 +1033,14 @@ function injectNav(currentPageFile) {
     });
 
     expandableImages.forEach((image) => {
-      image.classList.add('expandable-image');
-      image.tabIndex = 0;
-      image.setAttribute('role', 'button');
-      image.setAttribute('aria-haspopup', 'dialog');
-      image.setAttribute('aria-label', image.alt ? `Expand image: ${image.alt}` : 'Expand image');
-      image.title = image.alt ? `${image.alt} — click to expand` : 'Click to expand image';
-
-      image.addEventListener('click', () => {
-        openLightbox(image);
-      });
-
-      image.addEventListener('keydown', (event) => {
-        if (event.key === 'Enter' || event.key === ' ') {
-          event.preventDefault();
-          openLightbox(image);
-        }
-      });
+      decorateImage(image, openLightbox);
     });
+
+    window.addEventListener('load', () => {
+      document.querySelectorAll('img').forEach((image) => {
+        decorateImage(image, openLightbox);
+      });
+    }, { once: true });
   };
 
   if (document.readyState === 'loading') {
