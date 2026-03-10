@@ -157,7 +157,7 @@ function injectNav(currentPageFile) {
     const landingHref = getLandingHref();
     const buildChatHref = () => {
       const localBase = '/CPAP-devices/F%26P-Vitera-Full-Face-User-Guide/chat.html?guide=fp-vitera&family=cpap&guides=fp-vitera';
-      const base = isHostedChat ? hostedGuideChatHref : localBase;
+      const base = isLocalHost ? localBase : hostedGuideChatHref;
       return appendContextToHref(base, true);
     };
     const chatHref = buildChatHref();
@@ -552,7 +552,7 @@ function injectNav(currentPageFile) {
         }
 
         if (!hasUrlContext && !hasActiveTask) {
-          return isHostedChat ? hostedGuideChatHref : '/CPAP-devices/F%26P-Vitera-Full-Face-User-Guide/chat.html?guide=fp-vitera&family=cpap&guides=fp-vitera';
+          return isLocalHost ? '/CPAP-devices/F%26P-Vitera-Full-Face-User-Guide/chat.html?guide=fp-vitera&family=cpap&guides=fp-vitera' : hostedGuideChatHref;
         }
 
         const participantId = String(safeGetItem('mtg-telemetry-participant-id') || '').trim();
@@ -580,7 +580,7 @@ function injectNav(currentPageFile) {
           // Ignore task read errors
         }
         const contextQuery = params.toString();
-        const base = isHostedChat ? hostedGuideChatHref : '/CPAP-devices/F%26P-Vitera-Full-Face-User-Guide/chat.html?guide=fp-vitera&family=cpap&guides=fp-vitera';
+        const base = isLocalHost ? '/CPAP-devices/F%26P-Vitera-Full-Face-User-Guide/chat.html?guide=fp-vitera&family=cpap&guides=fp-vitera' : hostedGuideChatHref;
         const url = new URL(base, window.location.origin);
         const contextParams = new URLSearchParams(contextQuery);
         contextParams.forEach((value, key) => {
