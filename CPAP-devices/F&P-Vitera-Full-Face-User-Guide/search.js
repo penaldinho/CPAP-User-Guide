@@ -95,7 +95,7 @@ function findBestHighlightRange(text, queryWords) {
   return bestRange;
 }
 
-function highlightIndividualWords(text, queryWords) {
+function emphasizeIndividualWords(text, queryWords) {
   const uniqueWords = getQueryWords(queryWords.join(' '));
   if (!text || uniqueWords.length === 0) return escapeHtml(text);
 
@@ -106,7 +106,7 @@ function highlightIndividualWords(text, queryWords) {
 
   while ((match = regex.exec(text)) !== null) {
     result += escapeHtml(text.slice(lastIndex, match.index));
-    result += `<mark class="search-highlight">${escapeHtml(match[0])}</mark>`;
+    result += `<strong class="search-result-match">${escapeHtml(match[0])}</strong>`;
     lastIndex = match.index + match[0].length;
   }
 
@@ -114,19 +114,19 @@ function highlightIndividualWords(text, queryWords) {
   return result;
 }
 
-function highlightSearchText(text, queryWords) {
+function emphasizeSearchText(text, queryWords) {
   if (!text) return '';
 
   const bestRange = findBestHighlightRange(text, queryWords);
   if (bestRange && queryWords.length > 1) {
     return [
       escapeHtml(text.slice(0, bestRange.start)),
-      `<mark class="search-highlight">${escapeHtml(text.slice(bestRange.start, bestRange.end))}</mark>`,
+      `<strong class="search-result-match">${escapeHtml(text.slice(bestRange.start, bestRange.end))}</strong>`,
       escapeHtml(text.slice(bestRange.end))
     ].join('');
   }
 
-  return highlightIndividualWords(text, queryWords);
+  return emphasizeIndividualWords(text, queryWords);
 }
 
 function getSentenceScore(sentence, queryWords, queryLower) {
@@ -308,9 +308,8 @@ function displayResults(query) {
 
   const html = results.map(result => `
     <div class="search-result card">
-      <a href="${result.file}?highlight=${encodeURIComponent(query)}" class="search-result-title">${highlightSearchText(result.title, queryWords)}</a>
-      <p class="search-result-description">${highlightSearchText(result.description, queryWords)}</p>
-      ${result.matchSnippet ? `<p class="search-result-keywords"><strong>Matched text:</strong> ${highlightSearchText(result.matchSnippet, queryWords)}</p>` : ''}
+      <a href="${result.file}?highlight=${encodeURIComponent(query)}" class="search-result-title">${escapeHtml(result.title)}</a>
+      ${result.matchSnippet ? `<p class="search-result-snippet">${emphasizeSearchText(result.matchSnippet, queryWords)}</p>` : ''}
     </div>
   `).join('');
 
