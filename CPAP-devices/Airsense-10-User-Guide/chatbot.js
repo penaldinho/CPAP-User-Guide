@@ -1,12 +1,14 @@
 // Chatbot frontend functionality
 class ChatBot {
   constructor() {
+    this.chatContainer = document.getElementById('chat-container');
     this.messagesContainer = document.getElementById('chat-messages');
     this.inputField = document.getElementById('chat-input');
     this.sendBtn = document.getElementById('chat-send-btn');
     this.loadingDiv = document.getElementById('chat-loading');
     this.initialMessage = document.getElementById('chat-initial-message');
     this.isLoading = false;
+    this.hasUserAskedQuestion = false;
     this.guideNames = {
       'airsense-10': 'AirSense 10',
       'fp-vitera': 'F&P Vitera Full Face Mask',
@@ -21,8 +23,14 @@ class ChatBot {
     this.applyGuideSpecificGreeting();
     this.renderDisclaimerCard();
     this.renderChatbotSwitcher();
+    this.updateInputLayout();
 
     this.setupEventListeners();
+  }
+
+  updateInputLayout() {
+    if (!this.chatContainer) return;
+    this.chatContainer.classList.toggle('chat-pristine', !this.hasUserAskedQuestion);
   }
 
   getCurrentGuide() {
@@ -277,6 +285,11 @@ class ChatBot {
   async sendMessage() {
     const userMessage = this.inputField.value.trim();
     if (!userMessage || this.isLoading) return;
+
+    if (!this.hasUserAskedQuestion) {
+      this.hasUserAskedQuestion = true;
+      this.updateInputLayout();
+    }
 
     if (window.MTGTelemetry) {
       window.MTGTelemetry.track('chat_submit', {

@@ -36,7 +36,7 @@
       <p class="muted small" id="chat-intro-copy">Ask questions about your setup and get answers based on the selected user guide.</p>
     </div>
 
-    <div id="chat-container" style="display: flex; flex-direction: column; height: 600px; border: 1px solid #ddd; border-radius: 12px; overflow: hidden; margin-bottom: 16px;">
+    <div id="chat-container" class="chat-pristine" style="display: flex; flex-direction: column; height: 600px; border: 1px solid #ddd; border-radius: 12px; overflow: hidden; margin-bottom: 16px;">
       <div id="chat-messages" style="flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px;">
         <div class="chat-message assistant">
           <div class="chat-bubble" id="chat-initial-message">Hi! I'm your setup assistant. Ask any questions about setup, therapy, maintenance, or troubleshooting and I'll answer using your selected guide.</div>
@@ -84,6 +84,19 @@
 
     #chat-messages {
       background-color: #fafafa;
+    }
+
+    #chat-container.chat-pristine #chat-messages {
+      flex: 0 0 auto;
+      overflow-y: visible;
+    }
+
+    #chat-container.chat-pristine #chat-input-area {
+      margin-top: 4px;
+    }
+
+    #chat-container.chat-pristine #chat-loading {
+      margin-top: 4px;
     }
 
     .chat-message {
@@ -158,6 +171,6 @@
     }
   </style>
 
-  <script src="../Airsense-10-User-Guide/chatbot.js?v=20260226a"></script>
+  <script src="../Airsense-10-User-Guide/chatbot.js?v=20260310a"></script>
 </body>
 </html>
