@@ -325,6 +325,7 @@ const observerNotesSqlColumns = [
 ];
 
 const defaultParticipantAllocationRecords = [
+  { participant_id: 'TEST', allocation_group: 'digital' },
   { participant_id: 'P01', allocation_group: 'digital' },
   { participant_id: 'P02', allocation_group: 'physical' },
   { participant_id: 'P03', allocation_group: 'physical' },
@@ -362,7 +363,12 @@ const defaultParticipantAllocationById = Object.fromEntries(
 );
 
 const participantIdSortValue = (participantId) => {
-  const match = /^P(\d+)$/i.exec(String(participantId || '').trim());
+  const normalizedId = String(participantId || '').trim().toUpperCase();
+  if (normalizedId === 'TEST') {
+    return 0;
+  }
+
+  const match = /^P(\d+)$/i.exec(normalizedId);
   if (!match) {
     return Number.MAX_SAFE_INTEGER;
   }
@@ -1705,15 +1711,20 @@ const buildParticipantStateForTaskState = (record) => {
   };
 };
 
-const updateParticipantAllocationRecord = async (participantId, action, completed) => {
+const updateParticipantAllocationRecord = async (participantId, action, completed, allocationGroup) => {
   const normalizedId = String(participantId || '').trim().toUpperCase();
   if (!normalizedId) {
     throw new Error('participant_id is required');
   }
 
   const normalizedAction = String(action || '').trim().toLowerCase();
-  if (!['set_completed', 'open_session', 'close_session'].includes(normalizedAction)) {
-    throw new Error('action must be set_completed, open_session, or close_session');
+  if (!['set_completed', 'open_session', 'close_session', 'set_allocation_group'].includes(normalizedAction)) {
+    throw new Error('action must be set_completed, open_session, close_session, or set_allocation_group');
+  }
+
+  const normalizedAllocationGroup = String(allocationGroup || '').trim().toLowerCase();
+  if (normalizedAction === 'set_allocation_group' && !['physical', 'digital'].includes(normalizedAllocationGroup)) {
+    throw new Error('allocation_group must be physical or digital when action is set_allocation_group');
   }
 
   if (telemetryUsePostgres) {
@@ -1769,6 +1780,20 @@ const updateParticipantAllocationRecord = async (participantId, action, complete
         );
       }
 
+      if (normalizedAction === 'set_allocation_group') {
+        updateResult = await pool.query(
+          `
+            UPDATE participant_allocation
+            SET
+              allocation_group = $2,
+              updated_at = NOW()
+            WHERE participant_id = $1
+            RETURNING participant_id, allocation_group, session_status, session_opened_at, session_closed_at, completed, completed_at, created_at, updated_at
+          `,
+          [normalizedId, normalizedAllocationGroup]
+        );
+      }
+
       const updated = updateResult.rows[0] ? normalizeParticipantAllocationRecord(updateResult.rows[0]) : null;
       if (updated) {
         return updated;
@@ -1819,6 +1844,13 @@ const updateParticipantAllocationRecord = async (participantId, action, complete
       ...next,
       session_status: 'closed',
       session_closed_at: nowIso
+    };
+  }
+
+  if (normalizedAction === 'set_allocation_group') {
+    next = {
+      ...next,
+      allocation_group: normalizedAllocationGroup
     };
   }
 
@@ -2945,21 +2977,26 @@ app.post('/api/participant-allocation', async (req, res) => {
     const participantId = String(payload && payload.participant_id || '').trim().toUpperCase();
     const actionRaw = String(payload && payload.action || '').trim().toLowerCase();
     const completed = parseBooleanSafely(payload && payload.completed);
+    const allocationGroup = String(payload && payload.allocation_group || '').trim().toLowerCase();
     const action = actionRaw || (completed !== null ? 'set_completed' : '');
 
     if (!participantId) {
       return res.status(400).json({ error: 'participant_id is required' });
     }
 
-    if (!['set_completed', 'open_session', 'close_session'].includes(action)) {
-      return res.status(400).json({ error: 'action must be set_completed, open_session, or close_session' });
+    if (!['set_completed', 'open_session', 'close_session', 'set_allocation_group'].includes(action)) {
+      return res.status(400).json({ error: 'action must be set_completed, open_session, close_session, or set_allocation_group' });
     }
 
     if (action === 'set_completed' && completed === null) {
       return res.status(400).json({ error: 'completed must be true or false when action is set_completed' });
     }
 
-    const updated = await updateParticipantAllocationRecord(participantId, action, completed);
+    if (action === 'set_allocation_group' && !['physical', 'digital'].includes(allocationGroup)) {
+      return res.status(400).json({ error: 'allocation_group must be physical or digital when action is set_allocation_group' });
+    }
+
+    const updated = await updateParticipantAllocationRecord(participantId, action, completed, allocationGroup);
     res.status(200).json({ row: updated });
   } catch (error) {
     const message = String(error && error.message || '');

@@ -2436,7 +2436,7 @@
       <div style="display:grid; gap:8px;">
         <label style="display:grid; gap:4px;">
           <span>Participant ID</span>
-          <input id="mtg-participant-input" type="text" placeholder="e.g. P01" style="width:100%; min-width:0; box-sizing:border-box; padding:6px 8px; border:1px solid #cbd5e1; border-radius:6px;" />
+          <input id="mtg-participant-input" type="text" placeholder="e.g. P01 or TEST" style="width:100%; min-width:0; box-sizing:border-box; padding:6px 8px; border:1px solid #cbd5e1; border-radius:6px;" />
         </label>
         <button id="mtg-participant-save" type="button" style="padding:7px 10px; border:1px solid #cbd5e1; border-radius:6px; background:#f8fafc; cursor:pointer;">Save participant</button>
         <hr style="border:0; border-top:1px solid #e5e7eb; margin:2px 0;" />
