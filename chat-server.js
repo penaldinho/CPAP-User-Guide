@@ -1407,6 +1407,28 @@ const readParticipantAllocationRecordsPostgres = async () => {
     .sort((a, b) => participantIdSortValue(a.participant_id) - participantIdSortValue(b.participant_id));
 };
 
+const readParticipantAllocationRecordPostgres = async (participantId) => {
+  const normalizedId = String(participantId || '').trim().toUpperCase();
+  if (!normalizedId) {
+    return null;
+  }
+
+  const pool = getTelemetryPgPool();
+  await ensureParticipantAllocationDefaultsPostgres();
+
+  const result = await pool.query(
+    `
+      SELECT participant_id, allocation_group, session_status, session_opened_at, session_closed_at, completed, completed_at, created_at, updated_at
+      FROM participant_allocation
+      WHERE participant_id = $1
+      LIMIT 1
+    `,
+    [normalizedId]
+  );
+
+  return result.rows[0] ? normalizeParticipantAllocationRecord(result.rows[0]) : null;
+};
+
 const readPhysicalTrialRecordsPostgres = async (participantId) => {
   const pool = getTelemetryPgPool();
   const baseQuery = `
@@ -1634,6 +1656,53 @@ const readParticipantAllocationRecords = async () => {
   }
 
   return readParticipantAllocationRecordsFromFile();
+};
+
+const readParticipantAllocationRecord = async (participantId) => {
+  const normalizedId = String(participantId || '').trim().toUpperCase();
+  if (!normalizedId) {
+    return null;
+  }
+
+  if (telemetryUsePostgres) {
+    try {
+      const postgresRow = await readParticipantAllocationRecordPostgres(normalizedId);
+      if (postgresRow || !telemetryFallbackToFile) {
+        return postgresRow;
+      }
+
+      const fileRows = readParticipantAllocationRecordsFromFile();
+      return fileRows.find((row) => String(row && row.participant_id || '').trim().toUpperCase() === normalizedId) || null;
+    } catch (error) {
+      if (!telemetryFallbackToFile) {
+        throw error;
+      }
+      console.error('Participant allocation single-record read failed in postgres, using file fallback:', error.message);
+    }
+  }
+
+  const fileRows = readParticipantAllocationRecordsFromFile();
+  return fileRows.find((row) => String(row && row.participant_id || '').trim().toUpperCase() === normalizedId) || null;
+};
+
+const buildParticipantStateForTaskState = (record) => {
+  const normalized = record ? normalizeParticipantAllocationRecord(record) : null;
+  if (!normalized) {
+    return null;
+  }
+
+  const sessionStatus = String(normalized.session_status || '').trim().toLowerCase();
+  const completed = normalized.completed === true;
+  const isTerminal = completed || sessionStatus === 'closed';
+
+  return {
+    participant_id: normalized.participant_id,
+    session_status: sessionStatus || 'not_started',
+    session_closed_at: normalized.session_closed_at || null,
+    completed,
+    completed_at: normalized.completed_at || null,
+    is_terminal: isTerminal
+  };
 };
 
 const updateParticipantAllocationRecord = async (participantId, action, completed) => {
@@ -2046,28 +2115,56 @@ const readLatestTaskState = async (participantId) => {
     return {
       participant_id: '',
       active_task: null,
-      last_task: null
+      last_task: null,
+      participant_state: null
     };
   }
+
+  const participantState = buildParticipantStateForTaskState(await readParticipantAllocationRecord(normalizedParticipant));
+  const finalizeTaskState = (state) => {
+    const baseState = state && typeof state === 'object'
+      ? state
+      : {
+          participant_id: normalizedParticipant,
+          active_task: null,
+          last_task: null
+        };
+
+    if (participantState && participantState.is_terminal) {
+      return {
+        participant_id: normalizedParticipant,
+        active_task: null,
+        last_task: null,
+        participant_state: participantState
+      };
+    }
+
+    return {
+      participant_id: normalizedParticipant,
+      active_task: baseState.active_task || null,
+      last_task: baseState.last_task || null,
+      participant_state: participantState
+    };
+  };
 
   if (telemetryUsePostgres) {
     try {
       const postgresState = await readLatestTaskStatePostgres(normalizedParticipant);
       if (postgresState.active_task || postgresState.last_task || !telemetryFallbackToFile) {
-        return postgresState;
+        return finalizeTaskState(postgresState);
       }
-      return readLatestTaskStateFromNdjson(normalizedParticipant);
+      return finalizeTaskState(readLatestTaskStateFromNdjson(normalizedParticipant));
     } catch (error) {
       if (!telemetryFallbackToFile) {
         throw error;
       }
       console.error('Task state postgres read failed, using file fallback:', error.message);
-      return readLatestTaskStateFromNdjson(normalizedParticipant);
+      return finalizeTaskState(readLatestTaskStateFromNdjson(normalizedParticipant));
     }
   }
 
   ensureTelemetryStorage();
-  return readLatestTaskStateFromNdjson(normalizedParticipant);
+  return finalizeTaskState(readLatestTaskStateFromNdjson(normalizedParticipant));
 };
 
 const readDistinctParticipantIds = async () => {

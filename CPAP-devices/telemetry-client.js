@@ -333,6 +333,10 @@
     localStorage.setItem(lastTaskResultKey, JSON.stringify(result || {}));
   };
 
+  const clearLastTaskResult = () => {
+    localStorage.removeItem(lastTaskResultKey);
+  };
+
   const participantTaskOrder = [
     'scenario_card_1',
     'scenario_card_2',
@@ -406,6 +410,10 @@
 
   const clearParticipantNextTaskState = () => {
     localStorage.removeItem(participantNextTaskStateKey);
+  };
+
+  const clearShortFormDrafts = () => {
+    localStorage.removeItem(shortFormDraftsKey);
   };
 
   const getShortFormDrafts = () => safeJsonParse(localStorage.getItem(shortFormDraftsKey) || '{}', {});
@@ -501,6 +509,12 @@
   };
 
   const hydrateTaskStateFromUrl = () => {
+    if (!getRequestedParticipantId()) {
+      setTaskState({});
+      setTaskSubscribedInTab(false);
+      return;
+    }
+
     const url = new URL(window.location.href);
     const shouldClearTask = String(url.searchParams.get('mtg_task_clear') || '').trim() === '1';
     if (shouldClearTask) {
@@ -577,6 +591,104 @@
     window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
   };
 
+  const clearTelemetryContextInUrl = () => {
+    const url = new URL(window.location.href);
+    const keysToDelete = [];
+    url.searchParams.forEach((_, key) => {
+      if (key === 'research' || key.startsWith('mtg_')) {
+        keysToDelete.push(key);
+      }
+    });
+
+    if (!keysToDelete.length) {
+      return;
+    }
+
+    keysToDelete.forEach((key) => {
+      url.searchParams.delete(key);
+    });
+
+    window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
+  };
+
+  const isTerminalParticipantState = (state) => {
+    if (!state || typeof state !== 'object') {
+      return false;
+    }
+
+    if (state.is_terminal === true) {
+      return true;
+    }
+
+    const completed = state.completed === true;
+    const sessionStatus = String(state.session_status || '').trim().toLowerCase();
+    return completed || sessionStatus === 'closed';
+  };
+
+  const clearTelemetryClientContext = () => {
+    setParticipantIdRaw('');
+    setTaskState({});
+    setTaskSubscribedInTab(false);
+    clearLastTaskResult();
+    clearParticipantNextTaskState();
+    clearShortFormDrafts();
+    softCapNotifiedTaskKeys.clear();
+    shortFormAutoFocusTaskId = '';
+    shortFormRenderedTaskId = '';
+    isShortFormCardExpanded = false;
+    isTaskPromptExpanded = false;
+    clearTelemetryContextInUrl();
+  };
+
+  const getRequestedParticipantId = () => {
+    const url = new URL(window.location.href);
+    const fromUrl = String(url.searchParams.get('mtg_participant_id') || '').trim();
+    if (fromUrl) {
+      return fromUrl;
+    }
+    return String(getParticipantId() || '').trim();
+  };
+
+  const hasTaskContextInUrl = () => {
+    const url = new URL(window.location.href);
+    return [
+      'mtg_task_id',
+      'mtg_task_label',
+      'mtg_task_started_at',
+      'mtg_task_clear',
+      'mtg_last_task_id',
+      'mtg_last_task_label',
+      'mtg_last_task_status',
+      'mtg_last_task_duration_ms',
+      'mtg_last_task_ended_at',
+      'research'
+    ].some((key) => url.searchParams.has(key));
+  };
+
+  const clearOrphanedTelemetryContext = () => {
+    const participantId = String(getRequestedParticipantId() || '').trim();
+    if (participantId) {
+      return false;
+    }
+
+    const participantNextState = getParticipantNextTaskState();
+    const hasOrphanedState = Boolean(
+      String(getSharedTaskState().task_id || '').trim()
+      || isTaskSubscribedInTab()
+      || String(getLastTaskResult().task_id || '').trim()
+      || String(participantNextState.next_task_id || '').trim()
+      || String(participantNextState.status || '').trim() === 'completed'
+      || hasTaskContextInUrl()
+    );
+
+    if (!hasOrphanedState) {
+      return false;
+    }
+
+    clearTelemetryClientContext();
+    return true;
+  };
+
   const buildPostTrialQuestionnaireUrl = () => {
     const currentUrl = new URL(window.location.href);
     const explicit = String(currentUrl.searchParams.get('mtg_post_trial_url') || '').trim();
@@ -634,6 +746,27 @@
       taskId: introTaskId,
       taskLabel: getTaskDisplayLabel(introTaskId)
     });
+  };
+
+  const fetchTaskStateFromServer = async (participantId) => {
+    const normalizedParticipantId = String(participantId || '').trim();
+    if (!normalizedParticipantId) {
+      return null;
+    }
+
+    const endpoint = `${getTaskStateApiUrl()}?participant_id=${encodeURIComponent(normalizedParticipantId)}`;
+    const response = await fetch(endpoint, {
+      method: 'GET',
+      headers: { Accept: 'application/json' },
+      cache: 'no-store',
+      credentials: 'omit'
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    return response.json();
   };
 
   const markTaskClearedInUrl = () => {
@@ -834,19 +967,18 @@
     taskStateSyncState.lastPolledAt = now;
 
     try {
-      const endpoint = `${getTaskStateApiUrl()}?participant_id=${encodeURIComponent(participantId)}`;
-      const response = await fetch(endpoint, {
-        method: 'GET',
-        headers: { Accept: 'application/json' },
-        cache: 'no-store',
-        credentials: 'omit'
-      });
-
-      if (!response.ok) {
+      const payload = await fetchTaskStateFromServer(participantId);
+      if (!payload) {
         return;
       }
 
-      const payload = await response.json();
+      if (isTerminalParticipantState(payload && payload.participant_state)) {
+        clearTelemetryClientContext();
+        syncParticipantEndButton();
+        syncTaskPromptCard();
+        return;
+      }
+
       const active = payload && payload.active_task && String(payload.active_task.task_id || '').trim()
         ? payload.active_task
         : null;
@@ -2649,11 +2781,32 @@
     renderResearchPanel(true, true);
   };
 
-  const init = () => {
-    hydrateParticipantFromUrl();
-    hydrateLastTaskResultFromUrl();
-    hydrateTaskStateFromUrl();
-    maybeShowTrialIntroFromUrl();
+  const init = async () => {
+    let shouldHydrateTelemetryFromUrl = true;
+    if (clearOrphanedTelemetryContext()) {
+      shouldHydrateTelemetryFromUrl = false;
+    }
+
+    const requestedParticipantId = getRequestedParticipantId();
+    if (shouldHydrateTelemetryFromUrl && requestedParticipantId) {
+      try {
+        const initialServerState = await fetchTaskStateFromServer(requestedParticipantId);
+        if (isTerminalParticipantState(initialServerState && initialServerState.participant_state)) {
+          clearTelemetryClientContext();
+          shouldHydrateTelemetryFromUrl = false;
+        }
+      } catch {
+        // ignore initial participant-state lookup failures
+      }
+    }
+
+    if (shouldHydrateTelemetryFromUrl) {
+      hydrateParticipantFromUrl();
+      hydrateLastTaskResultFromUrl();
+      hydrateTaskStateFromUrl();
+      maybeShowTrialIntroFromUrl();
+    }
+
     if (isTaskSubscribedInTab() && !getSharedTaskState().task_id) {
       setTaskSubscribedInTab(false);
     }
