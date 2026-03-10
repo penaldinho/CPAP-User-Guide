@@ -10,7 +10,9 @@ class ChatBot {
     this.initialMessage = document.getElementById('chat-initial-message');
     this.isLoading = false;
     this.hasUserAskedQuestion = false;
-    this.defaultChatContainerHeight = this.chatContainer ? (this.chatContainer.style.height || '600px') : '600px';
+    this.defaultChatContainerHeight = this.chatContainer
+      ? (this.chatContainer.dataset.chatDefaultHeight || this.chatContainer.style.height || '600px')
+      : '600px';
     this.guideNames = {
       'airsense-10': 'AirSense 10',
       'fp-vitera': 'F&P Vitera Full Face Mask',
