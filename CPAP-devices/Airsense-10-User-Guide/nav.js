@@ -926,6 +926,18 @@ function injectNav(currentPageFile) {
       return renderedWidth >= 160 || renderedHeight >= 160 || naturalWidth >= 320 || naturalHeight >= 240;
     };
 
+    const syncExpandableImageWrapper = (image) => {
+      if (!(image instanceof HTMLImageElement)) return;
+      const wrapper = image.parentElement;
+      if (!wrapper || !wrapper.classList.contains('expandable-image-wrap')) return;
+
+      const rect = image.getBoundingClientRect();
+      const width = Math.round(rect.width);
+      if (width > 0) {
+        wrapper.style.width = `${width}px`;
+      }
+    };
+
     const decorateImage = (image, openLightbox) => {
       if (!isExpandableImage(image) || image.dataset.mtgExpandableImage === 'true') return;
 
@@ -954,6 +966,22 @@ function injectNav(currentPageFile) {
       image.setAttribute('aria-haspopup', 'dialog');
       image.setAttribute('aria-label', image.alt ? `Expand image: ${image.alt}` : 'Expand image');
       image.title = image.alt ? `${image.alt} — click to expand` : 'Click to expand image';
+
+      syncExpandableImageWrapper(image);
+
+      if (typeof window.ResizeObserver === 'function' && image.dataset.mtgExpandableResizeObserved !== 'true') {
+        const resizeObserver = new ResizeObserver(() => {
+          syncExpandableImageWrapper(image);
+        });
+        resizeObserver.observe(image);
+        image.dataset.mtgExpandableResizeObserved = 'true';
+      }
+
+      if (!image.complete) {
+        image.addEventListener('load', () => {
+          syncExpandableImageWrapper(image);
+        }, { once: true });
+      }
 
       image.addEventListener('click', (event) => {
         event.preventDefault();
@@ -1038,9 +1066,16 @@ function injectNav(currentPageFile) {
       decorateImage(image, openLightbox);
     });
 
+    window.addEventListener('resize', () => {
+      document.querySelectorAll('.expandable-image-wrap > img').forEach((image) => {
+        syncExpandableImageWrapper(image);
+      });
+    });
+
     window.addEventListener('load', () => {
       document.querySelectorAll('img').forEach((image) => {
         decorateImage(image, openLightbox);
+        syncExpandableImageWrapper(image);
       });
     }, { once: true });
   };

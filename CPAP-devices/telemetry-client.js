@@ -937,246 +937,9 @@
     localTransitionUntilMs: 0
   };
 
-  const trackedSectionState = {
-    observer: null,
-    elements: [],
-    pendingTimerId: null,
-    pendingSection: null,
-    activeSection: null,
-    activeEnteredAtMs: null,
-    activationDelayMs: 1000,
-    minimumVisibleRatio: 0.55,
-    evaluationFrameId: 0
-  };
-
   const markLocalTaskTransition = (durationMs = 4500) => {
     const windowMs = Number.isFinite(Number(durationMs)) ? Math.max(0, Number(durationMs)) : 4500;
     taskStateSyncState.localTransitionUntilMs = Date.now() + windowMs;
-  };
-
-  const cancelTrackedSectionEvaluation = () => {
-    if (trackedSectionState.evaluationFrameId) {
-      window.cancelAnimationFrame(trackedSectionState.evaluationFrameId);
-      trackedSectionState.evaluationFrameId = 0;
-    }
-  };
-
-  const clearPendingTrackedSection = () => {
-    if (trackedSectionState.pendingTimerId) {
-      window.clearTimeout(trackedSectionState.pendingTimerId);
-      trackedSectionState.pendingTimerId = null;
-    }
-    trackedSectionState.pendingSection = null;
-  };
-
-  const buildTrackedSectionPagePath = (sectionId) => {
-    const url = new URL(window.location.href);
-    return `${url.pathname}${url.search}${sectionId ? `#${encodeURIComponent(sectionId)}` : ''}`;
-  };
-
-  const updateTrackedSectionHash = (sectionId) => {
-    if (!sectionId) return;
-
-    try {
-      const url = new URL(window.location.href);
-      if (url.hash === `#${sectionId}`) {
-        return;
-      }
-      url.hash = sectionId;
-      window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
-    } catch {
-      // Ignore hash update failures
-    }
-  };
-
-  const getTrackedSectionMeta = (element) => {
-    if (!element) return null;
-    const dataset = element.dataset || {};
-    const sectionId = String(dataset.mtgSectionId || element.id || '').trim();
-    if (!sectionId) return null;
-
-    return {
-      element,
-      section_id: sectionId,
-      section_label: String(dataset.mtgSectionLabel || '').trim(),
-      section_source: String(dataset.mtgSectionSource || '').trim()
-    };
-  };
-
-  const getTrackedSectionVisibleRatio = (element) => {
-    if (!element) return 0;
-    const rect = element.getBoundingClientRect();
-    if (rect.height <= 0 || rect.width <= 0) return 0;
-
-    const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
-    if (viewportHeight <= 0) return 0;
-
-    const visibleHeight = Math.max(0, Math.min(rect.bottom, viewportHeight) - Math.max(rect.top, 0));
-    const denominator = Math.max(1, Math.min(rect.height, viewportHeight));
-    return visibleHeight / denominator;
-  };
-
-  const emitTrackedSectionExit = (reason) => {
-    const activeSection = trackedSectionState.activeSection;
-    if (!activeSection) return;
-
-    const enteredAtMs = trackedSectionState.activeEnteredAtMs;
-    const durationMs = Number.isFinite(enteredAtMs)
-      ? Math.max(0, Date.now() - enteredAtMs)
-      : 0;
-
-    track('section_exit', {
-      section_id: activeSection.section_id,
-      section_label: activeSection.section_label,
-      section_source: activeSection.section_source,
-      duration_ms: durationMs,
-      exit_reason: String(reason || '').trim() || 'unknown',
-      page_path: buildTrackedSectionPagePath(activeSection.section_id)
-    });
-
-    trackedSectionState.activeSection = null;
-    trackedSectionState.activeEnteredAtMs = null;
-  };
-
-  const activateTrackedSection = (meta) => {
-    if (!meta || !meta.section_id) return;
-
-    if (trackedSectionState.activeSection && trackedSectionState.activeSection.section_id === meta.section_id) {
-      updateTrackedSectionHash(meta.section_id);
-      return;
-    }
-
-    emitTrackedSectionExit('section_switch');
-    trackedSectionState.activeSection = meta;
-    trackedSectionState.activeEnteredAtMs = Date.now();
-
-    updateTrackedSectionHash(meta.section_id);
-    track('section_view', {
-      section_id: meta.section_id,
-      section_label: meta.section_label,
-      section_source: meta.section_source,
-      visible_threshold: trackedSectionState.minimumVisibleRatio,
-      activation_delay_ms: trackedSectionState.activationDelayMs,
-      page_path: buildTrackedSectionPagePath(meta.section_id)
-    });
-  };
-
-  const scheduleTrackedSectionActivation = (meta) => {
-    if (!meta || !meta.section_id) {
-      clearPendingTrackedSection();
-      return;
-    }
-
-    if (trackedSectionState.activeSection && trackedSectionState.activeSection.section_id === meta.section_id) {
-      clearPendingTrackedSection();
-      return;
-    }
-
-    if (trackedSectionState.pendingSection && trackedSectionState.pendingSection.section_id === meta.section_id) {
-      return;
-    }
-
-    clearPendingTrackedSection();
-    trackedSectionState.pendingSection = meta;
-    trackedSectionState.pendingTimerId = window.setTimeout(() => {
-      const latestMeta = trackedSectionState.elements
-        .map(({ element }) => getTrackedSectionMeta(element))
-        .find((entry) => entry && entry.section_id === meta.section_id);
-      const latestElement = latestMeta && latestMeta.element;
-      const visibleRatio = latestElement ? getTrackedSectionVisibleRatio(latestElement) : 0;
-
-      trackedSectionState.pendingTimerId = null;
-      trackedSectionState.pendingSection = null;
-
-      if (!latestMeta || visibleRatio < trackedSectionState.minimumVisibleRatio || document.visibilityState !== 'visible') {
-        return;
-      }
-
-      activateTrackedSection(latestMeta);
-    }, trackedSectionState.activationDelayMs);
-  };
-
-  const evaluateTrackedSections = () => {
-    cancelTrackedSectionEvaluation();
-
-    if (document.visibilityState !== 'visible' || !trackedSectionState.elements.length) {
-      clearPendingTrackedSection();
-      emitTrackedSectionExit('page_hidden');
-      return;
-    }
-
-    let bestCandidate = null;
-    trackedSectionState.elements.forEach(({ element }) => {
-      const meta = getTrackedSectionMeta(element);
-      if (!meta) return;
-
-      const visibleRatio = getTrackedSectionVisibleRatio(element);
-      if (visibleRatio < trackedSectionState.minimumVisibleRatio) {
-        return;
-      }
-
-      if (!bestCandidate || visibleRatio > bestCandidate.visibleRatio) {
-        bestCandidate = {
-          ...meta,
-          visibleRatio
-        };
-      }
-    });
-
-    if (!bestCandidate) {
-      clearPendingTrackedSection();
-      emitTrackedSectionExit('out_of_view');
-      return;
-    }
-
-    if (trackedSectionState.activeSection && trackedSectionState.activeSection.section_id === bestCandidate.section_id) {
-      clearPendingTrackedSection();
-      updateTrackedSectionHash(bestCandidate.section_id);
-      return;
-    }
-
-    scheduleTrackedSectionActivation(bestCandidate);
-  };
-
-  const queueTrackedSectionEvaluation = () => {
-    if (trackedSectionState.evaluationFrameId) return;
-    trackedSectionState.evaluationFrameId = window.requestAnimationFrame(() => {
-      trackedSectionState.evaluationFrameId = 0;
-      evaluateTrackedSections();
-    });
-  };
-
-  const registerTrackedSections = (selector = '[data-mtg-section-id]') => {
-    clearPendingTrackedSection();
-    cancelTrackedSectionEvaluation();
-
-    if (trackedSectionState.observer) {
-      trackedSectionState.observer.disconnect();
-      trackedSectionState.observer = null;
-    }
-
-    trackedSectionState.elements = Array.from(document.querySelectorAll(selector))
-      .map((element) => ({ element }))
-      .filter(({ element }) => getTrackedSectionMeta(element));
-
-    if (!trackedSectionState.elements.length || typeof window.IntersectionObserver !== 'function') {
-      return false;
-    }
-
-    trackedSectionState.observer = new window.IntersectionObserver(() => {
-      queueTrackedSectionEvaluation();
-    }, {
-      root: null,
-      rootMargin: '0px 0px -20% 0px',
-      threshold: [0, 0.25, 0.5, 0.55, 0.75, 1]
-    });
-
-    trackedSectionState.elements.forEach(({ element }) => {
-      trackedSectionState.observer.observe(element);
-    });
-
-    queueTrackedSectionEvaluation();
-    return true;
   };
 
   const getTaskStateApiUrl = () => getApiUrl().replace(/\/api\/telemetry$/, '/api/telemetry/task-state');
@@ -3102,8 +2865,6 @@
 
     window.addEventListener('pagehide', () => {
       emitVisibleSegmentExit();
-      emitTrackedSectionExit('pagehide');
-      clearPendingTrackedSection();
     });
 
     window.addEventListener('storage', (event) => {
@@ -3135,23 +2896,17 @@
         reconcileSharedTaskState({ allowPanelAutoOpen: false });
         reconcileTaskStateFromServer('visible');
         syncTaskPromptCard();
-        queueTrackedSectionEvaluation();
         return;
       }
 
       if (document.visibilityState === 'hidden') {
         emitVisibleSegmentExit();
-        emitTrackedSectionExit('page_hidden');
-        clearPendingTrackedSection();
       }
     });
 
     window.addEventListener('resize', () => {
       updateTaskCardSafeArea();
-      queueTrackedSectionEvaluation();
     });
-
-    registerTrackedSections();
 
     window.setInterval(() => {
       maybeApplyActiveTaskTimeCap();
@@ -3167,8 +2922,7 @@
     startTask,
     endTask,
     getContext,
-    getActiveTaskContext,
-    registerTrackedSections
+    getActiveTaskContext
   };
 
   if (document.readyState === 'loading') {

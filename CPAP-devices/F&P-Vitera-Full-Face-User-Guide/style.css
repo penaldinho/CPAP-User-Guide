@@ -1186,13 +1186,14 @@ details.card > summary h2 {
   display: inline-block;
   width: fit-content;
   max-width: 100%;
+  padding-top: 34px;
   vertical-align: top;
 }
 
 .expandable-image-hint {
   position: absolute;
-  top: 18px;
-  right: 18px;
+  top: 2px;
+  right: 0;
   z-index: 1;
   padding: 6px 10px;
   border-radius: 999px;
@@ -1201,6 +1202,7 @@ details.card > summary h2 {
   font-size: calc(0.8rem * var(--text-scale));
   font-weight: 600;
   line-height: 1;
+  white-space: nowrap;
   pointer-events: none;
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.18);
 }
@@ -1278,9 +1280,13 @@ body.image-lightbox-open {
 }
 
 @media (max-width: 640px) {
+  .expandable-image-wrap {
+    padding-top: 30px;
+  }
+
   .expandable-image-hint {
-    top: 12px;
-    right: 12px;
+    top: 2px;
+    right: 0;
     padding: 5px 8px;
     font-size: calc(0.72rem * var(--text-scale));
   }
