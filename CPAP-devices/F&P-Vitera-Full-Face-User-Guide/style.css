@@ -5,6 +5,8 @@
   --border: #ddd;
   --muted: #555;
   --text-scale: 1;
+  --inline-image-maxw: 560px;
+  --content-maxw: 920px;
 }
 
 * { box-sizing: border-box; }
@@ -873,6 +875,14 @@ body.text-size-large {
   margin: 18px 0;
 }
 
+@media (min-width: 900px) {
+  h1,
+  .card,
+  .footer {
+    max-width: var(--content-maxw);
+  }
+}
+
 .card-warning {
   background: #fff3cd;
   border-color: #ffc107;
@@ -1149,18 +1159,20 @@ details.card > summary h2 {
   font-weight: 600;
 }
 
-.card-body img,
+.card-body > img,
 .manual-image {
   display: block;
-  width: 100%;
-  max-width: 100%;
+  width: min(100%, var(--inline-image-maxw));
+  max-width: min(100%, var(--inline-image-maxw)) !important;
   height: auto;
   border-radius: 12px;
-  margin: 12px 0;
+  margin: 12px auto;
 }
 
-.card img[style],
-.card-body img[style] {
+.card p img[style*="vertical-align" i],
+.card li img[style*="vertical-align" i],
+.card-body p img[style*="vertical-align" i],
+.card-body li img[style*="vertical-align" i] {
   display: inline;
   width: auto;
   max-width: 100%;
@@ -1183,11 +1195,11 @@ details.card > summary h2 {
 
 .expandable-image-wrap {
   position: relative;
-  display: inline-block;
+  display: block;
   width: fit-content;
-  max-width: 100%;
+  max-width: min(100%, var(--inline-image-maxw));
   padding-top: 34px;
-  vertical-align: top;
+  margin: 12px auto;
 }
 
 .expandable-image-hint {

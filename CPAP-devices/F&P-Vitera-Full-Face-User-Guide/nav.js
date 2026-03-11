@@ -943,8 +943,11 @@ function injectNav(currentPageFile) {
       }
 
       const computed = window.getComputedStyle(image);
-      wrapper.style.display = computed.display === 'block' ? 'block' : 'inline-block';
-      wrapper.style.margin = computed.margin;
+      wrapper.style.display = 'block';
+      wrapper.style.marginTop = computed.marginTop;
+      wrapper.style.marginBottom = computed.marginBottom;
+      wrapper.style.marginLeft = 'auto';
+      wrapper.style.marginRight = 'auto';
 
       if (inlineWidth) {
         wrapper.style.width = inlineWidth;
@@ -952,11 +955,9 @@ function injectNav(currentPageFile) {
         wrapper.style.width = '';
       }
 
-      if (inlineMaxWidth) {
-        wrapper.style.maxWidth = inlineMaxWidth;
-      } else {
-        wrapper.style.maxWidth = '';
-      }
+      wrapper.style.maxWidth = inlineMaxWidth
+        ? `min(${inlineMaxWidth}, var(--inline-image-maxw))`
+        : 'var(--inline-image-maxw)';
 
       image.style.width = '100%';
       image.style.maxWidth = '100%';
@@ -977,6 +978,9 @@ function injectNav(currentPageFile) {
       const rect = image.getBoundingClientRect();
       const width = Math.round(rect.width);
       if (width > 0) {
+        wrapper.style.display = 'block';
+        wrapper.style.marginLeft = 'auto';
+        wrapper.style.marginRight = 'auto';
         wrapper.style.width = `${width}px`;
       }
     };
