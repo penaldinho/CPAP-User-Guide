@@ -926,10 +926,58 @@ function injectNav(currentPageFile) {
       return renderedWidth >= 160 || renderedHeight >= 160 || naturalWidth >= 320 || naturalHeight >= 240;
     };
 
+    const getInlineStyleValue = (image, propertyName) => {
+      const style = String(image.getAttribute('style') || '');
+      const escapedName = String(propertyName || '').replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
+      const match = style.match(new RegExp(`(?:^|;)\\s*${escapedName}\\s*:\\s*([^;]+)`, 'i'));
+      return match ? String(match[1] || '').trim() : '';
+    };
+
+    const usesRelativeImageSizing = (value) => /%|\bcalc\(|\bmin\(|\bmax\(/i.test(String(value || ''));
+
+    const configureExpandableImageWrapper = (image, wrapper) => {
+      if (!(image instanceof HTMLImageElement) || !wrapper) return false;
+
+      const inlineWidth = getInlineStyleValue(image, 'width');
+      const inlineMaxWidth = getInlineStyleValue(image, 'max-width');
+      const shouldManageWrapperWidth = usesRelativeImageSizing(inlineWidth) || usesRelativeImageSizing(inlineMaxWidth);
+
+      if (!shouldManageWrapperWidth) {
+        image.dataset.mtgExpandableWrapperManaged = 'false';
+        return false;
+      }
+
+      const computed = window.getComputedStyle(image);
+      wrapper.style.display = computed.display === 'block' ? 'block' : 'inline-block';
+      wrapper.style.margin = computed.margin;
+
+      if (inlineWidth) {
+        wrapper.style.width = inlineWidth;
+      } else {
+        wrapper.style.width = '';
+      }
+
+      if (inlineMaxWidth) {
+        wrapper.style.maxWidth = inlineMaxWidth;
+      } else {
+        wrapper.style.maxWidth = '';
+      }
+
+      image.style.width = '100%';
+      image.style.maxWidth = '100%';
+      image.style.margin = '0';
+      image.dataset.mtgExpandableWrapperManaged = 'true';
+      return true;
+    };
+
     const syncExpandableImageWrapper = (image) => {
       if (!(image instanceof HTMLImageElement)) return;
       const wrapper = image.parentElement;
       if (!wrapper || !wrapper.classList.contains('expandable-image-wrap')) return;
+
+      if (image.dataset.mtgExpandableWrapperManaged === 'true') {
+        return;
+      }
 
       const rect = image.getBoundingClientRect();
       const width = Math.round(rect.width);
@@ -969,6 +1017,7 @@ function injectNav(currentPageFile) {
       image.setAttribute('aria-label', image.alt ? `Expand image: ${image.alt}` : 'Expand image');
       image.title = image.alt ? `${image.alt} — click to expand` : 'Click to expand image';
 
+      configureExpandableImageWrapper(image, wrapper);
       syncExpandableImageWrapper(image);
 
       if (typeof window.ResizeObserver === 'function' && image.dataset.mtgExpandableResizeObserved !== 'true') {
