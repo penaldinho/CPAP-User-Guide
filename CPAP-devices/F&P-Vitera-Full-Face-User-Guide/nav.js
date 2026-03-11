@@ -928,6 +928,8 @@ function injectNav(currentPageFile) {
         wrapper.appendChild(hint);
       }
 
+      const hint = wrapper.querySelector('.expandable-image-hint');
+
       image.dataset.mtgExpandableImage = 'true';
       image.classList.add('expandable-image');
       if (!image.hasAttribute('tabindex')) {
@@ -952,6 +954,15 @@ function injectNav(currentPageFile) {
         image.addEventListener('load', () => {
           syncExpandableImageWrapper(image);
         }, { once: true });
+      }
+
+      if (hint && hint.dataset.mtgExpandableHintBound !== 'true') {
+        hint.dataset.mtgExpandableHintBound = 'true';
+        hint.addEventListener('click', (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          openLightbox(image);
+        });
       }
 
       image.addEventListener('click', (event) => {
