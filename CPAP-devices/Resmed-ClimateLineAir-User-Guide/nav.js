@@ -205,12 +205,33 @@ function injectNav(currentPageFile) {
       });
     };
 
+    const scrollActiveNavItemIntoView = () => {
+      if (window.innerWidth < 900) return;
+      if (document.body.classList.contains('nav-collapsed')) return;
+
+      const navList = navContainer.querySelector('.nav-list');
+      const activeLink = navList && navList.querySelector('a[aria-current="page"]');
+      if (!navList || !activeLink) return;
+
+      const navListRect = navList.getBoundingClientRect();
+      const activeRect = activeLink.getBoundingClientRect();
+      const currentScrollTop = navList.scrollTop;
+      const targetScrollTop = currentScrollTop + (activeRect.top - navListRect.top) - ((navListRect.height - activeRect.height) / 2);
+
+      navList.scrollTo({
+        top: Math.max(0, targetScrollTop),
+        behavior: 'auto'
+      });
+    };
+
     refreshChatLinks();
     navContainer.querySelectorAll('.nav-link-primary-chat, .nav-action-chat').forEach((link) => {
       link.addEventListener('mouseenter', refreshChatLinks);
       link.addEventListener('focus', refreshChatLinks);
       link.addEventListener('click', refreshChatLinks);
     });
+
+    window.requestAnimationFrame(scrollActiveNavItemIntoView);
     
     // Initialize nav text size controls
     const navTextSizeBtns = navContainer.querySelectorAll('.nav-text-size-btn');
@@ -244,6 +265,9 @@ function injectNav(currentPageFile) {
         const handleIcon = document.querySelector('.nav-handle-icon');
         if (handleIcon) {
           handleIcon.textContent = isCollapsed ? '❯' : '❮';
+        }
+        if (!isCollapsed) {
+          window.requestAnimationFrame(scrollActiveNavItemIntoView);
         }
       });
       navContainer.prepend(desktopToggle);
