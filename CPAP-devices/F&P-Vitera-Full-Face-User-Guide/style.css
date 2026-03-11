@@ -1183,8 +1183,10 @@ details.card > summary h2 {
 
 .expandable-image-wrap {
   position: relative;
-  display: block;
-  width: 100%;
+  display: inline-block;
+  width: fit-content;
+  max-width: 100%;
+  vertical-align: top;
 }
 
 .expandable-image-hint {
