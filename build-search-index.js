@@ -57,6 +57,17 @@ function extractTextFromHtml(html) {
   // Remove script and style elements
   let text = html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
   text = text.replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '');
+
+  // Preserve alt text for small inline icons used inside instructional text,
+  // while ignoring larger standalone/manual images.
+  text = text.replace(/<img\b[^>]*>/gi, (tag) => {
+    if (!looksInlineIconTag(tag)) {
+      return ' ';
+    }
+
+    const alt = extractAttribute(tag, 'alt');
+    return alt ? ` ${alt} ` : ' ';
+  });
   
   // Remove HTML tags
   text = text.replace(/<[^>]+>/g, ' ');
@@ -73,6 +84,157 @@ function extractTextFromHtml(html) {
   text = text.replace(/\s+/g, ' ').trim();
   
   return text;
+}
+
+function decodeHtmlEntities(text) {
+  const namedEntities = {
+    nbsp: ' ',
+    amp: '&',
+    lt: '<',
+    gt: '>',
+    quot: '"',
+    '#39': "'"
+  };
+
+  return String(text || '')
+    .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, code) => String.fromCharCode(parseInt(code, 16)))
+    .replace(/&([a-z0-9#]+);/gi, (match, name) => {
+      const key = String(name || '').toLowerCase();
+      return Object.prototype.hasOwnProperty.call(namedEntities, key)
+        ? namedEntities[key]
+        : match;
+    });
+}
+
+function extractAttribute(tag, attributeName) {
+  const escapedName = String(attributeName || '').replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
+  const match = String(tag || '').match(new RegExp(`${escapedName}\\s*=\\s*(["'])(.*?)\\1`, 'i'));
+  return match ? decodeHtmlEntities(match[2]).trim() : '';
+}
+
+function getNumericStyleValue(tag, propertyName) {
+  const style = extractAttribute(tag, 'style').toLowerCase();
+  const escapedName = String(propertyName || '').replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
+  const match = style.match(new RegExp(`${escapedName}\\s*:\\s*(\d+(?:\.\d+)?)px`, 'i'));
+  return match ? Number(match[1]) : 0;
+}
+
+function getNumericAttributeValue(tag, attributeName) {
+  const value = extractAttribute(tag, attributeName);
+  const match = value.match(/(\d+(?:\.\d+)?)/);
+  return match ? Number(match[1]) : 0;
+}
+
+function looksInlineIconTag(tag) {
+  const style = extractAttribute(tag, 'style').toLowerCase();
+  const width = getNumericAttributeValue(tag, 'width') || getNumericStyleValue(tag, 'width');
+  const height = getNumericAttributeValue(tag, 'height') || getNumericStyleValue(tag, 'height');
+  const explicitlySmall = width > 0 && height > 0 && width <= 120 && height <= 120;
+  const alt = extractAttribute(tag, 'alt');
+
+  return /vertical-align|display\s*:\s*inline|height\s*:\s*1(?:\.\d+)?em/.test(style)
+    || explicitlySmall
+    || (alt.length <= 2 && !extractAttribute(tag, 'class').includes('manual-image'));
+}
+
+function extractHtmlBlocks(html, tagName) {
+  const regex = new RegExp(`<${tagName}\\b[^>]*>([\\s\\S]*?)<\/${tagName}>`, 'gi');
+  const blocks = [];
+  let match;
+
+  while ((match = regex.exec(html)) !== null) {
+    blocks.push(match[1]);
+  }
+
+  return blocks;
+}
+
+function extractImageMetadata(html, filename, title) {
+  const headingRegex = /<h([1-6])\b[^>]*>([\s\S]*?)<\/h\1>/gi;
+  const headings = [];
+  let headingMatch;
+
+  while ((headingMatch = headingRegex.exec(html)) !== null) {
+    headings.push({
+      index: headingMatch.index,
+      level: Number(headingMatch[1]),
+      text: extractTextFromHtml(headingMatch[2])
+    });
+  }
+
+  const imageRegex = /<img\b[^>]*>/gi;
+  const images = [];
+  let imageMatch;
+
+  while ((imageMatch = imageRegex.exec(html)) !== null) {
+    const tag = imageMatch[0];
+    if (looksInlineIconTag(tag)) {
+      continue;
+    }
+
+    const src = extractAttribute(tag, 'src');
+    const alt = extractAttribute(tag, 'alt');
+    if (!src || !alt) {
+      continue;
+    }
+
+    let headingIndex = -1;
+    for (let i = 0; i < headings.length; i += 1) {
+      if (headings[i].index <= imageMatch.index) {
+        headingIndex = i;
+      } else {
+        break;
+      }
+    }
+
+    const currentHeading = headingIndex >= 0 ? headings[headingIndex] : null;
+    const nextHeading = headingIndex >= 0 ? headings[headingIndex + 1] : headings[0];
+    const contextWindowStart = Math.max(0, imageMatch.index - 600);
+    const contextWindowEnd = Math.min(html.length, imageMatch.index + 2800);
+    const sectionHtml = html.slice(contextWindowStart, contextWindowEnd);
+
+    const listItems = extractHtmlBlocks(sectionHtml, 'li')
+      .map((item) => extractTextFromHtml(item))
+      .filter(Boolean)
+      .slice(0, 8);
+
+    const paragraphs = extractHtmlBlocks(sectionHtml, 'p')
+      .map((item) => extractTextFromHtml(item))
+      .filter(Boolean)
+      .slice(0, 4);
+
+    const tableCells = [
+      ...extractHtmlBlocks(sectionHtml, 'th'),
+      ...extractHtmlBlocks(sectionHtml, 'td')
+    ]
+      .map((item) => extractTextFromHtml(item))
+      .filter(Boolean)
+      .slice(0, 12);
+
+    const sectionText = [
+      currentHeading ? currentHeading.text : '',
+      nextHeading && nextHeading.index < imageMatch.index + 1000 ? nextHeading.text : '',
+      ...listItems,
+      ...paragraphs,
+      ...tableCells
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    images.push({
+      src,
+      alt,
+      pageTitle: title || filename,
+      pageFile: filename,
+      heading: currentHeading ? currentHeading.text : title || filename,
+      context: sectionText.substring(0, 1200)
+    });
+  }
+
+  return images;
 }
 
 /**
@@ -179,13 +341,16 @@ function processHtmlFile(filepath) {
   const headings = extractHeadings(html);
   const description = extractDescription(html, text);
   const keywords = generateKeywords(text);
+  const images = extractImageMetadata(html, filename, title || filename);
   
   return {
     title: title || filename,
     file: filename,
     description: description || 'Information about ' + title.toLowerCase(),
     keywords: keywords,
-    content: text.substring(0, 5000) // Store first 5000 chars of content
+    content: text.substring(0, 5000), // Store first 5000 chars of content
+    headings,
+    images
   };
 }
 

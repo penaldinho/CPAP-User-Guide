@@ -33,7 +33,8 @@ const guideConfigs = Object.entries(setupConfig.guides || {}).reduce((acc, [guid
   acc[guideKey] = {
     name: guide.name,
     family: guide.family,
-    dir: path.join(__dirname, ...relativeDir)
+    dir: path.join(__dirname, ...relativeDir),
+    relativeDir: relativeDir.join('/')
   };
   return acc;
 }, {});
@@ -2274,6 +2275,391 @@ const buildManualContent = (searchIndex) => searchIndex.pages
   .map(page => `# ${page.title}\n\n${page.description}\n\n${page.content}`)
   .join('\n\n---\n\n');
 
+const buildSectionTitles = (searchIndex) => {
+  const titles = (searchIndex.pages || []).flatMap((page) => [
+    page.title,
+    ...(Array.isArray(page.headings) ? page.headings : [])
+  ]);
+
+  return [...new Set(
+    titles
+      .map((title) => String(title || '').trim())
+      .filter(Boolean)
+  )];
+};
+
+const imageMatchStopwords = new Set([
+  'the', 'a', 'an', 'and', 'or', 'but', 'if', 'then', 'than', 'with', 'from', 'into', 'onto', 'over', 'under',
+  'your', 'their', 'this', 'that', 'these', 'those', 'what', 'which', 'when', 'where', 'while', 'will', 'would',
+  'could', 'should', 'have', 'has', 'had', 'been', 'being', 'about', 'there', 'here', 'just', 'also', 'only',
+  'them', 'they', 'their', 'there', 'does', 'doing', 'done', 'than', 'then', 'into', 'through', 'using', 'used',
+  'user', 'guide', 'manual', 'page', 'section', 'please', 'show', 'need', 'want', 'help', 'asks', 'asked', 'question',
+  'image', 'images', 'picture', 'photo'
+]);
+
+const imageTokenAliases = {
+  temp: ['temperature'],
+  temperature: ['temp'],
+  tube: ['tubing'],
+  tubing: ['tube'],
+  fit: ['fitting', 'adjust'],
+  fitting: ['fit', 'adjust'],
+  assemble: ['assembly', 'reassemble'],
+  assembly: ['assemble', 'reassemble'],
+  reassemble: ['assemble', 'assembly'],
+  disassemble: ['disassembly', 'remove'],
+  disassembly: ['disassemble', 'remove'],
+  instruction: ['instructions', 'steps', 'how'],
+  instructions: ['instruction', 'steps', 'how'],
+  step: ['steps', 'instruction', 'instructions'],
+  steps: ['step', 'instruction', 'instructions'],
+  climate: ['ctrl', 'control'],
+  ctrl: ['climate', 'control'],
+  control: ['climate', 'ctrl'],
+  oxygen: ['supplemental'],
+  supplemental: ['oxygen'],
+  humidity: ['humidifier'],
+  humidifier: ['humidity'],
+  disconnect: ['remove', 'detach'],
+  remove: ['disconnect'],
+  connect: ['attach', 'setup'],
+  attach: ['connect']
+};
+
+const buildSearchIndexPath = path.join(__dirname, 'build-search-index.js');
+
+const commonImageQueryCorrections = {
+  masjk: 'mask',
+  maks: 'mask',
+  devic: 'device',
+  humidfier: 'humidifier',
+  tubig: 'tubing'
+};
+
+const normalizeSearchText = (text) => String(text || '')
+  .toLowerCase()
+  .replace(/&#10;|\r?\n/g, ' ')
+  .replace(/\bset\s+up\b/g, 'setup')
+  .replace(/\bset(?:\s+(?:the|this|that|my|your|our|their|his|her|its|it|device|machine|cpap|unit)){1,4}\s+up\b/g, 'setup')
+  .replace(/\bturn\s+on\b/g, 'enable')
+  .replace(/\bturn\s+off\b/g, 'disable')
+  .replace(/[^a-z0-9]+/g, ' ')
+  .replace(/\s+/g, ' ')
+  .replace(/\b[a-z]+\b/g, (token) => commonImageQueryCorrections[token] || token)
+  .trim();
+
+const hasExplicitImageIntent = (query) => /\b(image|images|diagram|picture|photo|show|visual|what does it look like|is there an image)\b/i.test(String(query || ''));
+
+const isProceduralImageQuery = (query) => /\b(how|setup|set up|connect|disconnect|attach|remove|adjust|change|return|clean|fit|fitting|assemble|assembly|reassemble|disassemble|disassembly|replace|insert|turn on|turn off)\b/i.test(String(query || ''));
+
+const isFittingQuery = (query) => /\b(fit|fitting|mask fit|fit mask|fit my mask|fit the mask|fitting instructions)\b/i.test(String(query || ''));
+const excludesFittingStep = (query) => /\b(before fitting|stop(?:ping)? before fitting|without fitting|not fitting|excluding fitting)\b/i.test(String(query || ''));
+
+const isAssemblyQuery = (query) => /\b(assemble|assembly|reassemble|put the mask together|mask assembly)\b/i.test(String(query || ''));
+
+const isDisassemblyQuery = (query) => /\b(disassemble|disassembly|take the mask apart|remove the mask parts)\b/i.test(String(query || ''));
+
+const isProceduralImageCandidate = (image) => {
+  const combined = `${image?.alt || ''} ${image?.context || ''} ${image?.heading || ''} ${image?.pageTitle || ''}`;
+  return /\b\d+\.|\b(step|steps|setup|connect|disconnect|attach|remove|adjust|change|return|clean|fit|assembly|reassemble|replace|insert)\b/i.test(combined);
+};
+
+const isGenericOverviewImageCandidate = (image) => {
+  const combined = `${image?.alt || ''} ${image?.heading || ''} ${image?.pageTitle || ''}`;
+  return /\b(overview|about your device|device overview|diagram showing the device|device diagram)\b/i.test(combined);
+};
+
+const isComponentDiagramCandidate = (image) => {
+  const combined = `${image?.alt || ''} ${image?.heading || ''} ${image?.pageTitle || ''}`;
+  return /\b(mask parts|components|component|part diagram|parts diagram|understanding your mask components)\b/i.test(combined);
+};
+
+const isFittingImageCandidate = (image) => {
+  const combined = `${image?.alt || ''} ${image?.heading || ''} ${image?.pageTitle || ''} ${image?.context || ''}`;
+  return /\b(fit your mask|fitting your mask|how to fit|mask fit|fit the mask)\b/i.test(combined);
+};
+
+const isAssemblyImageCandidate = (image) => {
+  const combined = `${image?.alt || ''} ${image?.heading || ''} ${image?.pageTitle || ''} ${image?.context || ''}`;
+  return /\b(mask assembly|assembly diagram|reassembling your mask|how to reassemble)\b/i.test(combined);
+};
+
+const isDisassemblyImageCandidate = (image) => {
+  const combined = `${image?.alt || ''} ${image?.heading || ''} ${image?.pageTitle || ''} ${image?.context || ''}`;
+  return /\b(disassembly for cleaning|disassembly|disassemble|take .* apart|remove the seal|remove the swivel|unhook the headgear clips)\b/i.test(combined);
+};
+
+const singularizeToken = (token) => {
+  const value = String(token || '');
+  if (value.endsWith('ies') && value.length > 4) {
+    return `${value.slice(0, -3)}y`;
+  }
+  if (value.endsWith('s') && value.length > 4 && !value.endsWith('ss')) {
+    return value.slice(0, -1);
+  }
+  return value;
+};
+
+const tokenizeForImageMatch = (text, { expandAliases = false } = {}) => {
+  const normalized = normalizeSearchText(text);
+  if (!normalized) {
+    return [];
+  }
+
+  const tokens = new Set();
+  normalized.split(' ').forEach((token) => {
+    if (!token || token.length < 3 || imageMatchStopwords.has(token)) {
+      return;
+    }
+
+    tokens.add(token);
+    const singular = singularizeToken(token);
+    if (singular && singular !== token && !imageMatchStopwords.has(singular)) {
+      tokens.add(singular);
+    }
+
+    if (expandAliases) {
+      const aliases = imageTokenAliases[token] || imageTokenAliases[singular] || [];
+      aliases.forEach((alias) => {
+        if (alias && alias.length >= 3 && !imageMatchStopwords.has(alias)) {
+          tokens.add(alias);
+        }
+      });
+    }
+  });
+
+  return [...tokens];
+};
+
+const countTokenMatches = (sourceText, queryTokens) => {
+  if (!queryTokens.length) {
+    return 0;
+  }
+
+  const sourceTokens = new Set(tokenizeForImageMatch(sourceText));
+  return queryTokens.reduce((count, token) => count + (sourceTokens.has(token) ? 1 : 0), 0);
+};
+
+const extractQueryPhrases = (text) => {
+  const rawTokens = normalizeSearchText(text)
+    .split(' ')
+    .filter((token) => token.length >= 3 && !imageMatchStopwords.has(token));
+
+  const phrases = [];
+  for (let i = 0; i < rawTokens.length - 1; i += 1) {
+    phrases.push(`${rawTokens[i]} ${rawTokens[i + 1]}`);
+  }
+  return phrases;
+};
+
+const scoreImageCandidate = (query, image) => {
+  const queryTokens = tokenizeForImageMatch(query, { expandAliases: true });
+  if (!queryTokens.length) {
+    return { score: 0, matchedTokenCount: 0 };
+  }
+
+  const isProceduralQuery = isProceduralImageQuery(query);
+  const isFitQuery = isFittingQuery(query);
+  const isAssemblyAsked = isAssemblyQuery(query);
+  const isDisassemblyAsked = isDisassemblyQuery(query);
+  const excludesFitting = excludesFittingStep(query);
+
+  const altMatches = countTokenMatches(image.alt, queryTokens);
+  const contextMatches = countTokenMatches(image.context, queryTokens);
+  const headingMatches = countTokenMatches(image.heading, queryTokens);
+  const pageMatches = countTokenMatches(image.pageTitle, queryTokens);
+  const matchedTokenCount = countTokenMatches(
+    `${image.alt} ${image.context} ${image.heading} ${image.pageTitle}`,
+    queryTokens
+  );
+
+  let score = (altMatches * 3.6)
+    + (contextMatches * 2.8)
+    + (headingMatches * 2.2)
+    + (pageMatches * 1.4)
+    + (matchedTokenCount * 0.45);
+
+  const normalizedCombined = normalizeSearchText(`${image.alt} ${image.heading} ${image.context} ${image.pageTitle}`);
+  const phraseMatches = extractQueryPhrases(query)
+    .filter((phrase) => phrase.length >= 7 && normalizedCombined.includes(phrase));
+  score += Math.min(phraseMatches.length, 2) * 1.75;
+
+  if (/\b(image|diagram|picture|photo|show|look|looks|where|which part|what does it look like)\b/i.test(query)) {
+    score += 1.2;
+  }
+
+  if (/\b(setup|connect|disconnect|attach|remove|adjust|change|return|clean|disconnecting|reconnect|fitting|assembly)\b/i.test(query)) {
+    score += 0.6;
+  }
+
+  if (isProceduralQuery && isProceduralImageCandidate(image)) {
+    score += 2.4;
+  }
+
+  if (isProceduralQuery && /\bsetup\b/i.test(`${image.heading} ${image.pageTitle} ${image.alt}`)) {
+    score += 2.1;
+  }
+
+  if (isProceduralQuery && isGenericOverviewImageCandidate(image) && !isProceduralImageCandidate(image)) {
+    score -= 2.2;
+  }
+
+  if (isFitQuery && isFittingImageCandidate(image)) {
+    score += 4.2;
+  }
+
+  if (isFitQuery && isComponentDiagramCandidate(image) && !isFittingImageCandidate(image)) {
+    score -= 3.4;
+  }
+
+  if (isFitQuery && !isFittingImageCandidate(image) && isProceduralImageCandidate(image)) {
+    score -= 1.8;
+  }
+
+  if (excludesFitting && isFittingImageCandidate(image)) {
+    score -= 6;
+  }
+
+  if (isAssemblyAsked && isAssemblyImageCandidate(image)) {
+    score += 4.2;
+  }
+
+  if (isAssemblyAsked && isComponentDiagramCandidate(image) && !isAssemblyImageCandidate(image)) {
+    score -= 2.6;
+  }
+
+  if (isDisassemblyAsked && isDisassemblyImageCandidate(image)) {
+    score += 4.2;
+  }
+
+  if (isDisassemblyAsked && isAssemblyImageCandidate(image)) {
+    score -= 2.4;
+  }
+
+  return { score, matchedTokenCount };
+};
+
+const getPublicGuideOrigin = (req) => {
+  const host = String(req?.get?.('host') || '').toLowerCase();
+  if (host.includes('localhost') || host.startsWith('127.0.0.1')) {
+    return `${req.protocol}://${req.get('host')}`;
+  }
+  return 'https://medtechguides.uk';
+};
+
+const buildPublicGuideUrl = (req, guide, targetPath) => {
+  const origin = getPublicGuideOrigin(req);
+  const rawTarget = String(targetPath || '').trim();
+  if (!rawTarget) {
+    return origin;
+  }
+
+  if (/^https?:\/\//i.test(rawTarget)) {
+    return rawTarget;
+  }
+
+  if (rawTarget.startsWith('/')) {
+    return `${origin}${rawTarget}`;
+  }
+
+  const relativeDir = String(guide?.relativeDir || '').replace(/^\/+|\/+$/g, '');
+  const normalizedTarget = rawTarget.replace(/^\/+/, '');
+  return `${origin}/${relativeDir}/${normalizedTarget}`;
+};
+
+const selectRelevantImage = (query, imageCandidates, req) => {
+  if (isSpecOrNumericQuestion(query) && !hasExplicitImageIntent(query)) {
+    return null;
+  }
+
+  const fitQuery = isFittingQuery(query);
+
+  const dedupedCandidates = [];
+  const seenCandidates = new Set();
+
+  (Array.isArray(imageCandidates) ? imageCandidates : []).forEach((image) => {
+    const key = `${String(image?.guideKey || '')}::${String(image?.src || '').trim().toLowerCase()}::${normalizeSearchText(image?.alt || '')}`;
+    if (!key || seenCandidates.has(key)) {
+      return;
+    }
+    seenCandidates.add(key);
+    dedupedCandidates.push(image);
+  });
+
+  const scored = dedupedCandidates
+    .map((image) => ({ image, ...scoreImageCandidate(query, image) }))
+    .filter((entry) => entry.score > 0 && entry.matchedTokenCount > 0)
+    .sort((a, b) => b.score - a.score);
+
+  if (!scored.length) {
+    return null;
+  }
+
+  if (fitQuery && !excludesFittingStep(query)) {
+    const bestFitting = scored.find((entry) => isFittingImageCandidate(entry.image));
+    if (bestFitting && bestFitting.score >= 5) {
+      return {
+        guide: bestFitting.image.guideName,
+        pageTitle: bestFitting.image.pageTitle,
+        sectionTitle: bestFitting.image.heading,
+        alt: bestFitting.image.alt,
+        imageUrl: buildPublicGuideUrl(req, bestFitting.image.guide, bestFitting.image.src),
+        pageUrl: buildPublicGuideUrl(req, bestFitting.image.guide, bestFitting.image.pageFile)
+      };
+    }
+  }
+
+  if (isAssemblyQuery(query)) {
+    const bestAssembly = scored.find((entry) => isAssemblyImageCandidate(entry.image));
+    if (bestAssembly && bestAssembly.score >= 5) {
+      return {
+        guide: bestAssembly.image.guideName,
+        pageTitle: bestAssembly.image.pageTitle,
+        sectionTitle: bestAssembly.image.heading,
+        alt: bestAssembly.image.alt,
+        imageUrl: buildPublicGuideUrl(req, bestAssembly.image.guide, bestAssembly.image.src),
+        pageUrl: buildPublicGuideUrl(req, bestAssembly.image.guide, bestAssembly.image.pageFile)
+      };
+    }
+  }
+
+  if (isDisassemblyQuery(query)) {
+    const bestDisassembly = scored.find((entry) => isDisassemblyImageCandidate(entry.image));
+    if (bestDisassembly && bestDisassembly.score >= 5) {
+      return {
+        guide: bestDisassembly.image.guideName,
+        pageTitle: bestDisassembly.image.pageTitle,
+        sectionTitle: bestDisassembly.image.heading,
+        alt: bestDisassembly.image.alt,
+        imageUrl: buildPublicGuideUrl(req, bestDisassembly.image.guide, bestDisassembly.image.src),
+        pageUrl: buildPublicGuideUrl(req, bestDisassembly.image.guide, bestDisassembly.image.pageFile)
+      };
+    }
+  }
+
+  const best = scored[0];
+  const second = scored[1];
+  const minimumScore = 6.5;
+  const minimumMargin = 1.75;
+
+  if (best.score < minimumScore) {
+    return null;
+  }
+
+  if (second && (best.score - second.score) < minimumMargin) {
+    return null;
+  }
+
+  return {
+    guide: best.image.guideName,
+    pageTitle: best.image.pageTitle,
+    sectionTitle: best.image.heading,
+    alt: best.image.alt,
+    imageUrl: buildPublicGuideUrl(req, best.image.guide, best.image.src),
+    pageUrl: buildPublicGuideUrl(req, best.image.guide, best.image.pageFile)
+  };
+};
+
 const listGuideHtmlFiles = (guideDir) => fs.readdirSync(guideDir)
   .filter((name) => name.toLowerCase().endsWith('.html'))
   .filter((name) => !excludedHtmlFiles.has(name.toLowerCase()))
@@ -2290,19 +2676,19 @@ const getLatestHtmlMtimeMs = (guideDir) => {
 const ensureFreshSearchIndex = (guideKey, guide) => {
   const searchIndexPath = path.join(guide.dir, 'search-index.json');
   const latestHtmlMtimeMs = getLatestHtmlMtimeMs(guide.dir);
+  const buildScriptMtimeMs = fs.statSync(buildSearchIndexPath).mtimeMs;
 
   let indexMtimeMs = 0;
   if (fs.existsSync(searchIndexPath)) {
     indexMtimeMs = fs.statSync(searchIndexPath).mtimeMs;
   }
 
-  if (!fs.existsSync(searchIndexPath) || latestHtmlMtimeMs > indexMtimeMs) {
-    const buildScriptPath = path.join(__dirname, 'build-search-index.js');
+  if (!fs.existsSync(searchIndexPath) || latestHtmlMtimeMs > indexMtimeMs || buildScriptMtimeMs > indexMtimeMs) {
     const relativeGuideDir = path.relative(__dirname, guide.dir);
-    execFileSync(process.execPath, [buildScriptPath, relativeGuideDir], {
+    execFileSync(process.execPath, [buildSearchIndexPath, relativeGuideDir], {
       stdio: 'ignore'
     });
-    console.log(`Rebuilt search index for ${guideKey} because source pages changed.`);
+    console.log(`Rebuilt search index for ${guideKey} because source pages or search indexing logic changed.`);
   }
 
   return {
@@ -2325,10 +2711,21 @@ const loadManualContent = (guideKey) => {
 
   const searchIndex = JSON.parse(fs.readFileSync(searchIndexPath, 'utf8'));
   const manualContent = buildManualContent(searchIndex);
+  const sectionTitles = buildSectionTitles(searchIndex);
+  const images = (searchIndex.pages || []).flatMap((page) =>
+    (page.images || []).map((image) => ({
+      ...image,
+      guide,
+      guideKey,
+      guideName: guide.name
+    }))
+  );
 
   const cached = {
     manualContent,
     guideName: guide.name,
+    sectionTitles,
+    images,
     indexMtimeMs
   };
   manualCache.set(guideKey, cached);
@@ -2369,6 +2766,8 @@ const loadManualBundle = (guideKeys) => {
   const docs = guideKeys.map(loadManualContent);
   return {
     guideName: docs.map((doc) => doc.guideName).join(' + '),
+    images: docs.flatMap((doc) => doc.images || []),
+    sectionTitles: [...new Set(docs.flatMap((doc) => doc.sectionTitles || []))],
     manualContent: docs
       .map((doc) => `## Guide: ${doc.guideName}\n\n${doc.manualContent}`)
       .join('\n\n====\n\n')
@@ -2573,7 +2972,7 @@ const extractQuotedSectionCitations = (response) => {
   return [...new Set(citations)];
 };
 
-const getScopeValidationFallback = (message, response, guideKeys, manualContent) => {
+const getScopeValidationFallback = (message, response, guideKeys, manualContent, indexedSectionTitles = []) => {
   if (!Array.isArray(guideKeys) || guideKeys.length !== 1) {
     return null;
   }
@@ -2593,11 +2992,18 @@ const getScopeValidationFallback = (message, response, guideKeys, manualContent)
     return null;
   }
 
-  const sectionTitles = extractSectionTitlesFromManualContent(manualContent);
+  const sectionTitles = Array.isArray(indexedSectionTitles) && indexedSectionTitles.length
+    ? indexedSectionTitles
+    : extractSectionTitlesFromManualContent(manualContent);
   const quotedCitations = extractQuotedSectionCitations(response);
   const hasInvalidCitation = quotedCitations.some((citation) => {
     const normalizedCitation = citation.toLowerCase();
-    return !sectionTitles.some((title) => title.toLowerCase() === normalizedCitation);
+    return !sectionTitles.some((title) => {
+      const normalizedTitle = String(title || '').toLowerCase();
+      return normalizedTitle === normalizedCitation
+        || normalizedTitle.replace(/^\d+\.\s*/, '') === normalizedCitation
+        || normalizedCitation.replace(/^\d+\.\s*/, '') === normalizedTitle;
+    });
   });
 
   if (hasInvalidCitation) {
@@ -2606,6 +3012,8 @@ const getScopeValidationFallback = (message, response, guideKeys, manualContent)
 
   return null;
 };
+
+const responseIndicatesNoDirectInstruction = (response) => /manual does not provide specific instructions|manual does not contain .*instructions|does not provide specific guidance/i.test(String(response || ''));
 
 const getDeterministicErrorCodeResponse = (message, guideKeys) => {
   const errorCode = parseExplicitErrorCode(message);
@@ -2900,7 +3308,7 @@ app.post('/api/chat', async (req, res) => {
       return res.json({ response: deterministicResponse });
     }
 
-    const { manualContent, guideName } = loadManualBundle(guideKeys);
+    const { manualContent, guideName, images, sectionTitles } = loadManualBundle(guideKeys);
 
     let response;
     if (LLM_PROVIDER === 'openai') {
@@ -2909,15 +3317,19 @@ app.post('/api/chat', async (req, res) => {
       response = await callHuggingFace(message, manualContent, guideName);
     }
 
-    const scopeValidationFallback = getScopeValidationFallback(message, response, guideKeys, manualContent);
+    const scopeValidationFallback = getScopeValidationFallback(message, response, guideKeys, manualContent, sectionTitles);
     if (scopeValidationFallback) {
       response = scopeValidationFallback;
     }
 
+    const image = responseIndicatesNoDirectInstruction(response)
+      ? null
+      : selectRelevantImage(message, images, req);
+
     console.log(`[${new Date().toISOString()}] Guides: ${guideKeys.join(', ')}`);
     console.log(`[${new Date().toISOString()}] Assistant: ${response.substring(0, 100)}...`);
 
-    res.json({ response });
+    res.json({ response, image });
   } catch (error) {
     console.error('Chat error:', error);
     res.status(500).json({ 

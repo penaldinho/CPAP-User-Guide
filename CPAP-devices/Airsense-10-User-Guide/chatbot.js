@@ -293,6 +293,29 @@ class ChatBot {
     return parts.join('');
   }
 
+  formatAssistantPayload(text, image) {
+    const content = this.formatAssistantText(text);
+    if (!image || !image.imageUrl) {
+      return content;
+    }
+
+    const sectionLabel = [image.guide, image.sectionTitle || image.pageTitle].filter(Boolean).join(' — ');
+    const escapedAlt = this.escapeHtml(image.alt || image.sectionTitle || image.pageTitle || 'Relevant guide image');
+    const escapedSectionLabel = this.escapeHtml(sectionLabel || 'Relevant guide image');
+    const escapedPageTitle = this.escapeHtml(image.pageTitle || 'Open source page');
+    const imageUrl = this.escapeHtml(image.imageUrl);
+    const pageUrl = this.escapeHtml(image.pageUrl || image.imageUrl);
+
+    return `${content}
+      <div style="margin-top:12px; padding-top:10px; border-top:1px solid #e5e7eb;">
+        <div style="font-size:12px; font-weight:600; color:#4b5563; margin-bottom:8px;">Relevant image: ${escapedSectionLabel}</div>
+        <a href="${pageUrl}" target="_blank" rel="noopener noreferrer" style="display:block; text-decoration:none; color:inherit;">
+          <img src="${imageUrl}" alt="${escapedAlt}" loading="lazy" style="display:block; width:100%; max-width:320px; height:auto; border-radius:10px; border:1px solid #d1d5db; background:#fff; margin:0 auto;" />
+          <div style="margin-top:8px; text-align:center; font-size:12px; color:#6b7280;">Open ${escapedPageTitle}</div>
+        </a>
+      </div>`;
+  }
+
   setupEventListeners() {
     this.sendBtn.addEventListener('click', () => this.sendMessage());
     this.inputField.addEventListener('keypress', (e) => {
@@ -373,7 +396,7 @@ class ChatBot {
       }
 
       const data = await response.json();
-      this.addMessage(data.response, 'assistant');
+      this.addMessage({ text: data.response, image: data.image }, 'assistant');
 
       if (window.MTGTelemetry) {
         window.MTGTelemetry.track('chat_response', {
@@ -410,7 +433,11 @@ class ChatBot {
     if (isHtml) {
       bubble.innerHTML = text;
     } else if (sender === 'assistant') {
-      bubble.innerHTML = this.formatAssistantText(text);
+      if (text && typeof text === 'object' && !Array.isArray(text)) {
+        bubble.innerHTML = this.formatAssistantPayload(text.text, text.image);
+      } else {
+        bubble.innerHTML = this.formatAssistantText(text);
+      }
     } else {
       bubble.textContent = text;
     }
