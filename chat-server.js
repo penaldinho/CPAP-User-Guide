@@ -2452,7 +2452,60 @@ const extractQueryPhrases = (text) => {
   return phrases;
 };
 
-const scoreImageCandidate = (query, image) => {
+const actionIntentMatchers = [
+  { intent: 'setup', pattern: /\b(setup|set up|first use|ready for first use|start therapy|getting started)\b/i },
+  { intent: 'connect', pattern: /\b(connect|attach|insert|plug|reconnect)\b/i },
+  { intent: 'fit', pattern: /\b(fit|fitting|mask fit|fit the mask|fit your mask)\b/i },
+  { intent: 'assemble', pattern: /\b(assemble|assembly|reassemble|put .* together)\b/i },
+  { intent: 'disassemble', pattern: /\b(disassemble|disassembly|take .* apart|remove the .*parts)\b/i },
+  { intent: 'clean', pattern: /\b(clean|cleaning|wash|wiping)\b/i },
+  { intent: 'adjust', pattern: /\b(adjust|change|return|turn|increase|decrease|set)\b/i }
+];
+
+const extractActionIntents = (text) => {
+  const source = String(text || '');
+  return actionIntentMatchers.reduce((intents, matcher) => {
+    if (matcher.pattern.test(source)) {
+      intents.add(matcher.intent);
+    }
+    return intents;
+  }, new Set());
+};
+
+const extractExcludedImageIntents = (query) => {
+  const source = String(query || '');
+  const intents = new Set();
+
+  if (/\b(before fitting|stop(?:ping)? before fitting|without fitting|not fitting|excluding fitting)\b/i.test(source)) {
+    intents.add('fit');
+  }
+
+  if (/\b(before assembly|without assembly|excluding assembly)\b/i.test(source)) {
+    intents.add('assemble');
+  }
+
+  if (/\b(before disassembly|without disassembly|excluding disassembly)\b/i.test(source)) {
+    intents.add('disassemble');
+  }
+
+  return intents;
+};
+
+const countIntentOverlap = (left, right) => {
+  let overlap = 0;
+  left.forEach((intent) => {
+    if (right.has(intent)) {
+      overlap += 1;
+    }
+  });
+  return overlap;
+};
+
+const responseImageAlignmentStopwords = new Set([
+  'information', 'specific', 'relevant', 'detail', 'details'
+]);
+
+const scoreImageCandidate = (query, image, response = '') => {
   const queryTokens = tokenizeForImageMatch(query, { expandAliases: true });
   if (!queryTokens.length) {
     return { score: 0, matchedTokenCount: 0 };
@@ -2462,7 +2515,13 @@ const scoreImageCandidate = (query, image) => {
   const isFitQuery = isFittingQuery(query);
   const isAssemblyAsked = isAssemblyQuery(query);
   const isDisassemblyAsked = isDisassemblyQuery(query);
-  const excludesFitting = excludesFittingStep(query);
+  const excludedIntents = extractExcludedImageIntents(query);
+  const queryIntents = extractActionIntents(query);
+  const responseIntents = extractActionIntents(response);
+  const imageIntents = extractActionIntents(`${image.alt} ${image.context} ${image.heading} ${image.pageTitle}`);
+  const queryTokenSet = new Set(queryTokens);
+  const responseTokens = tokenizeForImageMatch(response, { expandAliases: true })
+    .filter((token) => queryTokenSet.has(token) && !responseImageAlignmentStopwords.has(token));
 
   const altMatches = countTokenMatches(image.alt, queryTokens);
   const contextMatches = countTokenMatches(image.context, queryTokens);
@@ -2516,8 +2575,25 @@ const scoreImageCandidate = (query, image) => {
     score -= 1.8;
   }
 
-  if (excludesFitting && isFittingImageCandidate(image)) {
-    score -= 6;
+  const queryIntentOverlap = countIntentOverlap(queryIntents, imageIntents);
+  if (queryIntentOverlap > 0) {
+    score += queryIntentOverlap * 1.6;
+  }
+
+  const responseIntentOverlap = countIntentOverlap(responseIntents, imageIntents);
+  if (responseIntentOverlap > 0) {
+    score += responseIntentOverlap * 1.2;
+  }
+
+  const excludedIntentOverlap = countIntentOverlap(excludedIntents, imageIntents);
+  if (excludedIntentOverlap > 0) {
+    score -= excludedIntentOverlap * 3.6;
+  }
+
+  if (responseTokens.length) {
+    score += countTokenMatches(image.heading, responseTokens) * 1.35;
+    score += countTokenMatches(image.pageTitle, responseTokens) * 0.95;
+    score += countTokenMatches(image.context, responseTokens) * 0.55;
   }
 
   if (isAssemblyAsked && isAssemblyImageCandidate(image)) {
@@ -2567,12 +2643,13 @@ const buildPublicGuideUrl = (req, guide, targetPath) => {
   return `${origin}/${relativeDir}/${normalizedTarget}`;
 };
 
-const selectRelevantImage = (query, imageCandidates, req) => {
+const selectRelevantImage = (query, imageCandidates, req, response = '') => {
   if (isSpecOrNumericQuestion(query) && !hasExplicitImageIntent(query)) {
     return null;
   }
 
   const fitQuery = isFittingQuery(query);
+  const excludedIntents = extractExcludedImageIntents(query);
 
   const dedupedCandidates = [];
   const seenCandidates = new Set();
@@ -2587,7 +2664,7 @@ const selectRelevantImage = (query, imageCandidates, req) => {
   });
 
   const scored = dedupedCandidates
-    .map((image) => ({ image, ...scoreImageCandidate(query, image) }))
+    .map((image) => ({ image, ...scoreImageCandidate(query, image, response) }))
     .filter((entry) => entry.score > 0 && entry.matchedTokenCount > 0)
     .sort((a, b) => b.score - a.score);
 
@@ -2595,7 +2672,7 @@ const selectRelevantImage = (query, imageCandidates, req) => {
     return null;
   }
 
-  if (fitQuery && !excludesFittingStep(query)) {
+  if (fitQuery && !excludedIntents.has('fit')) {
     const bestFitting = scored.find((entry) => isFittingImageCandidate(entry.image));
     if (bestFitting && bestFitting.score >= 5) {
       return {
@@ -2910,6 +2987,15 @@ const getMentionedGuideKeys = (text) => {
   return mentioned;
 };
 
+const isGuideReferenceGroundedInManual = (guideKey, manualContent) => {
+  const aliases = guideEntityAliases[guideKey];
+  if (!Array.isArray(aliases) || !aliases.length) {
+    return false;
+  }
+
+  return containsAlias(manualContent, aliases);
+};
+
 const getOutOfScopeGuideResponse = (message, guideKeys) => {
   if (!Array.isArray(guideKeys) || guideKeys.length !== 1) {
     return null;
@@ -2983,8 +3069,8 @@ const getScopeValidationFallback = (message, response, guideKeys, manualContent,
     : activeGuideKey;
 
   const responseMentionedGuideKeys = getMentionedGuideKeys(response);
-  const responseConflict = responseMentionedGuideKeys.find((key) => key !== activeGuideKey);
-  if (responseConflict) {
+  const ungroundedResponseConflict = responseMentionedGuideKeys.find((key) => key !== activeGuideKey && !isGuideReferenceGroundedInManual(key, manualContent));
+  if (ungroundedResponseConflict) {
     return `I couldn't verify that answer strictly within ${activeGuideName}. Please rephrase your question for this guide or switch to the relevant guide.`;
   }
 
@@ -3013,7 +3099,7 @@ const getScopeValidationFallback = (message, response, guideKeys, manualContent,
   return null;
 };
 
-const responseIndicatesNoDirectInstruction = (response) => /manual does not provide specific instructions|manual does not contain .*instructions|does not provide specific guidance/i.test(String(response || ''));
+const responseIndicatesNoDirectInstruction = (response) => /manual does not provide specific instructions|manual does not provide specific information|manual does not contain .*instructions|does not provide specific guidance|does not provide .*information|does not mention .*instructions|does not describe .*instructions/i.test(String(response || ''));
 
 const getDeterministicErrorCodeResponse = (message, guideKeys) => {
   const errorCode = parseExplicitErrorCode(message);
@@ -3324,7 +3410,7 @@ app.post('/api/chat', async (req, res) => {
 
     const image = responseIndicatesNoDirectInstruction(response)
       ? null
-      : selectRelevantImage(message, images, req);
+      : selectRelevantImage(message, images, req, response);
 
     console.log(`[${new Date().toISOString()}] Guides: ${guideKeys.join(', ')}`);
     console.log(`[${new Date().toISOString()}] Assistant: ${response.substring(0, 100)}...`);
