@@ -1,0 +1,44 @@
+[
+  {
+    "id": 1,
+    "label": "Setup before fitting",
+    "category": "Setup",
+    "question": "Assemble the CPAP device and tubing, and connect the mask ready for first use, stopping before fitting the mask."
+  },
+  {
+    "id": 2,
+    "label": "Routine use and mask fit",
+    "category": "Routine Use",
+    "question": "Fit the mask to the mannequin as outlined in the appropriate user guide, check and ensure mask fit is good using the Check Mask Fit option on the CPAP device, and start therapy."
+  },
+  {
+    "id": 3,
+    "label": "Dry nose troubleshooting",
+    "category": "Troubleshooting",
+    "question": "You notice dry nose during therapy. Resolve this by adjusting the relevant comfort settings."
+  },
+  {
+    "id": 4,
+    "label": "AirSense cleaning frequency",
+    "category": "Routine Use",
+    "question": "According to the user guide, how often should the AirSense 10 device itself be cleaned?"
+  },
+  {
+    "id": 5,
+    "label": "AirSense error 006",
+    "category": "Safety",
+    "question": "If the Airsense device shows 'System fault – refer to user guide – Error 006' before therapy starts, what is the appropriate immediate action?"
+  },
+  {
+    "id": 6,
+    "label": "Vitera storage temperature",
+    "category": "Safety",
+    "question": "What storage temperature range is recommended for keeping a spare F&P Vitera mask?"
+  },
+  {
+    "id": 7,
+    "label": "ClimateLineAir tubing sufficiency",
+    "category": "Setup",
+    "question": "If the CPAP device is 7ft from the bed connection point, is ClimateLineAir tubing length sufficient?"
+  }
+]

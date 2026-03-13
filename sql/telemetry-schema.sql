@@ -172,6 +172,41 @@ CREATE INDEX IF NOT EXISTS idx_physical_trial_task_time
 CREATE INDEX IF NOT EXISTS idx_physical_trial_event_type_time
   ON physical_trial_events (event_type, received_at DESC);
 
+CREATE TABLE IF NOT EXISTS chat_eval_runs (
+  id BIGSERIAL PRIMARY KEY,
+  run_started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  base_url TEXT NOT NULL,
+  family TEXT,
+  case_count INTEGER NOT NULL,
+  guide_count INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS chat_eval_results (
+  id BIGSERIAL PRIMARY KEY,
+  run_id BIGINT NOT NULL REFERENCES chat_eval_runs(id) ON DELETE CASCADE,
+  evaluated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  guide_key TEXT NOT NULL,
+  guide_name TEXT NOT NULL,
+  case_id INTEGER NOT NULL,
+  case_label TEXT NOT NULL,
+  category TEXT,
+  question TEXT NOT NULL,
+  duration_ms INTEGER,
+  response TEXT,
+  error_text TEXT,
+  has_scope_fallback BOOLEAN NOT NULL DEFAULT FALSE,
+  has_no_direct_instruction_fallback BOOLEAN NOT NULL DEFAULT FALSE,
+  image_attached BOOLEAN NOT NULL DEFAULT FALSE,
+  image_page_title TEXT,
+  image_alt TEXT,
+  cited_sections JSONB NOT NULL DEFAULT '[]'::jsonb,
+  invalid_citations JSONB NOT NULL DEFAULT '[]'::jsonb,
+  mentions_other_guides JSONB NOT NULL DEFAULT '[]'::jsonb
+);
+
+CREATE INDEX IF NOT EXISTS idx_chat_eval_results_run_case
+  ON chat_eval_results (run_id, guide_key, case_id);
+
 CREATE TABLE IF NOT EXISTS observer_notes (
   id BIGSERIAL PRIMARY KEY,
   received_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
