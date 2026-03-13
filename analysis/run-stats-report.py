@@ -269,6 +269,117 @@ GROUP BY participant_id, COALESCE(NULLIF(TRIM(page_title), ''), NULLIF(TRIM(page
 ORDER BY page_views DESC, page_label ASC;
 """
 
+TASK_LEVEL_QUERY = """
+WITH task_instances AS (
+  SELECT
+    session_id,
+    participant_id,
+    task_id,
+    task_instance_seq,
+    task_label,
+    task_started_at,
+    task_ended_at,
+    task_total_duration_ms,
+    task_total_page_dwell_ms,
+    task_event_count,
+    task_page_count,
+    trial_mode
+  FROM telemetry_task_instances
+  WHERE UPPER(TRIM(COALESCE(participant_id, ''))) <> 'TEST'
+),
+observer_note_metrics AS (
+  SELECT
+    t.participant_id,
+    t.task_id,
+    t.task_instance_seq,
+    AVG(o.scenario_score::DOUBLE PRECISION) FILTER (
+      WHERE o.action_type = 'scenario_score' AND o.scenario_score IS NOT NULL
+    ) AS scenario_score,
+    MAX(COALESCE(o.help_instances_count, 0)) FILTER (
+      WHERE o.action_type = 'task_end'
+    ) AS help_instances_count,
+    COUNT(*) FILTER (WHERE o.action_type = 'error')::BIGINT AS error_count,
+    COUNT(*) FILTER (WHERE o.action_type = 'error' AND o.error_severity = 'major')::BIGINT AS major_error_count
+  FROM task_instances t
+  LEFT JOIN analysis_observer_notes o
+    ON o.participant_id = t.participant_id
+    AND COALESCE(NULLIF(o.trial_mode, ''), t.trial_mode) = t.trial_mode
+    AND o.task_id = t.task_id
+    AND COALESCE(o."timestamp", o.received_at) >= COALESCE(t.task_started_at, COALESCE(o."timestamp", o.received_at))
+    AND (t.task_ended_at IS NULL OR COALESCE(o."timestamp", o.received_at) <= t.task_ended_at)
+  GROUP BY t.participant_id, t.task_id, t.task_instance_seq
+),
+step_metrics AS (
+  SELECT
+    t.participant_id,
+    t.task_id,
+    t.task_instance_seq,
+    COUNT(s.*)::BIGINT AS step_mark_count,
+    AVG(CASE WHEN s.criterion_outcome = 'correct' THEN 1.0 ELSE 0.0 END) AS step_accuracy
+  FROM task_instances t
+  LEFT JOIN analysis_observer_step_marks s
+    ON s.participant_id = t.participant_id
+    AND COALESCE(NULLIF(s.trial_mode, ''), t.trial_mode) = t.trial_mode
+    AND s.task_id = t.task_id
+    AND COALESCE(s."timestamp", s.received_at) >= COALESCE(t.task_started_at, COALESCE(s."timestamp", s.received_at))
+    AND (t.task_ended_at IS NULL OR COALESCE(s."timestamp", s.received_at) <= t.task_ended_at)
+  GROUP BY t.participant_id, t.task_id, t.task_instance_seq
+),
+short_form_metrics AS (
+  SELECT
+    t.participant_id,
+    t.task_id,
+    t.task_instance_seq,
+    AVG(sf.proportion_correct::DOUBLE PRECISION) AS short_form_proportion_accuracy,
+    AVG(sf.all_parts_correct_binary::DOUBLE PRECISION) AS short_form_binary_accuracy,
+    AVG(NULLIF(sf.duration_ms, 0)::DOUBLE PRECISION) / 1000.0 AS short_form_duration_seconds
+  FROM task_instances t
+  LEFT JOIN analysis_short_form_result_scores sf
+    ON sf.participant_id = t.participant_id
+    AND COALESCE(NULLIF(sf.trial_mode, ''), t.trial_mode) = t.trial_mode
+    AND COALESCE(NULLIF(sf.task_id, ''), NULLIF(sf.question_id, '')) = t.task_id
+    AND COALESCE(sf."timestamp", sf.received_at) >= COALESCE(t.task_started_at, COALESCE(sf."timestamp", sf.received_at))
+    AND (t.task_ended_at IS NULL OR COALESCE(sf."timestamp", sf.received_at) <= t.task_ended_at)
+  GROUP BY t.participant_id, t.task_id, t.task_instance_seq
+)
+SELECT
+  t.session_id,
+  t.participant_id,
+  t.task_id,
+  t.task_instance_seq,
+  t.task_label,
+  t.trial_mode,
+  t.task_started_at,
+  t.task_ended_at,
+  t.task_total_duration_ms / 1000.0 AS task_total_duration_seconds,
+  t.task_total_page_dwell_ms / 1000.0 AS task_total_page_dwell_seconds,
+  t.task_event_count,
+  t.task_page_count,
+  onm.scenario_score,
+  COALESCE(onm.help_instances_count, 0) AS help_instances_count,
+  COALESCE(onm.error_count, 0) AS error_count,
+  COALESCE(onm.major_error_count, 0) AS major_error_count,
+  sm.step_mark_count,
+  sm.step_accuracy,
+  sfm.short_form_binary_accuracy,
+  sfm.short_form_proportion_accuracy,
+  sfm.short_form_duration_seconds
+FROM task_instances t
+LEFT JOIN observer_note_metrics onm
+  ON onm.participant_id = t.participant_id
+  AND onm.task_id = t.task_id
+  AND onm.task_instance_seq = t.task_instance_seq
+LEFT JOIN step_metrics sm
+  ON sm.participant_id = t.participant_id
+  AND sm.task_id = t.task_id
+  AND sm.task_instance_seq = t.task_instance_seq
+LEFT JOIN short_form_metrics sfm
+  ON sfm.participant_id = t.participant_id
+  AND sfm.task_id = t.task_id
+  AND sfm.task_instance_seq = t.task_instance_seq
+ORDER BY t.participant_id, t.task_id, t.task_instance_seq;
+"""
+
 OUTCOMES = [
     {"key": "scenario_avg_score", "label": "Scenario average score", "better": "higher"},
   {"key": "scenario_total_time_seconds", "label": "Scenario total time (s)", "better": "lower"},
@@ -317,6 +428,22 @@ POST_TRIAL_LIKERT_ITEMS = [
   ('q8_tlx_frustration', 'Frustration'),
   ('q9_tlx_perceived_performance', 'Perceived performance'),
   ('q10_tlx_temporal_demand', 'Temporal demand'),
+]
+
+PREPOST_COMPARATORS = [
+    {
+        'key': 'setup_confidence_matched',
+        'label': 'Setup confidence (matched baseline → post)',
+        'pre_key_digital': 'q7_digital_guidance',
+        'pre_key_physical': 'q8_physical_guidance',
+        'post_key': 'q5_confidence_setup',
+    },
+    {
+        'key': 'troubleshooting_confidence',
+        'label': 'Troubleshooting confidence (pre → post)',
+        'pre_key': 'q9_problem_solving',
+        'post_key': 'q6_confidence_troubleshooting',
+    },
 ]
 
 
@@ -503,6 +630,185 @@ def to_markdown_table(rows: list[dict[str, Any]]) -> str:
     for row in rows:
         body.append('| ' + ' | '.join(str(row.get(column, '')) for column in columns) + ' |')
     return '\n'.join([header, separator, *body]) + '\n'
+
+
+def build_task_summary_rows(task_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    grouped: dict[tuple[str, str, str], list[dict[str, Any]]] = {}
+    for row in task_rows:
+        task_id = str(row.get('task_id') or '').strip()
+        task_label = str(row.get('task_label') or '').strip()
+        group = str(row.get('allocation_group') or '').strip()
+        grouped.setdefault((task_id, task_label, group), []).append(row)
+
+    summary_rows: list[dict[str, Any]] = []
+    for (task_id, task_label, group), rows in sorted(grouped.items(), key=lambda item: (item[0][0], item[0][2], item[0][1])):
+        duration_values = [float(row['task_total_duration_seconds']) for row in rows if to_number(row.get('task_total_duration_seconds')) is not None]
+        dwell_values = [float(row['task_total_page_dwell_seconds']) for row in rows if to_number(row.get('task_total_page_dwell_seconds')) is not None]
+        page_count_values = [float(row['task_page_count']) for row in rows if to_number(row.get('task_page_count')) is not None]
+        scenario_score_values = [float(row['scenario_score']) for row in rows if to_number(row.get('scenario_score')) is not None]
+        help_values = [float(row['help_instances_count']) for row in rows if to_number(row.get('help_instances_count')) is not None]
+        error_values = [float(row['error_count']) for row in rows if to_number(row.get('error_count')) is not None]
+        major_error_values = [float(row['major_error_count']) for row in rows if to_number(row.get('major_error_count')) is not None]
+        step_accuracy_values = [float(row['step_accuracy']) for row in rows if to_number(row.get('step_accuracy')) is not None]
+        short_form_accuracy_values = [float(row['short_form_proportion_accuracy']) for row in rows if to_number(row.get('short_form_proportion_accuracy')) is not None]
+
+        duration_summary = summarize(duration_values)
+        dwell_summary = summarize(dwell_values)
+        page_count_summary = summarize(page_count_values)
+        scenario_score_summary = summarize(scenario_score_values)
+        help_summary = summarize(help_values)
+        error_summary = summarize(error_values)
+        major_error_summary = summarize(major_error_values)
+        step_accuracy_summary = summarize(step_accuracy_values)
+        short_form_accuracy_summary = summarize(short_form_accuracy_values)
+
+        summary_rows.append({
+            'task_id': task_id,
+            'task_label': task_label,
+            'allocation_group': group,
+            'n': len(rows),
+            'duration_mean_s': duration_summary['mean'],
+            'duration_sd_s': duration_summary['sd'],
+            'duration_median_s': duration_summary['median'],
+            'duration_q1_s': duration_summary['q1'],
+            'duration_q3_s': duration_summary['q3'],
+            'page_dwell_mean_s': dwell_summary['mean'],
+            'page_dwell_sd_s': dwell_summary['sd'],
+            'page_count_mean': page_count_summary['mean'],
+            'page_count_sd': page_count_summary['sd'],
+            'scenario_score_mean': scenario_score_summary['mean'],
+            'scenario_score_sd': scenario_score_summary['sd'],
+            'help_mean': help_summary['mean'],
+            'help_sd': help_summary['sd'],
+            'error_mean': error_summary['mean'],
+            'error_sd': error_summary['sd'],
+            'major_error_mean': major_error_summary['mean'],
+            'major_error_sd': major_error_summary['sd'],
+            'step_accuracy_mean': step_accuracy_summary['mean'],
+            'step_accuracy_sd': step_accuracy_summary['sd'],
+            'short_form_accuracy_mean': short_form_accuracy_summary['mean'],
+            'short_form_accuracy_sd': short_form_accuracy_summary['sd'],
+        })
+
+    return summary_rows
+
+
+def build_task_summary_markdown_rows(task_summary_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for row in task_summary_rows:
+        rows.append({
+            'Task': row['task_label'] or row['task_id'],
+            'Task ID': row['task_id'],
+            'Group': row['allocation_group'],
+            'n': row['n'],
+            'Duration mean ± SD (s)': format_mean_sd(row['duration_mean_s'], row['duration_sd_s']),
+            'Errors mean ± SD': format_mean_sd(row['error_mean'], row['error_sd']),
+            'Help mean ± SD': format_mean_sd(row['help_mean'], row['help_sd']),
+            'Scenario score mean ± SD': format_mean_sd(row['scenario_score_mean'], row['scenario_score_sd']),
+            'Step accuracy mean ± SD': format_mean_sd(row['step_accuracy_mean'], row['step_accuracy_sd']),
+            'Short-form accuracy mean ± SD': format_mean_sd(row['short_form_accuracy_mean'], row['short_form_accuracy_sd']),
+        })
+    return rows
+
+
+def build_prepost_participant_rows(participant_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for participant in participant_rows:
+        group = str(participant.get('allocation_group') or '').strip().lower()
+        participant_id = str(participant.get('participant_id') or '').strip()
+        for comparator in PREPOST_COMPARATORS:
+            if 'pre_key' in comparator:
+                pre_key = str(comparator['pre_key'])
+            else:
+                pre_key = str(comparator['pre_key_digital'] if group == 'digital' else comparator['pre_key_physical'])
+            post_key = str(comparator['post_key'])
+            pre_value = to_number(participant.get(pre_key))
+            post_value = to_number(participant.get(post_key))
+            change_value = None
+            if pre_value is not None and post_value is not None:
+                change_value = float(post_value) - float(pre_value)
+            rows.append({
+                'participant_id': participant_id,
+                'allocation_group': group,
+                'comparator_key': comparator['key'],
+                'comparator_label': comparator['label'],
+                'pre_metric_key': pre_key,
+                'post_metric_key': post_key,
+                'pre_value': pre_value,
+                'post_value': post_value,
+                'change_value': change_value,
+            })
+    return rows
+
+
+def build_prepost_summary_rows(prepost_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    summary_rows: list[dict[str, Any]] = []
+    for comparator in PREPOST_COMPARATORS:
+        comparator_rows = [row for row in prepost_rows if row.get('comparator_key') == comparator['key']]
+        digital_rows = [row for row in comparator_rows if row.get('allocation_group') == 'digital' and row.get('pre_value') is not None and row.get('post_value') is not None]
+        physical_rows = [row for row in comparator_rows if row.get('allocation_group') == 'physical' and row.get('pre_value') is not None and row.get('post_value') is not None]
+
+        digital_pre = [float(row['pre_value']) for row in digital_rows]
+        digital_post = [float(row['post_value']) for row in digital_rows]
+        digital_change = [float(row['change_value']) for row in digital_rows if row.get('change_value') is not None]
+        physical_pre = [float(row['pre_value']) for row in physical_rows]
+        physical_post = [float(row['post_value']) for row in physical_rows]
+        physical_change = [float(row['change_value']) for row in physical_rows if row.get('change_value') is not None]
+
+        digital_pre_summary = summarize(digital_pre)
+        digital_post_summary = summarize(digital_post)
+        digital_change_summary = summarize(digital_change)
+        physical_pre_summary = summarize(physical_pre)
+        physical_post_summary = summarize(physical_post)
+        physical_change_summary = summarize(physical_change)
+
+        change_diff = None
+        if digital_change_summary['mean'] is not None and physical_change_summary['mean'] is not None:
+            change_diff = float(digital_change_summary['mean']) - float(physical_change_summary['mean'])
+
+        summary_rows.append({
+            'comparator_key': comparator['key'],
+            'comparator_label': comparator['label'],
+            'digital_n': digital_change_summary['n'],
+            'digital_pre_mean': digital_pre_summary['mean'],
+            'digital_pre_sd': digital_pre_summary['sd'],
+            'digital_post_mean': digital_post_summary['mean'],
+            'digital_post_sd': digital_post_summary['sd'],
+            'digital_change_mean': digital_change_summary['mean'],
+            'digital_change_sd': digital_change_summary['sd'],
+            'physical_n': physical_change_summary['n'],
+            'physical_pre_mean': physical_pre_summary['mean'],
+            'physical_pre_sd': physical_pre_summary['sd'],
+            'physical_post_mean': physical_post_summary['mean'],
+            'physical_post_sd': physical_post_summary['sd'],
+            'physical_change_mean': physical_change_summary['mean'],
+            'physical_change_sd': physical_change_summary['sd'],
+            'mean_change_diff': change_diff,
+            'permutation_p_change': permutation_p_value(digital_change, physical_change),
+            'cliffs_delta_change': cliffs_delta(digital_change, physical_change),
+        })
+
+    return summary_rows
+
+
+def build_prepost_summary_markdown_rows(summary_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for row in summary_rows:
+        rows.append({
+            'Comparator': row['comparator_label'],
+            'Digital n': row['digital_n'],
+            'Digital pre mean ± SD': format_mean_sd(row['digital_pre_mean'], row['digital_pre_sd']),
+            'Digital post mean ± SD': format_mean_sd(row['digital_post_mean'], row['digital_post_sd']),
+            'Digital change mean ± SD': format_mean_sd(row['digital_change_mean'], row['digital_change_sd']),
+            'Physical n': row['physical_n'],
+            'Physical pre mean ± SD': format_mean_sd(row['physical_pre_mean'], row['physical_pre_sd']),
+            'Physical post mean ± SD': format_mean_sd(row['physical_post_mean'], row['physical_post_sd']),
+            'Physical change mean ± SD': format_mean_sd(row['physical_change_mean'], row['physical_change_sd']),
+            'Mean change diff (D-P)': format_number(row['mean_change_diff']),
+            'Permutation p': format_number(row['permutation_p_change'], 4),
+            "Cliff's delta": format_number(row['cliffs_delta_change']),
+        })
+    return rows
 
 
 def to_csv(rows: list[dict[str, Any]]) -> str:
@@ -856,12 +1162,28 @@ def fetch_page_usage_rows(database_url: str) -> list[dict[str, Any]]:
   return fetch_query_rows(database_url, PAGE_USAGE_QUERY)
 
 
+def fetch_task_rows(database_url: str) -> list[dict[str, Any]]:
+  return fetch_query_rows(database_url, TASK_LEVEL_QUERY)
+
+
 def normalize_participant_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     normalized_rows: list[dict[str, Any]] = []
     for row in rows:
         normalized = dict(row)
         for key, value in list(normalized.items()):
             if key in {'participant_id', 'allocation_group'}:
+                continue
+            normalized[key] = to_number(value)
+        normalized_rows.append(normalized)
+    return normalized_rows
+
+
+def normalize_task_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    normalized_rows: list[dict[str, Any]] = []
+    for row in rows:
+        normalized = dict(row)
+        for key, value in list(normalized.items()):
+            if key in {'session_id', 'participant_id', 'task_id', 'task_label', 'trial_mode', 'task_started_at', 'task_ended_at', 'allocation_group'}:
                 continue
             normalized[key] = to_number(value)
         normalized_rows.append(normalized)
@@ -877,6 +1199,18 @@ def main() -> int:
 
     participant_rows = normalize_participant_rows(fetch_rows(database_url))
     page_usage_rows = fetch_page_usage_rows(database_url)
+    raw_task_rows = fetch_task_rows(database_url)
+    allocation_group_by_participant = {
+      str(row.get('participant_id') or '').strip(): str(row.get('allocation_group') or '').strip()
+      for row in participant_rows
+    }
+    task_rows = normalize_task_rows([
+      {
+        **row,
+        'allocation_group': allocation_group_by_participant.get(str(row.get('participant_id') or '').strip(), str(row.get('trial_mode') or '').strip()),
+      }
+      for row in raw_task_rows
+    ])
     digital_rows = [row for row in participant_rows if row.get('allocation_group') == 'digital']
     physical_rows = [row for row in participant_rows if row.get('allocation_group') == 'physical']
 
@@ -944,6 +1278,15 @@ def main() -> int:
     report_ready_rows = build_report_ready_rows(test_rows)
     report_ready_csv = to_csv(report_ready_rows)
     report_ready_md = to_markdown_table(report_ready_rows)
+    task_by_participant_csv = to_csv(task_rows)
+    task_summary_rows = build_task_summary_rows(task_rows)
+    task_summary_csv = to_csv(task_summary_rows)
+    task_summary_md = to_markdown_table(build_task_summary_markdown_rows(task_summary_rows))
+    prepost_participant_rows = build_prepost_participant_rows(participant_rows)
+    prepost_participant_csv = to_csv(prepost_participant_rows)
+    prepost_summary_rows = build_prepost_summary_rows(prepost_participant_rows)
+    prepost_summary_csv = to_csv(prepost_summary_rows)
+    prepost_summary_md = to_markdown_table(build_prepost_summary_markdown_rows(prepost_summary_rows))
     report = build_report(participant_rows, test_rows, group_summary_rows, generated_at, figure_outputs)
 
     participant_file = TABLES_DIR / f'participant-level-{timestamp}.csv'
@@ -951,6 +1294,12 @@ def main() -> int:
     summary_file = TABLES_DIR / f'group-summary-{timestamp}.csv'
     report_ready_csv_file = TABLES_DIR / f'dissertation-summary-table-{timestamp}.csv'
     report_ready_md_file = TABLES_DIR / f'dissertation-summary-table-{timestamp}.md'
+    task_by_participant_file = TABLES_DIR / f'task-by-participant-{timestamp}.csv'
+    task_summary_csv_file = TABLES_DIR / f'task-summary-by-group-{timestamp}.csv'
+    task_summary_md_file = TABLES_DIR / f'task-summary-by-group-{timestamp}.md'
+    prepost_participant_file = TABLES_DIR / f'questionnaire-prepost-by-participant-{timestamp}.csv'
+    prepost_summary_csv_file = TABLES_DIR / f'questionnaire-prepost-summary-{timestamp}.csv'
+    prepost_summary_md_file = TABLES_DIR / f'questionnaire-prepost-summary-{timestamp}.md'
     report_file = REPORTS_DIR / f'stats-report-{timestamp}.md'
 
     participant_file.write_text(participant_csv, encoding='utf8')
@@ -958,6 +1307,12 @@ def main() -> int:
     summary_file.write_text(summary_csv, encoding='utf8')
     report_ready_csv_file.write_text(report_ready_csv, encoding='utf8')
     report_ready_md_file.write_text(report_ready_md, encoding='utf8')
+    task_by_participant_file.write_text(task_by_participant_csv, encoding='utf8')
+    task_summary_csv_file.write_text(task_summary_csv, encoding='utf8')
+    task_summary_md_file.write_text(task_summary_md, encoding='utf8')
+    prepost_participant_file.write_text(prepost_participant_csv, encoding='utf8')
+    prepost_summary_csv_file.write_text(prepost_summary_csv, encoding='utf8')
+    prepost_summary_md_file.write_text(prepost_summary_md, encoding='utf8')
     report_file.write_text(report, encoding='utf8')
 
     (TABLES_DIR / 'participant-level-latest.csv').write_text(participant_csv, encoding='utf8')
@@ -965,6 +1320,12 @@ def main() -> int:
     (TABLES_DIR / 'group-summary-latest.csv').write_text(summary_csv, encoding='utf8')
     (TABLES_DIR / 'dissertation-summary-table-latest.csv').write_text(report_ready_csv, encoding='utf8')
     (TABLES_DIR / 'dissertation-summary-table-latest.md').write_text(report_ready_md, encoding='utf8')
+    (TABLES_DIR / 'task-by-participant-latest.csv').write_text(task_by_participant_csv, encoding='utf8')
+    (TABLES_DIR / 'task-summary-by-group-latest.csv').write_text(task_summary_csv, encoding='utf8')
+    (TABLES_DIR / 'task-summary-by-group-latest.md').write_text(task_summary_md, encoding='utf8')
+    (TABLES_DIR / 'questionnaire-prepost-by-participant-latest.csv').write_text(prepost_participant_csv, encoding='utf8')
+    (TABLES_DIR / 'questionnaire-prepost-summary-latest.csv').write_text(prepost_summary_csv, encoding='utf8')
+    (TABLES_DIR / 'questionnaire-prepost-summary-latest.md').write_text(prepost_summary_md, encoding='utf8')
     (REPORTS_DIR / 'stats-report-latest.md').write_text(report, encoding='utf8')
 
     print('Stats report generated successfully.')
@@ -976,6 +1337,12 @@ def main() -> int:
     print(f'- {summary_file}')
     print(f'- {report_ready_csv_file}')
     print(f'- {report_ready_md_file}')
+    print(f'- {task_by_participant_file}')
+    print(f'- {task_summary_csv_file}')
+    print(f'- {task_summary_md_file}')
+    print(f'- {prepost_participant_file}')
+    print(f'- {prepost_summary_csv_file}')
+    print(f'- {prepost_summary_md_file}')
     for figure in figure_outputs:
       print(f"- {figure['timestamped_path']}")
     return 0

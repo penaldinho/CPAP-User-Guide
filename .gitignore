@@ -7,3 +7,10 @@ Write Up/
 # Local environment configuration / secrets
 .env
 .env.*
+
+# Python cache artifacts
+__pycache__/
+*.py[cod]
+
+# Generated analysis outputs
+analysis-output/
