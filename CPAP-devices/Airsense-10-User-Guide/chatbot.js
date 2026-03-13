@@ -73,7 +73,6 @@ class ChatBot {
     url.searchParams.set('guide', guideKey);
     url.searchParams.set('guides', guideKey);
 
-    const hasUrlContext = Array.from(currentParams.keys()).some((key) => key === 'research' || key.startsWith('mtg_'));
     const hasActiveTask = Boolean(
       currentParams.get('mtg_task_id')
       || telemetryContext.task_id
@@ -88,7 +87,7 @@ class ChatBot {
       })()
     );
 
-    if (!hasUrlContext && !hasActiveTask) {
+    if (!hasActiveTask) {
       return `${url.pathname}${url.search}`;
     }
 

@@ -144,6 +144,19 @@ function injectNav(currentPageFile) {
     const buildChatHref = () => {
       const localBase = '/CPAP-devices/Resmed-ClimateLineAir-User-Guide/chat.html?guide=climatelineair&family=cpap&guides=climatelineair';
       const base = isLocalHost ? localBase : hostedGuideChatHref;
+      let hasActiveTask = false;
+
+      try {
+        const activeTask = JSON.parse(sessionStorage.getItem('mtg-telemetry-task-state') || '{}');
+        hasActiveTask = Boolean(activeTask.task_id);
+      } catch {
+        hasActiveTask = false;
+      }
+
+      if (!hasActiveTask) {
+        return base;
+      }
+
       return appendContextToHref(base, true);
     };
     const chatHref = buildChatHref();
@@ -553,7 +566,6 @@ function injectNav(currentPageFile) {
       const hostedGuideChatHref = 'https://chat.medtechguides.uk/CPAP-devices/Resmed-ClimateLineAir-User-Guide/chat.html?guide=climatelineair&family=cpap&guides=climatelineair';
       const buildChatHref = () => {
         const params = new URLSearchParams(window.location.search);
-        const hasUrlContext = Array.from(params.keys()).some((key) => key === 'research' || key.startsWith('mtg_'));
         let hasActiveTask = false;
 
         try {
@@ -563,7 +575,7 @@ function injectNav(currentPageFile) {
           hasActiveTask = false;
         }
 
-        if (!hasUrlContext && !hasActiveTask) {
+        if (!hasActiveTask) {
           return isLocalHost ? '/CPAP-devices/Resmed-ClimateLineAir-User-Guide/chat.html?guide=climatelineair&family=cpap&guides=climatelineair' : hostedGuideChatHref;
         }
 

@@ -158,6 +158,19 @@ function injectNav(currentPageFile) {
     const buildChatHref = () => {
       const localBase = '/CPAP-devices/F%26P-Vitera-Full-Face-User-Guide/chat.html?guide=fp-vitera&family=cpap&guides=fp-vitera';
       const base = isLocalHost ? localBase : hostedGuideChatHref;
+      let hasActiveTask = false;
+
+      try {
+        const activeTask = JSON.parse(sessionStorage.getItem('mtg-telemetry-task-state') || '{}');
+        hasActiveTask = Boolean(activeTask.task_id);
+      } catch {
+        hasActiveTask = false;
+      }
+
+      if (!hasActiveTask) {
+        return base;
+      }
+
       return appendContextToHref(base, true);
     };
     const chatHref = buildChatHref();
@@ -565,7 +578,6 @@ function injectNav(currentPageFile) {
       const hostedGuideChatHref = 'https://chat.medtechguides.uk/CPAP-devices/F%26P-Vitera-Full-Face-User-Guide/chat.html?guide=fp-vitera&family=cpap&guides=fp-vitera';
       const buildChatHref = () => {
         const params = new URLSearchParams(window.location.search);
-        const hasUrlContext = Array.from(params.keys()).some((key) => key === 'research' || key.startsWith('mtg_'));
         let hasActiveTask = false;
 
         try {
@@ -575,7 +587,7 @@ function injectNav(currentPageFile) {
           hasActiveTask = false;
         }
 
-        if (!hasUrlContext && !hasActiveTask) {
+        if (!hasActiveTask) {
           return isLocalHost ? '/CPAP-devices/F%26P-Vitera-Full-Face-User-Guide/chat.html?guide=fp-vitera&family=cpap&guides=fp-vitera' : hostedGuideChatHref;
         }
 

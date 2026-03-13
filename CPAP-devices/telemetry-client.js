@@ -37,13 +37,18 @@
   const buildNavigationContextParams = (includeTaskClear) => {
     const currentUrl = new URL(window.location.href);
     const params = new URLSearchParams();
+    const taskState = getTaskState();
+    const hasActiveTask = Boolean(taskState.task_id);
+
+    if (!hasActiveTask && !includeTaskClear) {
+      return params;
+    }
 
     const participantId = getParticipantId();
     if (participantId) {
       params.set('mtg_participant_id', participantId);
     }
 
-    const taskState = getTaskState();
     if (taskState.task_id) {
       params.set('mtg_task_id', String(taskState.task_id));
       if (taskState.task_label) {

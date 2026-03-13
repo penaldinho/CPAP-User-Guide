@@ -153,6 +153,19 @@ function injectNav(currentPageFile) {
     const buildChatHref = () => {
       const localBase = '/CPAP-devices/Airsense-10-User-Guide/chat.html?guide=airsense-10&family=cpap&guides=airsense-10';
       const base = isLocalHost ? localBase : hostedGuideChatHref;
+      let hasActiveTask = false;
+
+      try {
+        const activeTask = JSON.parse(sessionStorage.getItem('mtg-telemetry-task-state') || '{}');
+        hasActiveTask = Boolean(activeTask.task_id);
+      } catch {
+        hasActiveTask = false;
+      }
+
+      if (!hasActiveTask) {
+        return base;
+      }
+
       return appendContextToHref(base, true);
     };
     const chatHref = buildChatHref();
@@ -578,7 +591,6 @@ function injectNav(currentPageFile) {
       const hostedGuideChatHref = 'https://chat.medtechguides.uk/CPAP-devices/Airsense-10-User-Guide/chat.html?guide=airsense-10&family=cpap&guides=airsense-10';
       const buildChatHref = () => {
         const params = new URLSearchParams(window.location.search);
-        const hasUrlContext = Array.from(params.keys()).some((key) => key === 'research' || key.startsWith('mtg_'));
         let hasActiveTask = false;
 
         try {
@@ -588,7 +600,7 @@ function injectNav(currentPageFile) {
           hasActiveTask = false;
         }
 
-        if (!hasUrlContext && !hasActiveTask) {
+        if (!hasActiveTask) {
           return isLocalHost ? '/CPAP-devices/Airsense-10-User-Guide/chat.html?guide=airsense-10&family=cpap&guides=airsense-10' : hostedGuideChatHref;
         }
 
