@@ -7,6 +7,8 @@ const { Pool } = require('pg');
 const OUTPUT_DIR = path.join(__dirname, '..', 'analysis-output');
 const TABLES_DIR = path.join(OUTPUT_DIR, 'tables');
 const REPORTS_DIR = path.join(OUTPUT_DIR, 'reports');
+const FIGURES_DIR = path.join(OUTPUT_DIR, 'figures');
+const CHAT_EVAL_DIR = path.join(OUTPUT_DIR, 'chat-eval');
 
 const ANALYSIS_QUERY = `
 WITH participant_pool AS (
@@ -82,8 +84,8 @@ scenario_task_end AS (
   SELECT
     participant_id,
     COUNT(*) AS scenario_task_count,
-    SUM(COALESCE(task_length_ms, 0))::BIGINT AS scenario_total_time_ms,
-    AVG(COALESCE(task_length_ms, 0)::DOUBLE PRECISION) AS scenario_avg_time_ms
+    SUM(COALESCE(task_length_ms, 0)::DOUBLE PRECISION) / 1000.0 AS scenario_total_time_seconds,
+    AVG(COALESCE(task_length_ms, 0)::DOUBLE PRECISION) / 1000.0 AS scenario_avg_time_seconds
   FROM analysis_observer_notes
   WHERE action_type = 'task_end'
     AND task_id LIKE 'scenario_card_%'
@@ -130,7 +132,7 @@ short_form AS (
     COUNT(*) AS short_form_question_count,
     AVG(COALESCE(all_parts_correct_binary, 0)::DOUBLE PRECISION) AS short_form_binary_accuracy,
     AVG(COALESCE(proportion_correct, 0)::DOUBLE PRECISION) AS short_form_proportion_accuracy,
-    AVG(NULLIF(duration_ms, 0)::DOUBLE PRECISION) AS short_form_avg_duration_ms
+    AVG(NULLIF(duration_ms, 0)::DOUBLE PRECISION) / 1000.0 AS short_form_avg_duration_seconds
   FROM analysis_short_form_result_scores
   GROUP BY participant_id
 ),
@@ -181,8 +183,8 @@ SELECT
   p.participant_id,
   p.allocation_group,
   COALESCE(st.scenario_task_count, 0) AS scenario_task_count,
-  st.scenario_total_time_ms,
-  st.scenario_avg_time_ms,
+  st.scenario_total_time_seconds,
+  st.scenario_avg_time_seconds,
   ss.scenario_avg_score,
   COALESCE(se.scenario_error_count, 0) AS scenario_error_count,
   COALESCE(se.scenario_major_error_count, 0) AS scenario_major_error_count,
@@ -192,7 +194,7 @@ SELECT
   sf.short_form_question_count,
   sf.short_form_binary_accuracy,
   sf.short_form_proportion_accuracy,
-  sf.short_form_avg_duration_ms,
+  sf.short_form_avg_duration_seconds,
   pre.q6_digital_literacy,
   pre.q7_digital_guidance,
   pre.q8_physical_guidance,
@@ -234,14 +236,14 @@ ORDER BY p.participant_id;
 
 const OUTCOMES = [
   { key: 'scenario_avg_score', label: 'Scenario average score', better: 'higher' },
-  { key: 'scenario_total_time_ms', label: 'Scenario total time (ms)', better: 'lower' },
+  { key: 'scenario_total_time_seconds', label: 'Scenario total time (s)', better: 'lower' },
   { key: 'scenario_error_count', label: 'Scenario error count', better: 'lower' },
   { key: 'scenario_major_error_count', label: 'Scenario major error count', better: 'lower' },
   { key: 'scenario_help_count', label: 'Scenario help count', better: 'lower' },
   { key: 'step_accuracy', label: 'Scenario step accuracy', better: 'higher' },
   { key: 'short_form_binary_accuracy', label: 'Short-form binary accuracy', better: 'higher' },
   { key: 'short_form_proportion_accuracy', label: 'Short-form proportion accuracy', better: 'higher' },
-  { key: 'short_form_avg_duration_ms', label: 'Short-form average duration (ms)', better: 'lower' },
+  { key: 'short_form_avg_duration_seconds', label: 'Short-form average duration (s)', better: 'lower' },
   { key: 'q2_info_ease', label: 'Post-trial ease finding information', better: 'higher' },
   { key: 'q5_confidence_setup', label: 'Post-trial confidence setup', better: 'higher' },
   { key: 'q7_mental_effort', label: 'Post-trial mental effort', better: 'lower' },
@@ -365,6 +367,25 @@ function toCsv(rows) {
 function ensureDirectories() {
   fs.mkdirSync(TABLES_DIR, { recursive: true });
   fs.mkdirSync(REPORTS_DIR, { recursive: true });
+  fs.mkdirSync(FIGURES_DIR, { recursive: true });
+  fs.mkdirSync(CHAT_EVAL_DIR, { recursive: true });
+}
+
+function clearPreviousOutputs() {
+  const managedDirectories = [TABLES_DIR, REPORTS_DIR, FIGURES_DIR, CHAT_EVAL_DIR];
+  let clearedCount = 0;
+
+  for (const directory of managedDirectories) {
+    if (!fs.existsSync(directory)) continue;
+    for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+      if (!entry.isFile()) continue;
+      if (entry.name.includes('-latest.')) continue;
+      fs.unlinkSync(path.join(directory, entry.name));
+      clearedCount += 1;
+    }
+  }
+
+  return clearedCount;
 }
 
 function getTimestamp() {
@@ -514,6 +535,7 @@ async function run() {
     }
 
     ensureDirectories();
+    const clearedCount = clearPreviousOutputs();
     const timestamp = getTimestamp();
     const generatedAt = new Date().toISOString();
 
@@ -538,6 +560,9 @@ async function run() {
     fs.writeFileSync(path.join(REPORTS_DIR, 'stats-report-latest.md'), report, 'utf8');
 
     console.log('Stats report generated successfully.');
+    if (clearedCount) {
+      console.log(`- Cleared ${clearedCount} previous analysis output(s).`);
+    }
     console.log(`- ${reportFile}`);
     console.log(`- ${participantFile}`);
     console.log(`- ${testsFile}`);

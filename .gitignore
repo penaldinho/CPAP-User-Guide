@@ -3,3 +3,7 @@ Write Up/
 
 # Office temporary lock files
 ~$*.docx
+
+# Local environment configuration / secrets
+.env
+.env.*

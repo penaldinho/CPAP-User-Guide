@@ -5,7 +5,8 @@
   "scripts": {
     "build-index": "node build-search-index.js",
     "chat": "node chat-server.js",
-    "stats:report": "node analysis/run-stats-report.js",
+    "stats:report": "python analysis/run-stats-report.py",
+    "stats:report:js": "node analysis/run-stats-report.js",
     "chat:eval": "node analysis/run-chat-eval.js"
   },
   "keywords": ["airsense", "cpap", "user guide", "training"],

@@ -75,17 +75,34 @@ ORDER BY received_at DESC;
 
 ## On-demand ETL + statistical report
 
-You can generate participant-level ETL outputs and a markdown stats report on demand (no timer) from your PostgreSQL trial database.
+You can generate participant-level ETL outputs and a markdown stats report on demand (no timer) from your PostgreSQL trial database. Downstream analysis and reporting now run through Python, while SQL continues to provide the canonical filtered analysis views.
 
 ### Prerequisites
 
-- `DATABASE_URL` environment variable set to your telemetry PostgreSQL database.
-- Node dependencies installed (`npm install`).
+- `DATABASE_URL` environment variable set to your telemetry PostgreSQL database, or a `.env` file in the workspace root containing it.
+- Python installed and available as `python`.
+- Python dependencies installed with `pip install -r requirements.txt`.
+- Optional: Node dependencies installed (`npm install`) if you also use the chat server or other Node scripts.
+
+Example `.env` file:
+
+```text
+DATABASE_URL=postgres://USERNAME:PASSWORD@HOST:5432/DBNAME
+PGSSLMODE=require
+```
 
 ### Run
 
 ```bash
 npm run stats:report
+```
+
+This runs [analysis/run-stats-report.py](analysis/run-stats-report.py).
+
+If you need the legacy JavaScript implementation for comparison, you can still run:
+
+```bash
+npm run stats:report:js
 ```
 
 ### Outputs
