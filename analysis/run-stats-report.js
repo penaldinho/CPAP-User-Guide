@@ -12,21 +12,21 @@ const ANALYSIS_QUERY = `
 WITH participant_pool AS (
   SELECT DISTINCT participant_id
   FROM (
-    SELECT participant_id FROM participant_allocation
+    SELECT participant_id FROM analysis_participant_allocation
     UNION ALL
-    SELECT participant_id FROM telemetry_events
+    SELECT participant_id FROM analysis_telemetry_events
     UNION ALL
-    SELECT participant_id FROM physical_trial_events
+    SELECT participant_id FROM analysis_physical_trial_events
     UNION ALL
-    SELECT participant_id FROM observer_notes
+    SELECT participant_id FROM analysis_observer_notes
     UNION ALL
-    SELECT participant_id FROM observer_step_marks
+    SELECT participant_id FROM analysis_observer_step_marks
     UNION ALL
-    SELECT participant_id FROM short_form_result_scores
+    SELECT participant_id FROM analysis_short_form_result_scores
     UNION ALL
-    SELECT participant_id FROM pre_trial_questionnaire
+    SELECT participant_id FROM analysis_pre_trial_questionnaire
     UNION ALL
-    SELECT participant_id FROM post_trial_questionnaire
+    SELECT participant_id FROM analysis_post_trial_questionnaire
   ) src
   WHERE NULLIF(TRIM(participant_id), '') IS NOT NULL
 ),
@@ -41,15 +41,15 @@ mode_guess AS (
       ELSE NULL
     END AS inferred_mode
   FROM (
-    SELECT participant_id, trial_mode FROM telemetry_events
+    SELECT participant_id, trial_mode FROM analysis_telemetry_events
     UNION ALL
-    SELECT participant_id, trial_mode FROM physical_trial_events
+    SELECT participant_id, trial_mode FROM analysis_physical_trial_events
     UNION ALL
-    SELECT participant_id, trial_mode FROM short_form_results
+    SELECT participant_id, trial_mode FROM analysis_short_form_results
     UNION ALL
-    SELECT participant_id, trial_mode FROM observer_notes
+    SELECT participant_id, trial_mode FROM analysis_observer_notes
     UNION ALL
-    SELECT participant_id, trial_mode FROM observer_step_marks
+    SELECT participant_id, trial_mode FROM analysis_observer_step_marks
   ) modes
   WHERE NULLIF(TRIM(participant_id), '') IS NOT NULL
   GROUP BY participant_id
@@ -63,7 +63,7 @@ participants AS (
       'digital'
     ) AS allocation_group
   FROM participant_pool p
-  LEFT JOIN participant_allocation pa
+  LEFT JOIN analysis_participant_allocation pa
     ON pa.participant_id = p.participant_id
   LEFT JOIN mode_guess mg
     ON mg.participant_id = p.participant_id
@@ -72,7 +72,7 @@ scenario_scores AS (
   SELECT
     participant_id,
     AVG(scenario_score::DOUBLE PRECISION) AS scenario_avg_score
-  FROM observer_notes
+  FROM analysis_observer_notes
   WHERE action_type = 'scenario_score'
     AND task_id LIKE 'scenario_card_%'
     AND scenario_score IS NOT NULL
@@ -84,7 +84,7 @@ scenario_task_end AS (
     COUNT(*) AS scenario_task_count,
     SUM(COALESCE(task_length_ms, 0))::BIGINT AS scenario_total_time_ms,
     AVG(COALESCE(task_length_ms, 0)::DOUBLE PRECISION) AS scenario_avg_time_ms
-  FROM observer_notes
+  FROM analysis_observer_notes
   WHERE action_type = 'task_end'
     AND task_id LIKE 'scenario_card_%'
   GROUP BY participant_id
@@ -94,7 +94,7 @@ scenario_errors AS (
     participant_id,
     COUNT(*) AS scenario_error_count,
     COUNT(*) FILTER (WHERE error_severity = 'major') AS scenario_major_error_count
-  FROM observer_notes
+  FROM analysis_observer_notes
   WHERE action_type = 'error'
     AND task_id LIKE 'scenario_card_%'
   GROUP BY participant_id
@@ -104,7 +104,7 @@ scenario_help_per_task AS (
     participant_id,
     task_id,
     MAX(COALESCE(help_instances_count, 0)) AS help_instances_count
-  FROM observer_notes
+  FROM analysis_observer_notes
   WHERE task_id LIKE 'scenario_card_%'
   GROUP BY participant_id, task_id
 ),
@@ -120,7 +120,7 @@ scenario_steps AS (
     participant_id,
     COUNT(*) AS step_mark_count,
     AVG(CASE WHEN criterion_outcome = 'correct' THEN 1.0 ELSE 0.0 END) AS step_accuracy
-  FROM observer_step_marks
+  FROM analysis_observer_step_marks
   WHERE task_id LIKE 'scenario_card_%'
   GROUP BY participant_id
 ),
@@ -131,7 +131,7 @@ short_form AS (
     AVG(COALESCE(all_parts_correct_binary, 0)::DOUBLE PRECISION) AS short_form_binary_accuracy,
     AVG(COALESCE(proportion_correct, 0)::DOUBLE PRECISION) AS short_form_proportion_accuracy,
     AVG(NULLIF(duration_ms, 0)::DOUBLE PRECISION) AS short_form_avg_duration_ms
-  FROM short_form_result_scores
+  FROM analysis_short_form_result_scores
   GROUP BY participant_id
 ),
 pre_q AS (
@@ -144,7 +144,7 @@ pre_q AS (
       q8_physical_guidance,
       q9_problem_solving,
       ROW_NUMBER() OVER (PARTITION BY participant_id ORDER BY received_at DESC, id DESC) AS rn
-    FROM pre_trial_questionnaire
+    FROM analysis_pre_trial_questionnaire
   ) ranked
   WHERE rn = 1
 ),
@@ -164,7 +164,7 @@ post_q AS (
       q9_tlx_perceived_performance,
       q10_tlx_temporal_demand,
       ROW_NUMBER() OVER (PARTITION BY participant_id ORDER BY received_at DESC, id DESC) AS rn
-    FROM post_trial_questionnaire
+    FROM analysis_post_trial_questionnaire
   ) ranked
   WHERE rn = 1
 ),
@@ -174,7 +174,7 @@ digital_behaviour AS (
     COUNT(*) FILTER (WHERE event_type = 'page_view') AS digital_page_view_count,
     COUNT(*) FILTER (WHERE NULLIF(TRIM(query), '') IS NOT NULL) AS digital_search_count,
     COUNT(*) FILTER (WHERE NULLIF(TRIM(chat_message), '') IS NOT NULL) AS digital_chat_count
-  FROM telemetry_events
+  FROM analysis_telemetry_events
   GROUP BY participant_id
 )
 SELECT

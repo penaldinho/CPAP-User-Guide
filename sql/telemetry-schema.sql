@@ -609,6 +609,50 @@ $$;
 CREATE INDEX IF NOT EXISTS idx_post_trial_questionnaire_participant_time
   ON post_trial_questionnaire (participant_id, received_at DESC);
 
+CREATE OR REPLACE VIEW analysis_participant_allocation AS
+SELECT *
+FROM participant_allocation
+WHERE UPPER(TRIM(COALESCE(participant_id, ''))) <> 'TEST';
+
+CREATE OR REPLACE VIEW analysis_telemetry_events AS
+SELECT *
+FROM telemetry_events
+WHERE UPPER(TRIM(COALESCE(participant_id, ''))) <> 'TEST';
+
+CREATE OR REPLACE VIEW analysis_physical_trial_events AS
+SELECT *
+FROM physical_trial_events
+WHERE UPPER(TRIM(COALESCE(participant_id, ''))) <> 'TEST';
+
+CREATE OR REPLACE VIEW analysis_observer_notes AS
+SELECT *
+FROM observer_notes
+WHERE UPPER(TRIM(COALESCE(participant_id, ''))) <> 'TEST';
+
+CREATE OR REPLACE VIEW analysis_observer_step_marks AS
+SELECT *
+FROM observer_step_marks
+WHERE UPPER(TRIM(COALESCE(participant_id, ''))) <> 'TEST';
+
+CREATE OR REPLACE VIEW analysis_short_form_results AS
+SELECT *
+FROM short_form_results
+WHERE UPPER(TRIM(COALESCE(participant_id, ''))) <> 'TEST';
+
+CREATE OR REPLACE VIEW analysis_pre_trial_questionnaire AS
+SELECT *
+FROM pre_trial_questionnaire
+WHERE UPPER(TRIM(COALESCE(participant_id, ''))) <> 'TEST';
+
+CREATE OR REPLACE VIEW analysis_post_trial_questionnaire AS
+SELECT *
+FROM post_trial_questionnaire
+WHERE UPPER(TRIM(COALESCE(participant_id, ''))) <> 'TEST';
+
+CREATE OR REPLACE VIEW analysis_short_form_result_scores AS
+SELECT *
+FROM short_form_result_scores;
+
 CREATE OR REPLACE VIEW telemetry_task_events_enriched AS
 WITH ordered AS (
   SELECT
