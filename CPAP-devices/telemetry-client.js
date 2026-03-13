@@ -898,6 +898,9 @@
 
     const alwaysAllowedWithoutTask = new Set([
       'participant_set',
+      'chat_submit',
+      'chat_response',
+      'chat_error',
       'task_start',
       'task_end',
       'task_end_clicked_by_participant'
