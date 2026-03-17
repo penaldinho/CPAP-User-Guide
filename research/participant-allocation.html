@@ -127,9 +127,6 @@
         heading.id = 'password-modal-title';
         heading.textContent = title;
 
-        const description = document.createElement('p');
-        description.textContent = 'Characters are hidden while you type.';
-
         const label = document.createElement('label');
         label.setAttribute('for', 'password-modal-input');
         label.textContent = 'Password';
@@ -154,7 +151,6 @@
         actions.appendChild(cancelButton);
         actions.appendChild(confirmButton);
         modal.appendChild(heading);
-        modal.appendChild(description);
         modal.appendChild(label);
         modal.appendChild(input);
         modal.appendChild(actions);
