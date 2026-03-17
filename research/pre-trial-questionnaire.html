@@ -469,10 +469,12 @@
         });
         if (response.ok) {
           if (trialMode === 'physical') {
+            const trialRunToken = `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
             const trialPortalUrl = new URL('trial-portal.html', window.location.href);
             trialPortalUrl.searchParams.set('participant', participantId);
             trialPortalUrl.searchParams.set('lock_participant', '1');
             trialPortalUrl.searchParams.set('mode', 'physical');
+            trialPortalUrl.searchParams.set('trial_run', trialRunToken);
             trialPortalUrl.searchParams.set('post_trial_url', `/research/post-trial-questionnaire.html?participant=${encodeURIComponent(participantId)}&lock_participant=1&mode=physical`);
             window.location.href = trialPortalUrl.toString();
           } else {

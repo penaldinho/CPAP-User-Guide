@@ -193,6 +193,7 @@
 
         return {
           screen: parsed.screen === 'trial' ? 'trial' : 'setup',
+          launchToken: String(parsed.launchToken || '').trim(),
           participantId: String(parsed.participantId || '').trim(),
           currentTaskIndex: Number.isInteger(parsed.currentTaskIndex) ? Math.max(0, Math.min(taskOrder.length - 1, parsed.currentTaskIndex)) : 0,
           startedTaskId: String(parsed.startedTaskId || '').trim(),
@@ -221,6 +222,7 @@
 
       const queryParams = new URLSearchParams(window.location.search);
       const presetParticipant = String(queryParams.get('participant') || '').trim();
+      const trialRunToken = String(queryParams.get('trial_run') || '').trim();
       const lockParticipant = ['1', 'true', 'yes'].includes(String(queryParams.get('lock_participant') || '').trim().toLowerCase());
       const postTrialUrlParam = String(queryParams.get('post_trial_url') || '').trim();
       const buildPostTrialUrl = (participantId) => {
@@ -297,6 +299,7 @@
 
       const makeFreshRunnerState = () => ({
         screen: 'setup',
+        launchToken: '',
         participantId: '',
         currentTaskIndex: 0,
         startedTaskId: '',
@@ -308,7 +311,20 @@
       });
 
       const startNewSession = () => {
-        const id = makeSessionId();
+            if (trialRunToken) {
+              const storedLaunchToken = String(state.launchToken || '').trim();
+              if (storedLaunchToken !== trialRunToken) {
+                state = {
+                  ...makeFreshRunnerState(),
+                  participantId: presetParticipant,
+                  launchToken: trialRunToken
+                };
+                setRunnerState(state);
+              } else if (presetParticipant && !normalizeParticipantId(state.participantId)) {
+                state.participantId = presetParticipant;
+                setRunnerState(state);
+              }
+            } else if (presetParticipant) {
         localStorage.setItem(sessionKey, id);
         return id;
       };
