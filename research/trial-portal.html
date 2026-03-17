@@ -240,9 +240,35 @@
 
       const normalizeParticipantId = (value) => String(value || '').trim().toUpperCase();
 
+      const makeFreshRunnerState = () => ({
+        screen: 'setup',
+        launchToken: '',
+        participantId: '',
+        currentTaskIndex: 0,
+        startedTaskId: '',
+        startedAt: '',
+        completedTaskIds: [],
+        completedElapsedMsByTask: {},
+        shortFormDrafts: {},
+        timedOutTaskIds: []
+      });
+
       let state = getRunnerState();
 
-      if (presetParticipant) {
+      if (trialRunToken) {
+        const storedLaunchToken = String(state.launchToken || '').trim();
+        if (storedLaunchToken !== trialRunToken) {
+          state = {
+            ...makeFreshRunnerState(),
+            participantId: presetParticipant,
+            launchToken: trialRunToken
+          };
+          setRunnerState(state);
+        } else if (presetParticipant && !normalizeParticipantId(state.participantId)) {
+          state.participantId = presetParticipant;
+          setRunnerState(state);
+        }
+      } else if (presetParticipant) {
         const presetParticipantId = normalizeParticipantId(presetParticipant);
         const storedParticipantId = normalizeParticipantId(state.participantId);
 
@@ -297,34 +323,8 @@
         return capsMs[task.kind] || null;
       };
 
-      const makeFreshRunnerState = () => ({
-        screen: 'setup',
-        launchToken: '',
-        participantId: '',
-        currentTaskIndex: 0,
-        startedTaskId: '',
-        startedAt: '',
-        completedTaskIds: [],
-        completedElapsedMsByTask: {},
-        shortFormDrafts: {},
-        timedOutTaskIds: []
-      });
-
       const startNewSession = () => {
-            if (trialRunToken) {
-              const storedLaunchToken = String(state.launchToken || '').trim();
-              if (storedLaunchToken !== trialRunToken) {
-                state = {
-                  ...makeFreshRunnerState(),
-                  participantId: presetParticipant,
-                  launchToken: trialRunToken
-                };
-                setRunnerState(state);
-              } else if (presetParticipant && !normalizeParticipantId(state.participantId)) {
-                state.participantId = presetParticipant;
-                setRunnerState(state);
-              }
-            } else if (presetParticipant) {
+        const id = makeSessionId();
         localStorage.setItem(sessionKey, id);
         return id;
       };
