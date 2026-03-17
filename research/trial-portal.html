@@ -236,11 +236,24 @@
         return fallback.toString();
       };
 
+      const normalizeParticipantId = (value) => String(value || '').trim().toUpperCase();
+
       let state = getRunnerState();
 
-      if (presetParticipant && !state.participantId) {
-        state.participantId = presetParticipant;
-        setRunnerState(state);
+      if (presetParticipant) {
+        const presetParticipantId = normalizeParticipantId(presetParticipant);
+        const storedParticipantId = normalizeParticipantId(state.participantId);
+
+        if (!storedParticipantId) {
+          state.participantId = presetParticipant;
+          setRunnerState(state);
+        } else if (storedParticipantId !== presetParticipantId) {
+          state = {
+            ...makeFreshRunnerState(),
+            participantId: presetParticipant
+          };
+          setRunnerState(state);
+        }
       }
 
       if (state.participantId && participantInput) {
@@ -784,6 +797,8 @@
             await submitEvent('task_end', 'participant_completed_all_tasks');
             const lastParticipantId = String(state.participantId || '').trim();
             if (lastParticipantId) {
+              state = makeFreshRunnerState();
+              setRunnerState(state);
               window.location.href = buildPostTrialUrl(lastParticipantId);
               return;
             }
