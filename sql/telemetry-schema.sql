@@ -612,42 +612,113 @@ CREATE INDEX IF NOT EXISTS idx_post_trial_questionnaire_participant_time
 CREATE OR REPLACE VIEW analysis_participant_allocation AS
 SELECT *
 FROM participant_allocation
-WHERE UPPER(TRIM(COALESCE(participant_id, ''))) <> 'TEST';
+WHERE NULLIF(TRIM(COALESCE(participant_id, '')), '') IS NOT NULL
+  AND UPPER(TRIM(COALESCE(participant_id, ''))) <> 'TEST';
 
 CREATE OR REPLACE VIEW analysis_telemetry_events AS
-SELECT *
-FROM telemetry_events
-WHERE UPPER(TRIM(COALESCE(participant_id, ''))) <> 'TEST';
+SELECT (ranked.record).*
+FROM (
+  SELECT
+    t AS record,
+    ROW_NUMBER() OVER (
+      PARTITION BY to_jsonb(t) - 'id' - 'received_at'
+      ORDER BY COALESCE(t."timestamp", t.received_at) DESC, t.id DESC
+    ) AS duplicate_rank
+  FROM telemetry_events t
+  WHERE NULLIF(TRIM(COALESCE(t.participant_id, '')), '') IS NOT NULL
+    AND UPPER(TRIM(COALESCE(t.participant_id, ''))) <> 'TEST'
+) ranked
+WHERE ranked.duplicate_rank = 1;
 
 CREATE OR REPLACE VIEW analysis_physical_trial_events AS
-SELECT *
-FROM physical_trial_events
-WHERE UPPER(TRIM(COALESCE(participant_id, ''))) <> 'TEST';
+SELECT (ranked.record).*
+FROM (
+  SELECT
+    t AS record,
+    ROW_NUMBER() OVER (
+      PARTITION BY to_jsonb(t) - 'id' - 'received_at'
+      ORDER BY COALESCE(t."timestamp", t.received_at) DESC, t.id DESC
+    ) AS duplicate_rank
+  FROM physical_trial_events t
+  WHERE NULLIF(TRIM(COALESCE(t.participant_id, '')), '') IS NOT NULL
+    AND UPPER(TRIM(COALESCE(t.participant_id, ''))) <> 'TEST'
+) ranked
+WHERE ranked.duplicate_rank = 1;
 
 CREATE OR REPLACE VIEW analysis_observer_notes AS
-SELECT *
-FROM observer_notes
-WHERE UPPER(TRIM(COALESCE(participant_id, ''))) <> 'TEST';
+SELECT (ranked.record).*
+FROM (
+  SELECT
+    t AS record,
+    ROW_NUMBER() OVER (
+      PARTITION BY to_jsonb(t) - 'id' - 'received_at'
+      ORDER BY COALESCE(t."timestamp", t.received_at) DESC, t.id DESC
+    ) AS duplicate_rank
+  FROM observer_notes t
+  WHERE NULLIF(TRIM(COALESCE(t.participant_id, '')), '') IS NOT NULL
+    AND UPPER(TRIM(COALESCE(t.participant_id, ''))) <> 'TEST'
+) ranked
+WHERE ranked.duplicate_rank = 1;
 
 CREATE OR REPLACE VIEW analysis_observer_step_marks AS
-SELECT *
-FROM observer_step_marks
-WHERE UPPER(TRIM(COALESCE(participant_id, ''))) <> 'TEST';
+SELECT (ranked.record).*
+FROM (
+  SELECT
+    t AS record,
+    ROW_NUMBER() OVER (
+      PARTITION BY to_jsonb(t) - 'id' - 'received_at'
+      ORDER BY COALESCE(t."timestamp", t.received_at) DESC, t.id DESC
+    ) AS duplicate_rank
+  FROM observer_step_marks t
+  WHERE NULLIF(TRIM(COALESCE(t.participant_id, '')), '') IS NOT NULL
+    AND UPPER(TRIM(COALESCE(t.participant_id, ''))) <> 'TEST'
+) ranked
+WHERE ranked.duplicate_rank = 1;
 
 CREATE OR REPLACE VIEW analysis_short_form_results AS
-SELECT *
-FROM short_form_results
-WHERE UPPER(TRIM(COALESCE(participant_id, ''))) <> 'TEST';
+SELECT (ranked.record).*
+FROM (
+  SELECT
+    t AS record,
+    ROW_NUMBER() OVER (
+      PARTITION BY to_jsonb(t) - 'id' - 'received_at'
+      ORDER BY COALESCE(t."timestamp", t.received_at) DESC, t.id DESC
+    ) AS duplicate_rank
+  FROM short_form_results t
+  WHERE NULLIF(TRIM(COALESCE(t.participant_id, '')), '') IS NOT NULL
+    AND UPPER(TRIM(COALESCE(t.participant_id, ''))) <> 'TEST'
+) ranked
+WHERE ranked.duplicate_rank = 1;
 
 CREATE OR REPLACE VIEW analysis_pre_trial_questionnaire AS
-SELECT *
-FROM pre_trial_questionnaire
-WHERE UPPER(TRIM(COALESCE(participant_id, ''))) <> 'TEST';
+SELECT (ranked.record).*
+FROM (
+  SELECT
+    t AS record,
+    ROW_NUMBER() OVER (
+      PARTITION BY TRIM(COALESCE(t.participant_id, ''))
+      ORDER BY COALESCE(t."timestamp", t.received_at) DESC, t.id DESC
+    ) AS duplicate_rank
+  FROM pre_trial_questionnaire t
+  WHERE NULLIF(TRIM(COALESCE(t.participant_id, '')), '') IS NOT NULL
+    AND UPPER(TRIM(COALESCE(t.participant_id, ''))) <> 'TEST'
+) ranked
+WHERE ranked.duplicate_rank = 1;
 
 CREATE OR REPLACE VIEW analysis_post_trial_questionnaire AS
-SELECT *
-FROM post_trial_questionnaire
-WHERE UPPER(TRIM(COALESCE(participant_id, ''))) <> 'TEST';
+SELECT (ranked.record).*
+FROM (
+  SELECT
+    t AS record,
+    ROW_NUMBER() OVER (
+      PARTITION BY TRIM(COALESCE(t.participant_id, ''))
+      ORDER BY COALESCE(t."timestamp", t.received_at) DESC, t.id DESC
+    ) AS duplicate_rank
+  FROM post_trial_questionnaire t
+  WHERE NULLIF(TRIM(COALESCE(t.participant_id, '')), '') IS NOT NULL
+    AND UPPER(TRIM(COALESCE(t.participant_id, ''))) <> 'TEST'
+) ranked
+WHERE ranked.duplicate_rank = 1;
 
 CREATE OR REPLACE VIEW analysis_short_form_result_scores AS
 SELECT *
@@ -673,9 +744,8 @@ WITH ordered AS (
         ORDER BY COALESCE("timestamp", received_at), id
         ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
       ) AS task_instance_seq
-  FROM telemetry_events
+  FROM analysis_telemetry_events
   WHERE NULLIF(task_id, '') IS NOT NULL
-    AND UPPER(TRIM(COALESCE(participant_id, ''))) <> 'TEST'
 ),
 scoped AS (
   SELECT *
@@ -954,9 +1024,8 @@ physical_ordered AS (
         ORDER BY COALESCE("timestamp", received_at), id
         ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
       ) AS task_instance_seq
-  FROM physical_trial_events
+  FROM analysis_physical_trial_events
   WHERE NULLIF(task_id, '') IS NOT NULL
-    AND UPPER(TRIM(COALESCE(participant_id, ''))) <> 'TEST'
 ),
 physical_scoped AS (
   SELECT *
@@ -985,7 +1054,7 @@ physical_task_page_counts AS (
     b.task_instance_seq,
     COUNT(*)::BIGINT AS task_page_count
   FROM physical_task_bounds b
-  INNER JOIN observer_notes o
+  INNER JOIN analysis_observer_notes o
     ON COALESCE(NULLIF(o.trial_mode, ''), 'physical') = b.trial_mode
     AND o.participant_id = b.participant_id
     AND o.task_id = b.task_id
@@ -1227,10 +1296,9 @@ WITH base_answers AS (
     s.duration_ms,
     'a'::TEXT AS part_key,
     COALESCE(NULLIF(s.part_a_answer_text, ''), NULLIF(s.answer_text, '')) AS answer_text
-  FROM short_form_results s
+  FROM analysis_short_form_results s
   WHERE COALESCE(NULLIF(s.question_id, ''), NULLIF(s.task_id, '')) IS NOT NULL
     AND COALESCE(NULLIF(s.question_id, ''), NULLIF(s.task_id, '')) <> ''
-    AND UPPER(TRIM(COALESCE(s.participant_id, ''))) <> 'TEST'
 ),
 answers AS (
   SELECT
@@ -1352,10 +1420,9 @@ result_expected AS (
     s.id AS short_form_result_id,
     COALESCE(NULLIF(s.question_id, ''), NULLIF(s.task_id, '')) AS question_id,
     e.part_key
-  FROM short_form_results s
+  FROM analysis_short_form_results s
   INNER JOIN expected_parts e
     ON e.question_id = COALESCE(NULLIF(s.question_id, ''), NULLIF(s.task_id, ''))
-  WHERE UPPER(TRIM(COALESCE(s.participant_id, ''))) <> 'TEST'
 ),
 joined AS (
   SELECT
@@ -1383,8 +1450,7 @@ metadata AS (
     s.trial_mode,
     s.duration_ms,
     COALESCE(NULLIF(s.part_a_answer_text, ''), NULLIF(s.answer_text, '')) AS entered_answer_text
-  FROM short_form_results s
-  WHERE UPPER(TRIM(COALESCE(s.participant_id, ''))) <> 'TEST'
+  FROM analysis_short_form_results s
 )
 SELECT
   m.short_form_result_id,

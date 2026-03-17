@@ -32,6 +32,13 @@
     button.secondary { background: #fff; color: #1d4ed8; }
     button.small { padding: 6px 9px; font-size: 12px; }
     button:disabled, input[type="checkbox"]:disabled { opacity: 0.55; cursor: not-allowed; }
+    .password-modal-backdrop { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.48); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 1000; }
+    .password-modal { width: min(100%, 360px); background: #fff; border: 1px solid #dbe2ef; border-radius: 12px; box-shadow: 0 18px 40px rgba(15, 23, 42, 0.18); padding: 18px; }
+    .password-modal h2 { margin: 0 0 8px; font-size: 18px; }
+    .password-modal p { margin-bottom: 12px; }
+    .password-modal label { display: block; font-size: 13px; font-weight: 600; color: #334155; margin-bottom: 6px; }
+    .password-modal input[type="password"] { width: 100%; box-sizing: border-box; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 8px; font: inherit; color: #1f2937; }
+    .password-modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
   </style>
 </head>
 <body>
@@ -106,6 +113,81 @@
       let apiBasicAuthHeader = '';
       let activeEndpointBase = endpointBase;
 
+      const requestPassword = (title, confirmLabel) => new Promise((resolve) => {
+        const backdrop = document.createElement('div');
+        backdrop.className = 'password-modal-backdrop';
+
+        const modal = document.createElement('div');
+        modal.className = 'password-modal';
+        modal.setAttribute('role', 'dialog');
+        modal.setAttribute('aria-modal', 'true');
+        modal.setAttribute('aria-labelledby', 'password-modal-title');
+
+        const heading = document.createElement('h2');
+        heading.id = 'password-modal-title';
+        heading.textContent = title;
+
+        const description = document.createElement('p');
+        description.textContent = 'Characters are hidden while you type.';
+
+        const label = document.createElement('label');
+        label.setAttribute('for', 'password-modal-input');
+        label.textContent = 'Password';
+
+        const input = document.createElement('input');
+        input.id = 'password-modal-input';
+        input.type = 'password';
+        input.autocomplete = 'current-password';
+
+        const actions = document.createElement('div');
+        actions.className = 'password-modal-actions';
+
+        const cancelButton = document.createElement('button');
+        cancelButton.type = 'button';
+        cancelButton.className = 'secondary';
+        cancelButton.textContent = 'Cancel';
+
+        const confirmButton = document.createElement('button');
+        confirmButton.type = 'button';
+        confirmButton.textContent = confirmLabel || 'Continue';
+
+        actions.appendChild(cancelButton);
+        actions.appendChild(confirmButton);
+        modal.appendChild(heading);
+        modal.appendChild(description);
+        modal.appendChild(label);
+        modal.appendChild(input);
+        modal.appendChild(actions);
+        backdrop.appendChild(modal);
+        document.body.appendChild(backdrop);
+
+        const cleanup = (value) => {
+          backdrop.remove();
+          resolve(value);
+        };
+
+        cancelButton.addEventListener('click', () => cleanup(null));
+        confirmButton.addEventListener('click', () => cleanup(String(input.value || '')));
+        backdrop.addEventListener('click', (event) => {
+          if (event.target === backdrop) {
+            cleanup(null);
+          }
+        });
+        input.addEventListener('keydown', (event) => {
+          if (event.key === 'Enter') {
+            event.preventDefault();
+            cleanup(String(input.value || ''));
+            return;
+          }
+          if (event.key === 'Escape') {
+            event.preventDefault();
+            cleanup(null);
+          }
+        });
+
+        window.setTimeout(() => input.focus(), 0);
+      });
+
       const attachApiAuthHeader = (requestOptions) => {
         const options = requestOptions && typeof requestOptions === 'object'
           ? { ...requestOptions }
@@ -122,8 +204,8 @@
         return options;
       };
 
-      const promptForApiPassword = () => {
-        const password = window.prompt('Participant Allocation password');
+      const promptForApiPassword = async () => {
+        const password = await requestPassword('Participant Allocation password', 'Continue');
         if (password === null) {
           return false;
         }
@@ -139,8 +221,9 @@
           const targetUrl = `${baseUrl}${suffix}`;
           let response = await fetch(targetUrl, attachApiAuthHeader(requestOptions));
 
-          if (response.status === 401 && !apiBasicAuthHeader) {
-            const confirmed = promptForApiPassword();
+          if (response.status === 401) {
+            apiBasicAuthHeader = '';
+            const confirmed = await promptForApiPassword();
             if (confirmed) {
               response = await fetch(targetUrl, attachApiAuthHeader(requestOptions));
             }
@@ -504,7 +587,7 @@
           return;
         }
 
-        const resetPassword = window.prompt('Enter password to reset session statuses');
+        const resetPassword = await requestPassword('Enter password to reset session statuses', 'Reset');
         if (resetPassword === null) {
           setStatus('Reset cancelled.', false);
           return;
