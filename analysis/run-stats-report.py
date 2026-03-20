@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 import csv
+import json
 import math
 import os
 import random
 import sys
 from datetime import datetime, timezone
+from html import escape as html_escape
 from pathlib import Path
 from typing import Any
+from urllib.parse import unquote
 
 try:
   import matplotlib
@@ -163,6 +166,7 @@ pre_q AS (
   FROM (
     SELECT
       participant_id,
+      q1_age_years,
       q6_digital_literacy,
       q7_digital_guidance,
       q8_physical_guidance,
@@ -217,6 +221,7 @@ SELECT
   sf.short_form_binary_accuracy,
   sf.short_form_proportion_accuracy,
   sf.short_form_avg_duration_seconds,
+  pre.q1_age_years,
   pre.q6_digital_literacy,
   pre.q7_digital_guidance,
   pre.q8_physical_guidance,
@@ -257,16 +262,107 @@ ORDER BY p.participant_id;
 """
 
 PAGE_USAGE_QUERY = """
+WITH normalized_page_views AS (
+  SELECT
+    participant_id,
+    COALESCE(
+      NULLIF(TRIM(page_title), ''),
+      NULLIF(TRIM(SPLIT_PART(SPLIT_PART(page_path, '?', 1), '#', 1)), '')
+    ) AS page_label,
+    NULLIF(TRIM(SPLIT_PART(SPLIT_PART(page_path, '?', 1), '#', 1)), '') AS page_path
+  FROM analysis_telemetry_events
+  WHERE event_type = 'page_view'
+)
 SELECT
   participant_id,
-  COALESCE(NULLIF(TRIM(page_title), ''), NULLIF(TRIM(page_path), '')) AS page_label,
+  page_label,
   page_path,
   COUNT(*) AS page_views
-FROM analysis_telemetry_events
-WHERE event_type = 'page_view'
-  AND NULLIF(TRIM(page_path), '') IS NOT NULL
-GROUP BY participant_id, COALESCE(NULLIF(TRIM(page_title), ''), NULLIF(TRIM(page_path), '')), page_path
+FROM normalized_page_views
+WHERE page_path IS NOT NULL
+GROUP BY participant_id, page_label, page_path
 ORDER BY page_views DESC, page_label ASC;
+"""
+
+SCENARIO_PAGE_TRANSITIONS_QUERY = """
+WITH page_views AS (
+  SELECT
+    e.participant_id,
+    e.task_id,
+    e.task_instance_seq,
+    COALESCE(NULLIF(TRIM(e.task_label), ''), e.task_id) AS task_label,
+    NULLIF(TRIM(SPLIT_PART(SPLIT_PART(e.page_path, '?', 1), '#', 1)), '') AS page_path,
+    ROW_NUMBER() OVER (
+      PARTITION BY e.participant_id, e.task_id, e.task_instance_seq
+      ORDER BY e.event_at ASC, e.id ASC
+    ) AS page_seq
+  FROM telemetry_task_events_enriched e
+  INNER JOIN analysis_participant_allocation pa
+    ON pa.participant_id = e.participant_id
+    AND pa.allocation_group = 'digital'
+  WHERE e.event_type = 'page_view'
+    AND e.task_id LIKE 'scenario_card_%'
+    AND NULLIF(TRIM(SPLIT_PART(SPLIT_PART(e.page_path, '?', 1), '#', 1)), '') IS NOT NULL
+),
+deduped_page_views AS (
+  SELECT *
+  FROM (
+    SELECT
+      pv.*,
+      LAG(pv.page_path) OVER (
+        PARTITION BY pv.participant_id, pv.task_id, pv.task_instance_seq
+        ORDER BY pv.page_seq ASC
+      ) AS previous_page_path
+    FROM page_views pv
+  ) ranked
+  WHERE ranked.previous_page_path IS DISTINCT FROM ranked.page_path
+     OR ranked.previous_page_path IS NULL
+),
+sequenced_page_views AS (
+  SELECT
+    participant_id,
+    task_id,
+    task_instance_seq,
+    task_label,
+    page_path,
+    ROW_NUMBER() OVER (
+      PARTITION BY participant_id, task_id, task_instance_seq
+      ORDER BY page_seq ASC
+    ) AS deduped_page_seq
+  FROM deduped_page_views
+),
+ordered_transitions AS (
+  SELECT
+    participant_id,
+    task_id,
+    task_instance_seq,
+    task_label,
+    deduped_page_seq AS source_step,
+    page_path AS source_page,
+    LEAD(deduped_page_seq) OVER (
+      PARTITION BY participant_id, task_id, task_instance_seq
+      ORDER BY deduped_page_seq ASC
+    ) AS target_step,
+    LEAD(page_path) OVER (
+      PARTITION BY participant_id, task_id, task_instance_seq
+      ORDER BY deduped_page_seq ASC
+    ) AS target_page
+  FROM sequenced_page_views
+)
+SELECT
+  task_id,
+  task_label,
+  source_step,
+  source_page,
+  target_step,
+  target_page,
+  COUNT(*)::BIGINT AS transition_count,
+  COUNT(DISTINCT participant_id)::BIGINT AS participant_count
+FROM ordered_transitions
+WHERE target_page IS NOT NULL
+  AND source_page IS NOT NULL
+GROUP BY task_id, task_label, source_step, source_page, target_step, target_page
+ORDER BY task_id, source_step ASC, transition_count DESC, source_page ASC, target_page ASC;
 """
 
 TASK_LEVEL_QUERY = """
@@ -841,8 +937,6 @@ def clear_previous_outputs() -> list[str]:
         for path in directory.iterdir():
             if not path.is_file():
                 continue
-            if '-latest.' in path.name:
-                continue
             path.unlink()
             cleared.append(str(path))
 
@@ -856,13 +950,352 @@ def shorten_label(value: str, max_length: int = 42) -> str:
     return f"{text[:max_length - 1].rstrip()}…"
 
 
-def save_figure(fig: Any, stem: str, timestamp: str) -> tuple[Path, Path]:
-    timestamped = FIGURES_DIR / f'{stem}-{timestamp}.png'
+def sort_task_ids(task_id: str) -> tuple[int, int | str]:
+  if task_id.startswith('scenario_card_'):
+    suffix = task_id.removeprefix('scenario_card_')
+    return (0, int(suffix) if suffix.isdigit() else suffix)
+  if task_id.startswith('short_form_q'):
+    suffix = task_id.removeprefix('short_form_q')
+    return (1, int(suffix) if suffix.isdigit() else suffix)
+  return (2, task_id)
+
+
+def build_task_axis_label(task_id: str, task_label: str) -> str:
+  if task_id.startswith('scenario_card_'):
+    suffix = task_id.removeprefix('scenario_card_')
+    return f'Scenario {suffix}'
+  if task_id.startswith('short_form_q'):
+    suffix = task_id.removeprefix('short_form_q')
+    return f'Q{suffix}'
+  return shorten_label(task_label or task_id, 24)
+
+
+def save_figure(fig: Any, stem: str) -> Path:
     latest = FIGURES_DIR / f'{stem}-latest.png'
-    fig.savefig(timestamped, dpi=200, bbox_inches='tight')
     fig.savefig(latest, dpi=200, bbox_inches='tight')
     plt.close(fig)
-    return timestamped, latest
+    return latest
+
+
+def save_html_document(content: str, stem: str) -> Path:
+  latest_html = FIGURES_DIR / f'{stem}-latest.html'
+  latest_html.write_text(content, encoding='utf-8')
+  return latest_html
+
+
+def format_page_node_label(page_path: str) -> str:
+  raw_path = decode_page_path(page_path).strip('/')
+  if not raw_path:
+    return 'Unknown'
+  parts = [part for part in raw_path.split('/') if part]
+  filename = parts[-1] if parts else raw_path
+  guide_labels = {
+    'Airsense-10-User-Guide': 'AirSense 10',
+    'F&P-Vitera-Full-Face-User-Guide': 'Vitera',
+    'Resmed-ClimateLineAir-User-Guide': 'ClimateLineAir',
+  }
+
+  for part in parts:
+    if part in guide_labels:
+      return f'{guide_labels[part]} / {filename}'
+
+  if len(parts) >= 2 and filename.lower() == 'index.html':
+    return f'{parts[-2]} / {filename}'
+  if len(parts) == 1:
+    return parts[0]
+  return '/'.join(parts[-2:])
+
+
+def decode_page_path(page_path: str) -> str:
+  decoded = str(page_path or '').strip()
+  for _ in range(3):
+    next_decoded = unquote(decoded)
+    if next_decoded == decoded:
+      break
+    decoded = next_decoded
+  return decoded
+
+
+def format_page_hover_path(page_path: str) -> str:
+  raw_path = decode_page_path(page_path)
+  if not raw_path:
+    return '/'
+  return raw_path if raw_path.startswith('/') else f'/{raw_path}'
+
+
+def format_page_flow_color(page_path: str, alpha: float) -> str:
+  normalized = format_page_hover_path(page_path).lower()
+  if '/airsense-10-user-guide/' in normalized:
+    return f'rgba(37,99,235,{alpha})'
+  if '/f&p-vitera-full-face-user-guide/' in normalized:
+    return f'rgba(217,119,6,{alpha})'
+  if '/resmed-climatelineair-user-guide/' in normalized:
+    return f'rgba(5,150,105,{alpha})'
+  if normalized in {'/cpap-devices/', '/cpap-devices/index.html'}:
+    return f'rgba(71,85,105,{alpha})'
+  if normalized in {'/', '/index.html'}:
+    return f'rgba(107,114,128,{alpha})'
+  return f'rgba(220,38,38,{alpha})'
+
+
+def build_d3_sankey_html(title: str, payload: dict[str, Any]) -> str:
+  template = """<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>__TITLE__</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f8fafc;
+      --panel: #ffffff;
+      --ink: #0f172a;
+      --muted: #475569;
+      --border: #cbd5e1;
+      --grid: #e2e8f0;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", "Helvetica Neue", sans-serif;
+      background: linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%);
+      color: var(--ink);
+    }
+    .page {
+      max-width: 100%;
+      padding: 24px;
+    }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      box-shadow: 0 18px 40px rgba(15, 23, 42, 0.08);
+      overflow: hidden;
+    }
+    .header {
+      padding: 20px 24px 12px;
+      border-bottom: 1px solid var(--grid);
+    }
+    .title {
+      margin: 0;
+      font-size: 1.35rem;
+      line-height: 1.2;
+    }
+    .subtitle {
+      margin: 8px 0 0;
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+    .legend {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin-top: 12px;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+    .legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .legend-swatch {
+      width: 12px;
+      height: 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(15, 23, 42, 0.16);
+    }
+    .chart-wrap {
+      padding: 8px 0 20px;
+      overflow-x: auto;
+    }
+    svg {
+      display: block;
+      background: transparent;
+    }
+    .step-label {
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      fill: #334155;
+    }
+    .step-guide {
+      stroke: var(--grid);
+      stroke-dasharray: 3 5;
+    }
+    .node rect {
+      stroke: rgba(15, 23, 42, 0.28);
+      stroke-width: 1;
+      rx: 4;
+    }
+    .node text {
+      font-size: 12px;
+      fill: #0f172a;
+      dominant-baseline: middle;
+    }
+    .link {
+      fill: none;
+      stroke-opacity: 0.38;
+      mix-blend-mode: multiply;
+      stroke-linecap: butt;
+    }
+    .link:hover {
+      stroke-opacity: 0.72;
+    }
+    .tooltip {
+      position: fixed;
+      pointer-events: none;
+      opacity: 0;
+      background: rgba(15, 23, 42, 0.95);
+      color: white;
+      padding: 10px 12px;
+      border-radius: 10px;
+      font-size: 12px;
+      line-height: 1.4;
+      box-shadow: 0 12px 30px rgba(15, 23, 42, 0.22);
+      max-width: 320px;
+      transition: opacity 120ms ease;
+      z-index: 20;
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <section class="card">
+      <header class="header">
+        <h1 class="title">__TITLE__</h1>
+        <p class="subtitle">Chronological page flow for digital participants. Hover nodes or links for exact paths and transition counts.</p>
+        <div class="legend">
+          <span class="legend-item"><span class="legend-swatch" style="background: rgba(37,99,235,0.7)"></span>AirSense 10</span>
+          <span class="legend-item"><span class="legend-swatch" style="background: rgba(217,119,6,0.7)"></span>Vitera</span>
+          <span class="legend-item"><span class="legend-swatch" style="background: rgba(5,150,105,0.7)"></span>ClimateLineAir</span>
+          <span class="legend-item"><span class="legend-swatch" style="background: rgba(71,85,105,0.7)"></span>CPAP-devices</span>
+          <span class="legend-item"><span class="legend-swatch" style="background: rgba(107,114,128,0.7)"></span>Landing pages</span>
+        </div>
+      </header>
+      <div class="chart-wrap" id="chart"></div>
+    </section>
+  </div>
+  <div class="tooltip" id="tooltip"></div>
+  <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/d3-sankey@0.12.3/dist/d3-sankey.min.js"></script>
+  <script>
+    const data = __DATA__;
+    const margin = { top: 58, right: 260, bottom: 24, left: 180 };
+    const width = data.width;
+    const height = data.height;
+
+    const container = d3.select('#chart');
+    const svg = container.append('svg')
+      .attr('width', width)
+      .attr('height', height);
+
+    const tooltip = d3.select('#tooltip');
+    const graph = {
+      nodes: data.nodes.map(node => ({ ...node })),
+      links: data.links.map(link => ({ ...link }))
+    };
+
+    const sankey = d3.sankey()
+      .nodeId(node => node.id)
+      .nodeAlign(d3.sankeyLeft)
+      .nodeWidth(14)
+      .nodePadding(data.nodePadding)
+      .nodeSort((left, right) => left.sortIndex - right.sortIndex)
+      .linkSort((left, right) => (left.target.sortIndex - right.target.sortIndex) || (left.source.sortIndex - right.source.sortIndex))
+      .extent([[margin.left, margin.top], [width - margin.right, height - margin.bottom]]);
+
+    sankey(graph);
+
+    svg.append('g')
+      .selectAll('line')
+      .data(data.steps)
+      .join('line')
+      .attr('class', 'step-guide')
+      .attr('x1', step => step.x)
+      .attr('x2', step => step.x)
+      .attr('y1', margin.top - 20)
+      .attr('y2', height - margin.bottom + 4);
+
+    svg.append('g')
+      .selectAll('text')
+      .data(data.steps)
+      .join('text')
+      .attr('class', 'step-label')
+      .attr('x', step => step.x)
+      .attr('y', margin.top - 30)
+      .attr('text-anchor', 'middle')
+      .text(step => step.label);
+
+    const linkGroup = svg.append('g')
+      .attr('fill', 'none')
+      .selectAll('path')
+      .data(graph.links)
+      .join('path')
+      .attr('class', 'link')
+      .attr('d', d3.sankeyLinkHorizontal())
+      .attr('stroke', link => link.color)
+      .attr('stroke-width', link => Math.max(1, link.width));
+
+    linkGroup.append('title')
+      .text(link => `${link.transition}\nTransitions: ${link.count}`);
+
+    const nodeGroup = svg.append('g')
+      .selectAll('g')
+      .data(graph.nodes)
+      .join('g')
+      .attr('class', 'node');
+
+    nodeGroup.append('rect')
+      .attr('x', node => node.x0)
+      .attr('y', node => node.y0)
+      .attr('height', node => Math.max(8, node.y1 - node.y0))
+      .attr('width', node => node.x1 - node.x0)
+      .attr('fill', node => node.color)
+      .append('title')
+      .text(node => `${node.fullPath}\nStep ${node.step}`);
+
+    nodeGroup.append('text')
+      .attr('x', node => node.x0 < width / 2 ? node.x1 + 8 : node.x0 - 8)
+      .attr('y', node => (node.y0 + node.y1) / 2)
+      .attr('text-anchor', node => node.x0 < width / 2 ? 'start' : 'end')
+      .text(node => node.label);
+
+    const showTooltip = (event, html) => {
+      tooltip.html(html)
+        .style('opacity', 1)
+        .style('left', `${event.clientX + 14}px`)
+        .style('top', `${event.clientY + 14}px`);
+    };
+
+    const hideTooltip = () => {
+      tooltip.style('opacity', 0);
+    };
+
+    nodeGroup
+      .on('mousemove', (event, node) => {
+        showTooltip(event, `<strong>${node.label}</strong><br>${node.fullPath}<br>Step ${node.step}`);
+      })
+      .on('mouseleave', hideTooltip);
+
+    linkGroup
+      .on('mousemove', (event, link) => {
+        showTooltip(event, `<strong>${link.transition}</strong><br>Transitions: ${link.count}`);
+      })
+      .on('mouseleave', hideTooltip);
+  </script>
+</body>
+</html>
+"""
+  return template.replace('__TITLE__', html_escape(title)).replace('__DATA__', json.dumps(payload))
+
+
+def build_scenario_sankey_stem(task_id: str) -> str:
+  if task_id.startswith('scenario_card_'):
+    suffix = task_id.removeprefix('scenario_card_')
+    return f'starter-digital-scenario-{suffix}-page-flow-sankey'
+  return f"starter-{task_id.replace('_', '-')}-page-flow-sankey"
 
 
 def create_group_distribution_figure(rows: list[dict[str, Any]], key: str, title: str, ylabel: str) -> Any | None:
@@ -908,6 +1341,434 @@ def create_group_distribution_figure(rows: list[dict[str, Any]], key: str, title
     ax.set_ylabel(ylabel)
     ax.grid(axis='y', linestyle=':', alpha=0.4)
     return fig
+
+
+def create_digital_trait_scatter_figure(
+  participant_rows: list[dict[str, Any]],
+  x_key: str,
+  y_key: str,
+  title: str,
+  xlabel: str,
+  ylabel: str,
+) -> Any | None:
+  points: list[tuple[str, float, float]] = []
+  for row in participant_rows:
+    if row.get('allocation_group') != 'digital':
+      continue
+    x_value = to_number(row.get(x_key))
+    y_value = to_number(row.get(y_key))
+    if x_value is None or y_value is None:
+      continue
+    participant_id = str(row.get('participant_id') or '').strip()
+    if not participant_id:
+      continue
+    points.append((participant_id, float(x_value), float(y_value)))
+
+  if len(points) < 2:
+    return None
+
+  rng = random.Random(42)
+  x_values = [point[1] for point in points]
+  y_values = [point[2] for point in points]
+  x_min = min(x_values)
+  x_max = max(x_values)
+  x_span = x_max - x_min
+  jitter_scale = 0.08 if x_span <= 6 else max(0.02, x_span * 0.015)
+  jittered_x = [x_value + rng.uniform(-jitter_scale, jitter_scale) for _participant_id, x_value, _y_value in points]
+
+  fig, ax = plt.subplots(figsize=(7.8, 5.6))
+  ax.scatter(jittered_x, y_values, color='#2563eb', alpha=0.85, s=54, edgecolors='white', linewidths=0.7, zorder=3)
+
+  if len(set(x_values)) >= 2:
+    mean_x = sum(x_values) / len(x_values)
+    mean_y = sum(y_values) / len(y_values)
+    numerator = sum((x_value - mean_x) * (y_value - mean_y) for x_value, y_value in zip(x_values, y_values))
+    denominator = sum((x_value - mean_x) ** 2 for x_value in x_values)
+    if denominator > 0:
+      slope = numerator / denominator
+      intercept = mean_y - (slope * mean_x)
+      line_x = [x_min, x_max]
+      line_y = [(slope * value) + intercept for value in line_x]
+      ax.plot(line_x, line_y, color='#0f172a', linewidth=1.6, linestyle='--', alpha=0.8, zorder=2)
+
+  y_span = max(y_values) - min(y_values)
+  label_offset = max(3.0, y_span * 0.015)
+  for (participant_id, _x_value, y_value), x_value in zip(points, jittered_x):
+    ax.text(x_value + (jitter_scale * 0.25), y_value + label_offset, participant_id, fontsize=8.5, color='#334155')
+
+  x_padding = max(0.25, (x_span * 0.08) if x_span > 0 else 0.5)
+  ax.set_xlim(x_min - x_padding, x_max + x_padding)
+  ax.set_title(title)
+  ax.set_xlabel(xlabel)
+  ax.set_ylabel(ylabel)
+  ax.grid(True, linestyle=':', alpha=0.35)
+  fig.tight_layout()
+  return fig
+
+
+def compute_task_span_seconds_by_participant(task_rows: list[dict[str, Any]], start_task_id: str, end_task_id: str) -> dict[str, float]:
+  start_times: dict[str, datetime] = {}
+  end_times: dict[str, datetime] = {}
+
+  for row in task_rows:
+    participant_id = str(row.get('participant_id') or '').strip()
+    task_id = str(row.get('task_id') or '').strip()
+    if not participant_id or task_id not in {start_task_id, end_task_id}:
+      continue
+
+    raw_started_at = str(row.get('task_started_at') or '').strip()
+    raw_ended_at = str(row.get('task_ended_at') or '').strip()
+    started_at = None
+    ended_at = None
+    try:
+      started_at = datetime.fromisoformat(raw_started_at.replace('Z', '+00:00')) if raw_started_at else None
+    except ValueError:
+      started_at = None
+    try:
+      ended_at = datetime.fromisoformat(raw_ended_at.replace('Z', '+00:00')) if raw_ended_at else None
+    except ValueError:
+      ended_at = None
+
+    if task_id == start_task_id and started_at is not None:
+      existing_start = start_times.get(participant_id)
+      if existing_start is None or started_at < existing_start:
+        start_times[participant_id] = started_at
+    if task_id == end_task_id and ended_at is not None:
+      existing_end = end_times.get(participant_id)
+      if existing_end is None or ended_at > existing_end:
+        end_times[participant_id] = ended_at
+
+  spans: dict[str, float] = {}
+  for participant_id, started_at in start_times.items():
+    ended_at = end_times.get(participant_id)
+    if ended_at is None or ended_at <= started_at:
+      continue
+    spans[participant_id] = (ended_at - started_at).total_seconds()
+  return spans
+
+
+def create_participant_metric_scatter_figure(
+  participant_rows: list[dict[str, Any]],
+  metric_by_participant: dict[str, float],
+  x_key: str,
+  title: str,
+  xlabel: str,
+  ylabel: str,
+  allocation_group: str | None = None,
+) -> Any | None:
+  points: list[tuple[str, float, float]] = []
+  for row in participant_rows:
+    participant_id = str(row.get('participant_id') or '').strip()
+    if not participant_id or participant_id not in metric_by_participant:
+      continue
+    if allocation_group is not None and row.get('allocation_group') != allocation_group:
+      continue
+    x_value = to_number(row.get(x_key))
+    if x_value is None:
+      continue
+    points.append((participant_id, float(x_value), float(metric_by_participant[participant_id])))
+
+  if len(points) < 2:
+    return None
+
+  rng = random.Random(42)
+  x_values = [point[1] for point in points]
+  y_values = [point[2] for point in points]
+  x_min = min(x_values)
+  x_max = max(x_values)
+  x_span = x_max - x_min
+  jitter_scale = 0.08 if x_span <= 6 else max(0.02, x_span * 0.015)
+  jittered_x = [x_value + rng.uniform(-jitter_scale, jitter_scale) for _participant_id, x_value, _y_value in points]
+
+  color = '#2563eb' if allocation_group == 'digital' else '#0f766e'
+  fig, ax = plt.subplots(figsize=(7.8, 5.6))
+  ax.scatter(jittered_x, y_values, color=color, alpha=0.85, s=54, edgecolors='white', linewidths=0.7, zorder=3)
+
+  if len(set(x_values)) >= 2:
+    mean_x = sum(x_values) / len(x_values)
+    mean_y = sum(y_values) / len(y_values)
+    numerator = sum((x_value - mean_x) * (y_value - mean_y) for x_value, y_value in zip(x_values, y_values))
+    denominator = sum((x_value - mean_x) ** 2 for x_value in x_values)
+    if denominator > 0:
+      slope = numerator / denominator
+      intercept = mean_y - (slope * mean_x)
+      line_x = [x_min, x_max]
+      line_y = [(slope * value) + intercept for value in line_x]
+      ax.plot(line_x, line_y, color='#0f172a', linewidth=1.6, linestyle='--', alpha=0.8, zorder=2)
+
+  y_span = max(y_values) - min(y_values)
+  label_offset = max(3.0, y_span * 0.015)
+  for (participant_id, _x_value, y_value), x_value in zip(points, jittered_x):
+    ax.text(x_value + (jitter_scale * 0.25), y_value + label_offset, participant_id, fontsize=8.5, color='#334155')
+
+  x_padding = max(0.25, (x_span * 0.08) if x_span > 0 else 0.5)
+  ax.set_xlim(x_min - x_padding, x_max + x_padding)
+  ax.set_title(title)
+  ax.set_xlabel(xlabel)
+  ax.set_ylabel(ylabel)
+  ax.grid(True, linestyle=':', alpha=0.35)
+  fig.tight_layout()
+  return fig
+
+
+def create_task_duration_by_group_figure(task_rows: list[dict[str, Any]], task_prefix: str, duration_key: str, title: str, ylabel: str) -> Any | None:
+    groups = [('digital', '#2563eb'), ('physical', '#dc2626')]
+    grouped_tasks: dict[str, dict[str, Any]] = {}
+
+    for row in task_rows:
+        task_id = str(row.get('task_id') or '').strip()
+        group_name = str(row.get('allocation_group') or '').strip()
+        duration_value = to_number(row.get(duration_key))
+        if not task_id.startswith(task_prefix) or group_name not in {'digital', 'physical'} or duration_value is None:
+            continue
+
+        task_entry = grouped_tasks.setdefault(task_id, {
+            'task_label': str(row.get('task_label') or '').strip(),
+            'digital': [],
+            'physical': [],
+        })
+        if not task_entry['task_label']:
+            task_entry['task_label'] = str(row.get('task_label') or '').strip()
+        task_entry[group_name].append(float(duration_value))
+
+    ordered_task_ids = [
+        task_id
+        for task_id in sorted(grouped_tasks.keys(), key=sort_task_ids)
+        if grouped_tasks[task_id]['digital'] or grouped_tasks[task_id]['physical']
+    ]
+    if not ordered_task_ids:
+        return None
+
+    fig_width = max(8.0, len(ordered_task_ids) * 2.4)
+    fig, ax = plt.subplots(figsize=(fig_width, 6))
+    box_values: list[list[float]] = []
+    box_positions: list[float] = []
+    box_colors: list[str] = []
+    tick_positions: list[float] = []
+    tick_labels: list[str] = []
+
+    for index, task_id in enumerate(ordered_task_ids, start=1):
+        task_entry = grouped_tasks[task_id]
+        tick_positions.append(float(index))
+        tick_labels.append(build_task_axis_label(task_id, str(task_entry['task_label'] or '')))
+        for offset, (group_name, color) in zip((-0.18, 0.18), groups):
+            values = list(task_entry[group_name])
+            if not values:
+                continue
+            box_values.append(values)
+            box_positions.append(index + offset)
+            box_colors.append(color)
+
+    if not box_values:
+        plt.close(fig)
+        return None
+
+    bp = ax.boxplot(box_values, positions=box_positions, patch_artist=True, widths=0.28, showfliers=False)
+    for patch, color in zip(bp['boxes'], box_colors):
+        patch.set(facecolor=color, alpha=0.28, edgecolor=color, linewidth=1.5)
+    for whisker, color in zip(bp['whiskers'], [color for color in box_colors for _ in (0, 1)]):
+        whisker.set(color=color, linewidth=1.2)
+    for cap, color in zip(bp['caps'], [color for color in box_colors for _ in (0, 1)]):
+        cap.set(color=color, linewidth=1.2)
+    for median_line in bp['medians']:
+        median_line.set(color='#111827', linewidth=1.5)
+
+    rng = random.Random(42)
+    for position, values, color in zip(box_positions, box_values, box_colors):
+        jitter = [position + rng.uniform(-0.045, 0.045) for _ in values]
+        ax.scatter(jitter, values, color=color, alpha=0.78, s=24, edgecolors='white', linewidths=0.35, zorder=3)
+        ax.scatter([position], [sum(values) / len(values)], color='#111827', marker='D', s=40, zorder=4)
+
+    ax.set_xticks(tick_positions)
+    ax.set_xticklabels(tick_labels)
+    ax.set_title(title)
+    ax.set_ylabel(ylabel)
+    ax.grid(axis='y', linestyle=':', alpha=0.4)
+    ax.set_xlim(0.5, len(tick_positions) + 0.5)
+
+    legend_handles = [plt.Rectangle((0, 0), 1, 1, facecolor=color, edgecolor=color, alpha=0.28) for _, color in groups]
+    ax.legend(legend_handles, [group_name.title() for group_name, _ in groups], frameon=False, loc='upper right')
+    fig.tight_layout()
+    return fig
+
+
+def create_scenario_page_flow_sankey_figures(transition_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+  grouped: dict[str, dict[str, Any]] = {}
+  for row in transition_rows:
+    task_id = str(row.get('task_id') or '').strip()
+    source_page = str(row.get('source_page') or '').strip()
+    target_page = str(row.get('target_page') or '').strip()
+    transition_count = int(to_number(row.get('transition_count')) or 0)
+    source_step = int(to_number(row.get('source_step')) or 0)
+    target_step = int(to_number(row.get('target_step')) or 0)
+    if not task_id.startswith('scenario_card_') or not source_page or not target_page or transition_count <= 0:
+      continue
+    if source_step <= 0 or target_step <= 0 or target_step <= source_step:
+      continue
+
+    task_entry = grouped.setdefault(task_id, {
+      'task_label': str(row.get('task_label') or '').strip(),
+      'transitions': {},
+      'page_totals': {},
+    })
+    transition_key = (source_step, source_page, target_step, target_page)
+    task_entry['transitions'][transition_key] = task_entry['transitions'].get(transition_key, 0) + transition_count
+    task_entry['page_totals'][source_page] = task_entry['page_totals'].get(source_page, 0) + transition_count
+    task_entry['page_totals'][target_page] = task_entry['page_totals'].get(target_page, 0) + transition_count
+
+  ordered_task_ids = [task_id for task_id in sorted(grouped.keys(), key=sort_task_ids) if grouped[task_id]['transitions']]
+  if not ordered_task_ids:
+    return []
+
+  outputs: list[dict[str, Any]] = []
+  for task_id in ordered_task_ids:
+    task_entry = grouped[task_id]
+    collapsed: dict[tuple[int, str, int, str], int] = {}
+    stage_totals: dict[int, dict[str, int]] = {}
+    max_step = 0
+
+    for (source_step, source_page, target_step, target_page), value in task_entry['transitions'].items():
+      transition_key = (source_step, source_page, target_step, target_page)
+      collapsed[transition_key] = collapsed.get(transition_key, 0) + value
+
+      source_stage = stage_totals.setdefault(source_step, {})
+      source_stage[source_page] = source_stage.get(source_page, 0) + value
+
+      target_stage = stage_totals.setdefault(target_step, {})
+      target_stage[target_page] = target_stage.get(target_page, 0) + value
+
+      max_step = max(max_step, target_step)
+
+    links = sorted(
+      collapsed.items(),
+      key=lambda item: (item[0][0], item[0][2], -item[1], item[0][1], item[0][3]),
+    )
+    if not links or max_step < 2:
+      continue
+
+    max_nodes_in_step = max(len(nodes) for nodes in stage_totals.values())
+    incoming_edges: dict[tuple[int, str], list[tuple[int, str, int]]] = {}
+    outgoing_edges: dict[tuple[int, str], list[tuple[int, str, int]]] = {}
+    for (source_step, source_page, target_step, target_page), value in links:
+      outgoing_edges.setdefault((source_step, source_page), []).append((target_step, target_page, value))
+      incoming_edges.setdefault((target_step, target_page), []).append((source_step, source_page, value))
+
+    ordered_pages_by_step: dict[int, list[str]] = {
+      step: [
+        page
+        for page, _value in sorted(
+          nodes.items(),
+          key=lambda item: (-item[1], format_page_node_label(item[0]).lower()),
+        )
+      ]
+      for step, nodes in stage_totals.items()
+    }
+
+    def compute_barycenter(neighbors: list[tuple[int, str, int]], step_order: dict[int, dict[str, int]]) -> float | None:
+      weighted_total = 0.0
+      weight_sum = 0.0
+      for neighbor_step, neighbor_page, weight in neighbors:
+        position = step_order.get(neighbor_step, {}).get(neighbor_page)
+        if position is None:
+          continue
+        weighted_total += float(position) * float(weight)
+        weight_sum += float(weight)
+      if weight_sum <= 0:
+        return None
+      return weighted_total / weight_sum
+
+    for _iteration in range(6):
+      step_order = {
+        step: {page: index for index, page in enumerate(pages)}
+        for step, pages in ordered_pages_by_step.items()
+      }
+      for step in range(2, max_step + 1):
+        pages = ordered_pages_by_step.get(step, [])
+        pages.sort(
+          key=lambda page: (
+            1 if compute_barycenter(incoming_edges.get((step, page), []), step_order) is None else 0,
+            step_order.get(step, {}).get(page, 0)
+            if compute_barycenter(incoming_edges.get((step, page), []), step_order) is None
+            else float(compute_barycenter(incoming_edges.get((step, page), []), step_order)),
+            -stage_totals[step][page],
+            format_page_node_label(page).lower(),
+          )
+        )
+
+      step_order = {
+        step: {page: index for index, page in enumerate(pages)}
+        for step, pages in ordered_pages_by_step.items()
+      }
+      for step in range(max_step - 1, 0, -1):
+        pages = ordered_pages_by_step.get(step, [])
+        pages.sort(
+          key=lambda page: (
+            1 if compute_barycenter(outgoing_edges.get((step, page), []), step_order) is None else 0,
+            step_order.get(step, {}).get(page, 0)
+            if compute_barycenter(outgoing_edges.get((step, page), []), step_order) is None
+            else float(compute_barycenter(outgoing_edges.get((step, page), []), step_order)),
+            -stage_totals[step][page],
+            format_page_node_label(page).lower(),
+          )
+        )
+
+    ordered_nodes: list[tuple[int, str]] = []
+    for step in sorted(stage_totals.keys()):
+      pages_for_step = ordered_pages_by_step.get(step, [])
+      for index, page in enumerate(pages_for_step):
+        ordered_nodes.append((step, page))
+
+    if not ordered_nodes:
+      continue
+
+    width = max(1400, 320 + (max_step * 220))
+    height = max(720, 180 + (max_nodes_in_step * 72))
+    steps = [
+      {
+        'step': step,
+        'label': 'Start' if step == 1 else ('End' if step == max_step else f'Step {step}'),
+        'x': 180 + ((width - 440) * ((step - 1) / max(1, max_step - 1))),
+      }
+      for step in range(1, max_step + 1)
+    ]
+    nodes = [
+      {
+        'id': f'{step}|{page}',
+        'label': format_page_node_label(page),
+        'fullPath': format_page_hover_path(page),
+        'step': step,
+        'sortIndex': index,
+        'color': format_page_flow_color(page, 0.84),
+      }
+      for index, (step, page) in enumerate(ordered_nodes)
+    ]
+    graph_links = [
+      {
+        'source': f'{source_step}|{source_page}',
+        'target': f'{target_step}|{target_page}',
+        'value': value,
+        'count': value,
+        'color': format_page_flow_color(target_page, 0.52),
+        'transition': f'Step {source_step}: {format_page_hover_path(source_page)} -> Step {target_step}: {format_page_hover_path(target_page)}',
+      }
+      for (source_step, source_page, target_step, target_page), value in links
+    ]
+    title = f'{build_task_axis_label(task_id, str(task_entry["task_label"] or ""))} digital page-flow Sankey'
+    outputs.append({
+      'task_id': task_id,
+      'label': title,
+      'stem': build_scenario_sankey_stem(task_id),
+      'html': build_d3_sankey_html(title, {
+        'width': width,
+        'height': height,
+        'nodePadding': 22,
+        'steps': steps,
+        'nodes': nodes,
+        'links': graph_links,
+      }),
+    })
+
+  return outputs
 
 
 def create_post_trial_likert_figure(rows: list[dict[str, Any]]) -> Any | None:
@@ -1032,48 +1893,109 @@ def create_ranked_page_use_figure(page_usage_rows: list[dict[str, Any]], digital
     return fig
 
 
-def generate_figures(participant_rows: list[dict[str, Any]], page_usage_rows: list[dict[str, Any]], timestamp: str) -> list[dict[str, str]]:
-    figure_outputs: list[dict[str, str]] = []
+def generate_figures(participant_rows: list[dict[str, Any]], page_usage_rows: list[dict[str, Any]], task_rows: list[dict[str, Any]], scenario_transition_rows: list[dict[str, Any]]) -> list[dict[str, str]]:
+  figure_outputs: list[dict[str, str]] = []
+  participant_trial_span_seconds = compute_task_span_seconds_by_participant(task_rows, 'scenario_card_1', 'short_form_q4')
 
-    for config in STARTER_FIGURES:
-        fig = create_group_distribution_figure(participant_rows, config['key'], config['title'], config['ylabel'])
-        if fig is None:
-            continue
-        timestamped, latest = save_figure(fig, config['filename'], timestamp)
-        figure_outputs.append({
-            'label': config['title'],
-            'timestamped_path': str(timestamped),
-            'latest_path': str(latest),
-        })
+  for config in STARTER_FIGURES:
+    fig = create_group_distribution_figure(participant_rows, config['key'], config['title'], config['ylabel'])
+    if fig is None:
+      continue
+    latest = save_figure(fig, config['filename'])
+    figure_outputs.append({
+      'label': config['title'],
+      'path': str(latest),
+    })
 
-    likert_fig = create_post_trial_likert_figure(participant_rows)
-    if likert_fig is not None:
-        timestamped, latest = save_figure(likert_fig, 'starter-post-trial-likert', timestamp)
-        figure_outputs.append({
-            'label': 'Post-trial questionnaire response distributions',
-            'timestamped_path': str(timestamped),
-            'latest_path': str(latest),
-        })
+  likert_fig = create_post_trial_likert_figure(participant_rows)
+  if likert_fig is not None:
+    latest = save_figure(likert_fig, 'starter-post-trial-likert')
+    figure_outputs.append({
+      'label': 'Post-trial questionnaire response distributions',
+      'path': str(latest),
+    })
 
-    digital_participant_ids = {
-        str(row.get('participant_id') or '').strip()
-        for row in participant_rows
-        if row.get('allocation_group') == 'digital'
-    }
-    page_use_fig = create_ranked_page_use_figure(page_usage_rows, digital_participant_ids)
-    if page_use_fig is not None:
-        timestamped, latest = save_figure(page_use_fig, 'starter-digital-page-use', timestamp)
-        figure_outputs.append({
-            'label': 'Most-viewed digital guide pages',
-            'timestamped_path': str(timestamped),
-            'latest_path': str(latest),
-        })
+  digital_participant_ids = {
+    str(row.get('participant_id') or '').strip()
+    for row in participant_rows
+    if row.get('allocation_group') == 'digital'
+  }
+  page_use_fig = create_ranked_page_use_figure(page_usage_rows, digital_participant_ids)
+  if page_use_fig is not None:
+    latest = save_figure(page_use_fig, 'starter-digital-page-use')
+    figure_outputs.append({
+      'label': 'Most-viewed digital guide pages',
+      'path': str(latest),
+    })
 
-    return figure_outputs
+  scenario_duration_fig = create_task_duration_by_group_figure(
+    task_rows,
+    'scenario_card_',
+    'task_total_duration_seconds',
+    'Scenario duration by scenario and group',
+    'Duration (s)',
+  )
+  if scenario_duration_fig is not None:
+    latest = save_figure(scenario_duration_fig, 'starter-scenario-duration-by-scenario')
+    figure_outputs.append({
+      'label': 'Scenario duration by scenario and group',
+      'path': str(latest),
+    })
 
+  question_duration_fig = create_task_duration_by_group_figure(
+    task_rows,
+    'short_form_q',
+    'short_form_duration_seconds',
+    'Short-form question duration by question and group',
+    'Duration (s)',
+  )
+  if question_duration_fig is not None:
+    latest = save_figure(question_duration_fig, 'starter-short-form-duration-by-question')
+    figure_outputs.append({
+      'label': 'Short-form question duration by question and group',
+      'path': str(latest),
+    })
 
-def get_timestamp() -> str:
-    return datetime.now().strftime('%Y%m%d-%H%M%S')
+  digital_literacy_trial_span_fig = create_participant_metric_scatter_figure(
+    participant_rows,
+    participant_trial_span_seconds,
+    'q6_digital_literacy',
+    'Digital literacy vs Scenario 1 start to Q4 end time (digital group)',
+    'Pre-trial digital literacy (1-5)',
+    'Scenario 1 start to Q4 end time (s)',
+    allocation_group='digital',
+  )
+  if digital_literacy_trial_span_fig is not None:
+    latest = save_figure(digital_literacy_trial_span_fig, 'starter-digital-literacy-vs-full-trial-time')
+    figure_outputs.append({
+      'label': 'Digital literacy vs Scenario 1 start to Q4 end time (digital group)',
+      'path': str(latest),
+    })
+
+  age_trial_span_fig = create_participant_metric_scatter_figure(
+    participant_rows,
+    participant_trial_span_seconds,
+    'q1_age_years',
+    'Age vs Scenario 1 start to Q4 end time (all participants)',
+    'Age (years)',
+    'Scenario 1 start to Q4 end time (s)',
+  )
+  if age_trial_span_fig is not None:
+    latest = save_figure(age_trial_span_fig, 'starter-age-vs-full-trial-time')
+    figure_outputs.append({
+      'label': 'Age vs Scenario 1 start to Q4 end time (all participants)',
+      'path': str(latest),
+    })
+
+  scenario_sankey_outputs = create_scenario_page_flow_sankey_figures(scenario_transition_rows)
+  for output in scenario_sankey_outputs:
+    latest = save_html_document(str(output['html']), str(output['stem']))
+    figure_outputs.append({
+      'label': str(output['label']),
+      'path': str(latest),
+    })
+
+  return figure_outputs
 
 
 def build_report(participant_rows: list[dict[str, Any]], test_rows: list[dict[str, Any]], group_summary_rows: list[dict[str, Any]], generated_at: str, figure_outputs: list[dict[str, str]]) -> str:
@@ -1125,10 +2047,10 @@ def build_report(participant_rows: list[dict[str, Any]], test_rows: list[dict[st
         '',
     ])
     if not figure_outputs:
-        lines.append('- No figures were generated (likely insufficient data).')
+      lines.append('- No figures were generated (likely insufficient data).')
     else:
-        for figure in figure_outputs:
-            lines.append(f"- {figure['label']}: {figure['latest_path']}")
+      for figure in figure_outputs:
+        lines.append(f"- {figure['label']}: {figure['path']}")
 
     lines.extend([
         '',
@@ -1160,6 +2082,10 @@ def fetch_rows(database_url: str) -> list[dict[str, Any]]:
 
 def fetch_page_usage_rows(database_url: str) -> list[dict[str, Any]]:
   return fetch_query_rows(database_url, PAGE_USAGE_QUERY)
+
+
+def fetch_scenario_transition_rows(database_url: str) -> list[dict[str, Any]]:
+  return fetch_query_rows(database_url, SCENARIO_PAGE_TRANSITIONS_QUERY)
 
 
 def fetch_task_rows(database_url: str) -> list[dict[str, Any]]:
@@ -1200,6 +2126,7 @@ def main() -> int:
     participant_rows = normalize_participant_rows(fetch_rows(database_url))
     page_usage_rows = fetch_page_usage_rows(database_url)
     raw_task_rows = fetch_task_rows(database_url)
+    scenario_transition_rows = fetch_scenario_transition_rows(database_url)
     allocation_group_by_participant = {
       str(row.get('participant_id') or '').strip(): str(row.get('allocation_group') or '').strip()
       for row in participant_rows
@@ -1268,9 +2195,8 @@ def main() -> int:
 
     ensure_directories()
     cleared_outputs = clear_previous_outputs()
-    timestamp = get_timestamp()
     generated_at = datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
-    figure_outputs = generate_figures(participant_rows, page_usage_rows, timestamp)
+    figure_outputs = generate_figures(participant_rows, page_usage_rows, task_rows, scenario_transition_rows)
 
     participant_csv = to_csv(participant_rows)
     tests_csv = to_csv(test_rows)
@@ -1289,18 +2215,18 @@ def main() -> int:
     prepost_summary_md = to_markdown_table(build_prepost_summary_markdown_rows(prepost_summary_rows))
     report = build_report(participant_rows, test_rows, group_summary_rows, generated_at, figure_outputs)
 
-    participant_file = TABLES_DIR / f'participant-level-{timestamp}.csv'
-    tests_file = TABLES_DIR / f'outcome-tests-{timestamp}.csv'
-    summary_file = TABLES_DIR / f'group-summary-{timestamp}.csv'
-    report_ready_csv_file = TABLES_DIR / f'dissertation-summary-table-{timestamp}.csv'
-    report_ready_md_file = TABLES_DIR / f'dissertation-summary-table-{timestamp}.md'
-    task_by_participant_file = TABLES_DIR / f'task-by-participant-{timestamp}.csv'
-    task_summary_csv_file = TABLES_DIR / f'task-summary-by-group-{timestamp}.csv'
-    task_summary_md_file = TABLES_DIR / f'task-summary-by-group-{timestamp}.md'
-    prepost_participant_file = TABLES_DIR / f'questionnaire-prepost-by-participant-{timestamp}.csv'
-    prepost_summary_csv_file = TABLES_DIR / f'questionnaire-prepost-summary-{timestamp}.csv'
-    prepost_summary_md_file = TABLES_DIR / f'questionnaire-prepost-summary-{timestamp}.md'
-    report_file = REPORTS_DIR / f'stats-report-{timestamp}.md'
+    participant_file = TABLES_DIR / 'participant-level-latest.csv'
+    tests_file = TABLES_DIR / 'outcome-tests-latest.csv'
+    summary_file = TABLES_DIR / 'group-summary-latest.csv'
+    report_ready_csv_file = TABLES_DIR / 'dissertation-summary-table-latest.csv'
+    report_ready_md_file = TABLES_DIR / 'dissertation-summary-table-latest.md'
+    task_by_participant_file = TABLES_DIR / 'task-by-participant-latest.csv'
+    task_summary_csv_file = TABLES_DIR / 'task-summary-by-group-latest.csv'
+    task_summary_md_file = TABLES_DIR / 'task-summary-by-group-latest.md'
+    prepost_participant_file = TABLES_DIR / 'questionnaire-prepost-by-participant-latest.csv'
+    prepost_summary_csv_file = TABLES_DIR / 'questionnaire-prepost-summary-latest.csv'
+    prepost_summary_md_file = TABLES_DIR / 'questionnaire-prepost-summary-latest.md'
+    report_file = REPORTS_DIR / 'stats-report-latest.md'
 
     participant_file.write_text(participant_csv, encoding='utf8')
     tests_file.write_text(tests_csv, encoding='utf8')
@@ -1314,19 +2240,6 @@ def main() -> int:
     prepost_summary_csv_file.write_text(prepost_summary_csv, encoding='utf8')
     prepost_summary_md_file.write_text(prepost_summary_md, encoding='utf8')
     report_file.write_text(report, encoding='utf8')
-
-    (TABLES_DIR / 'participant-level-latest.csv').write_text(participant_csv, encoding='utf8')
-    (TABLES_DIR / 'outcome-tests-latest.csv').write_text(tests_csv, encoding='utf8')
-    (TABLES_DIR / 'group-summary-latest.csv').write_text(summary_csv, encoding='utf8')
-    (TABLES_DIR / 'dissertation-summary-table-latest.csv').write_text(report_ready_csv, encoding='utf8')
-    (TABLES_DIR / 'dissertation-summary-table-latest.md').write_text(report_ready_md, encoding='utf8')
-    (TABLES_DIR / 'task-by-participant-latest.csv').write_text(task_by_participant_csv, encoding='utf8')
-    (TABLES_DIR / 'task-summary-by-group-latest.csv').write_text(task_summary_csv, encoding='utf8')
-    (TABLES_DIR / 'task-summary-by-group-latest.md').write_text(task_summary_md, encoding='utf8')
-    (TABLES_DIR / 'questionnaire-prepost-by-participant-latest.csv').write_text(prepost_participant_csv, encoding='utf8')
-    (TABLES_DIR / 'questionnaire-prepost-summary-latest.csv').write_text(prepost_summary_csv, encoding='utf8')
-    (TABLES_DIR / 'questionnaire-prepost-summary-latest.md').write_text(prepost_summary_md, encoding='utf8')
-    (REPORTS_DIR / 'stats-report-latest.md').write_text(report, encoding='utf8')
 
     print('Stats report generated successfully.')
     if cleared_outputs:
@@ -1344,7 +2257,7 @@ def main() -> int:
     print(f'- {prepost_summary_csv_file}')
     print(f'- {prepost_summary_md_file}')
     for figure in figure_outputs:
-      print(f"- {figure['timestamped_path']}")
+      print(f"- {figure['path']}")
     return 0
 
 

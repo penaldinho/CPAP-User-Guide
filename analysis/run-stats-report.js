@@ -379,24 +379,12 @@ function clearPreviousOutputs() {
     if (!fs.existsSync(directory)) continue;
     for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
       if (!entry.isFile()) continue;
-      if (entry.name.includes('-latest.')) continue;
       fs.unlinkSync(path.join(directory, entry.name));
       clearedCount += 1;
     }
   }
 
   return clearedCount;
-}
-
-function getTimestamp() {
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = String(now.getMonth() + 1).padStart(2, '0');
-  const d = String(now.getDate()).padStart(2, '0');
-  const hh = String(now.getHours()).padStart(2, '0');
-  const mm = String(now.getMinutes()).padStart(2, '0');
-  const ss = String(now.getSeconds()).padStart(2, '0');
-  return `${y}${m}${d}-${hh}${mm}${ss}`;
 }
 
 function buildReport({ participantRows, testRows, groupSummaryRows, generatedAt }) {
@@ -536,7 +524,6 @@ async function run() {
 
     ensureDirectories();
     const clearedCount = clearPreviousOutputs();
-    const timestamp = getTimestamp();
     const generatedAt = new Date().toISOString();
 
     const participantCsv = toCsv(participantRows);
@@ -544,20 +531,15 @@ async function run() {
     const summaryCsv = toCsv(groupSummaryRows);
     const report = buildReport({ participantRows, testRows, groupSummaryRows, generatedAt });
 
-    const participantFile = path.join(TABLES_DIR, `participant-level-${timestamp}.csv`);
-    const testsFile = path.join(TABLES_DIR, `outcome-tests-${timestamp}.csv`);
-    const summaryFile = path.join(TABLES_DIR, `group-summary-${timestamp}.csv`);
-    const reportFile = path.join(REPORTS_DIR, `stats-report-${timestamp}.md`);
+    const participantFile = path.join(TABLES_DIR, 'participant-level-latest.csv');
+    const testsFile = path.join(TABLES_DIR, 'outcome-tests-latest.csv');
+    const summaryFile = path.join(TABLES_DIR, 'group-summary-latest.csv');
+    const reportFile = path.join(REPORTS_DIR, 'stats-report-latest.md');
 
     fs.writeFileSync(participantFile, participantCsv, 'utf8');
     fs.writeFileSync(testsFile, testsCsv, 'utf8');
     fs.writeFileSync(summaryFile, summaryCsv, 'utf8');
     fs.writeFileSync(reportFile, report, 'utf8');
-
-    fs.writeFileSync(path.join(TABLES_DIR, 'participant-level-latest.csv'), participantCsv, 'utf8');
-    fs.writeFileSync(path.join(TABLES_DIR, 'outcome-tests-latest.csv'), testsCsv, 'utf8');
-    fs.writeFileSync(path.join(TABLES_DIR, 'group-summary-latest.csv'), summaryCsv, 'utf8');
-    fs.writeFileSync(path.join(REPORTS_DIR, 'stats-report-latest.md'), report, 'utf8');
 
     console.log('Stats report generated successfully.');
     if (clearedCount) {

@@ -114,4 +114,4 @@ Generated files are written to:
 - `analysis-output/tables/outcome-tests-latest.csv`
 - `analysis-output/tables/group-summary-latest.csv`
 
-Timestamped versions are also created on each run.
+Each run overwrites the same canonical `-latest` output files.
