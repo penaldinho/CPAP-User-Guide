@@ -1456,33 +1456,53 @@ def create_participant_metric_scatter_figure(
   ylabel: str,
   allocation_group: str | None = None,
 ) -> Any | None:
-  points: list[tuple[str, float, float]] = []
+  points: list[tuple[str, str, float, float]] = []
   for row in participant_rows:
     participant_id = str(row.get('participant_id') or '').strip()
     if not participant_id or participant_id not in metric_by_participant:
       continue
-    if allocation_group is not None and row.get('allocation_group') != allocation_group:
+    group_name = str(row.get('allocation_group') or '').strip()
+    if allocation_group is not None and group_name != allocation_group:
       continue
     x_value = to_number(row.get(x_key))
     if x_value is None:
       continue
-    points.append((participant_id, float(x_value), float(metric_by_participant[participant_id])))
+    points.append((participant_id, group_name, float(x_value), float(metric_by_participant[participant_id])))
 
   if len(points) < 2:
     return None
 
+  group_colors = {
+    'digital': '#2563eb',
+    'physical': '#dc2626',
+  }
   rng = random.Random(42)
-  x_values = [point[1] for point in points]
-  y_values = [point[2] for point in points]
+  x_values = [point[2] for point in points]
+  y_values = [point[3] for point in points]
   x_min = min(x_values)
   x_max = max(x_values)
   x_span = x_max - x_min
   jitter_scale = 0.08 if x_span <= 6 else max(0.02, x_span * 0.015)
-  jittered_x = [x_value + rng.uniform(-jitter_scale, jitter_scale) for _participant_id, x_value, _y_value in points]
+  jittered_points = [
+    (participant_id, group_name, x_value + rng.uniform(-jitter_scale, jitter_scale), y_value)
+    for participant_id, group_name, x_value, y_value in points
+  ]
 
-  color = '#2563eb' if allocation_group == 'digital' else '#0f766e'
   fig, ax = plt.subplots(figsize=(7.8, 5.6))
-  ax.scatter(jittered_x, y_values, color=color, alpha=0.85, s=54, edgecolors='white', linewidths=0.7, zorder=3)
+  present_groups = [group_name for group_name in ('digital', 'physical') if any(point[1] == group_name for point in points)]
+  for group_name in present_groups:
+    group_points = [point for point in jittered_points if point[1] == group_name]
+    ax.scatter(
+      [point[2] for point in group_points],
+      [point[3] for point in group_points],
+      color=group_colors[group_name],
+      alpha=0.85,
+      s=54,
+      edgecolors='white',
+      linewidths=0.7,
+      zorder=3,
+      label=group_name.title(),
+    )
 
   if len(set(x_values)) >= 2:
     mean_x = sum(x_values) / len(x_values)
@@ -1496,17 +1516,14 @@ def create_participant_metric_scatter_figure(
       line_y = [(slope * value) + intercept for value in line_x]
       ax.plot(line_x, line_y, color='#0f172a', linewidth=1.6, linestyle='--', alpha=0.8, zorder=2)
 
-  y_span = max(y_values) - min(y_values)
-  label_offset = max(3.0, y_span * 0.015)
-  for (participant_id, _x_value, y_value), x_value in zip(points, jittered_x):
-    ax.text(x_value + (jitter_scale * 0.25), y_value + label_offset, participant_id, fontsize=8.5, color='#334155')
-
   x_padding = max(0.25, (x_span * 0.08) if x_span > 0 else 0.5)
   ax.set_xlim(x_min - x_padding, x_max + x_padding)
   ax.set_title(title)
   ax.set_xlabel(xlabel)
   ax.set_ylabel(ylabel)
   ax.grid(True, linestyle=':', alpha=0.35)
+  if len(present_groups) > 1:
+    ax.legend(frameon=False, loc='upper right')
   fig.tight_layout()
   return fig
 
