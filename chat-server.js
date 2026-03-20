@@ -377,6 +377,94 @@ const participantIdSortValue = (participantId) => {
   return Number.isFinite(parsed) ? parsed : Number.MAX_SAFE_INTEGER;
 };
 
+const getParticipantIdParts = (participantId) => {
+  const normalizedId = String(participantId || '').trim().toUpperCase();
+  const match = /^P(\d+)$/i.exec(normalizedId);
+  if (!match) {
+    return null;
+  }
+
+  const numericPart = String(match[1] || '');
+  const numericValue = Number.parseInt(numericPart, 10);
+  if (!Number.isFinite(numericValue)) {
+    return null;
+  }
+
+  return {
+    normalizedId,
+    numericPart,
+    numericValue,
+    width: Math.max(2, numericPart.length)
+  };
+};
+
+const getNextParticipantId = (rows) => {
+  const list = Array.isArray(rows) ? rows : [];
+  let maxValue = 0;
+  let width = 2;
+
+  for (const row of list) {
+    const parts = getParticipantIdParts(row && row.participant_id);
+    if (!parts) {
+      continue;
+    }
+    if (parts.numericValue > maxValue) {
+      maxValue = parts.numericValue;
+    }
+    width = Math.max(width, parts.width);
+  }
+
+  const nextValue = maxValue + 1;
+  return `P${String(nextValue).padStart(Math.max(width, String(nextValue).length), '0')}`;
+};
+
+const getBalancedAllocationGroup = (rows) => {
+  const list = Array.isArray(rows) ? rows : [];
+  let physicalCount = 0;
+  let digitalCount = 0;
+  let latestParticipant = null;
+
+  for (const row of list) {
+    const participantParts = getParticipantIdParts(row && row.participant_id);
+    if (!participantParts) {
+      continue;
+    }
+
+    if (!latestParticipant || participantParts.numericValue > latestParticipant.numericValue) {
+      latestParticipant = {
+        numericValue: participantParts.numericValue,
+        allocationGroup: String(row && row.allocation_group || '').trim().toLowerCase()
+      };
+    }
+
+    const allocationGroup = String(row && row.allocation_group || '').trim().toLowerCase();
+    if (allocationGroup === 'physical') {
+      physicalCount += 1;
+      continue;
+    }
+
+    digitalCount += 1;
+  }
+
+  if (physicalCount < digitalCount) {
+    return 'physical';
+  }
+
+  if (digitalCount < physicalCount) {
+    return 'digital';
+  }
+
+  if (latestParticipant && latestParticipant.allocationGroup === 'physical') {
+    return 'digital';
+  }
+
+  if (latestParticipant && latestParticipant.allocationGroup === 'digital') {
+    return 'physical';
+  }
+
+  return 'digital';
+};
+
 const normalizeParticipantAllocationRecord = (record) => {
   const participantId = String(record && record.participant_id || '').trim().toUpperCase();
   const fallbackGroup = defaultParticipantAllocationById[participantId];
@@ -1710,6 +1798,72 @@ const buildParticipantStateForTaskState = (record) => {
     completed_at: normalized.completed_at || null,
     is_terminal: isTerminal
   };
+};
+
+const createParticipantAllocationRecord = async () => {
+  if (telemetryUsePostgres) {
+    try {
+      const pool = getTelemetryPgPool();
+      await ensureParticipantAllocationDefaultsPostgres();
+
+      for (let attempt = 0; attempt < 5; attempt += 1) {
+        const existingRowsResult = await pool.query('SELECT participant_id, allocation_group FROM participant_allocation');
+        const nextParticipantId = getNextParticipantId(existingRowsResult.rows || []);
+        const allocationGroup = getBalancedAllocationGroup(existingRowsResult.rows || []);
+        const insertResult = await pool.query(
+          `
+            INSERT INTO participant_allocation (
+              participant_id,
+              allocation_group,
+              session_status,
+              session_opened_at,
+              session_closed_at,
+              completed,
+              completed_at,
+              created_at,
+              updated_at
+            )
+            VALUES ($1, $2, 'not_started', NULL, NULL, FALSE, NULL, NOW(), NOW())
+            ON CONFLICT (participant_id) DO NOTHING
+            RETURNING participant_id, allocation_group, session_status, session_opened_at, session_closed_at, completed, completed_at, created_at, updated_at
+          `,
+          [nextParticipantId, allocationGroup]
+        );
+
+        const insertedRow = insertResult.rows[0] ? normalizeParticipantAllocationRecord(insertResult.rows[0]) : null;
+        if (insertedRow) {
+          return insertedRow;
+        }
+      }
+
+      throw new Error('Failed to allocate a unique participant_id');
+    } catch (error) {
+      if (!telemetryFallbackToFile) {
+        throw error;
+      }
+      console.error('Participant allocation postgres create failed, using file fallback:', error.message);
+    }
+  }
+
+  const rows = readParticipantAllocationRecordsFromFile();
+  const nowIso = new Date().toISOString();
+  const nextParticipantId = getNextParticipantId(rows);
+  const nextRow = normalizeParticipantAllocationRecord({
+    participant_id: nextParticipantId,
+    allocation_group: getBalancedAllocationGroup(rows),
+    session_status: 'not_started',
+    session_opened_at: null,
+    session_closed_at: null,
+    completed: false,
+    completed_at: null,
+    created_at: nowIso,
+    updated_at: nowIso
+  });
+
+  rows.push(nextRow);
+  rows.sort((a, b) => participantIdSortValue(a.participant_id) - participantIdSortValue(b.participant_id));
+  writeParticipantAllocationRecordsToFile(rows);
+  return rows.find((row) => String(row.participant_id || '').trim().toUpperCase() === nextParticipantId) || nextRow;
 };
 
 const updateParticipantAllocationRecord = async (participantId, action, completed, allocationGroup) => {
@@ -3478,12 +3632,17 @@ app.post('/api/participant-allocation', async (req, res) => {
     const allocationGroup = String(payload && payload.allocation_group || '').trim().toLowerCase();
     const action = actionRaw || (completed !== null ? 'set_completed' : '');
 
+    if (action === 'add_participant') {
+      const created = await createParticipantAllocationRecord();
+      return res.status(201).json({ row: created });
+    }
+
     if (!participantId) {
       return res.status(400).json({ error: 'participant_id is required' });
     }
 
     if (!['set_completed', 'open_session', 'close_session', 'set_allocation_group'].includes(action)) {
-      return res.status(400).json({ error: 'action must be set_completed, open_session, close_session, or set_allocation_group' });
+      return res.status(400).json({ error: 'action must be add_participant, set_completed, open_session, close_session, or set_allocation_group' });
     }
 
     if (action === 'set_completed' && completed === null) {

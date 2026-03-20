@@ -50,6 +50,7 @@
       <div class="toolbar">
         <div class="meta" id="summary">Loading...</div>
         <div style="display:flex; gap:8px;">
+          <button id="btn-add-participant" type="button">Add Participant</button>
           <button id="btn-reset-selected" type="button" class="secondary">Reset Selected Statuses</button>
           <button id="btn-reset-all" type="button" class="secondary">Reset All Statuses</button>
           <button id="btn-refresh" type="button" class="secondary">Refresh</button>
@@ -102,6 +103,7 @@
       const rowsBody = el('allocation_rows');
       const summaryEl = el('summary');
       const statusEl = el('status');
+      const addParticipantButton = el('btn-add-participant');
       const refreshButton = el('btn-refresh');
       const resetSelectedButton = el('btn-reset-selected');
       const resetAllButton = el('btn-reset-all');
@@ -109,6 +111,7 @@
 
       let rowsState = [];
       let savingParticipantId = '';
+      let isAddingParticipant = false;
       let selectedForReset = new Set();
       let apiBasicAuthHeader = '';
       let activeEndpointBase = endpointBase;
@@ -315,6 +318,15 @@
 
       const isTestParticipant = (participantId) => String(participantId || '').trim().toUpperCase() === 'TEST';
 
+      const participantSortValue = (participantId) => {
+        const normalizedId = String(participantId || '').trim().toUpperCase();
+        if (normalizedId === 'TEST') return 0;
+        const match = /^P(\d+)$/i.exec(normalizedId);
+        if (!match) return Number.MAX_SAFE_INTEGER;
+        const parsed = Number.parseInt(match[1], 10);
+        return Number.isFinite(parsed) ? parsed : Number.MAX_SAFE_INTEGER;
+      };
+
       const renderSummary = () => {
         const countedRows = rowsState.filter((row) => !isTestParticipant(row && row.participant_id));
         const total = countedRows.length;
@@ -424,11 +436,59 @@
         const selectableCount = participantIds.length;
         const selectedCount = participantIds.filter((id) => selectedForReset.has(id)).length;
 
+        if (addParticipantButton) {
+          addParticipantButton.disabled = isAddingParticipant;
+        }
         resetSelectedButton.disabled = selectableCount === 0 || selectedCount === 0;
         resetAllButton.disabled = selectableCount === 0;
         if (selectAllResetCheckbox) {
           selectAllResetCheckbox.checked = selectableCount > 0 && selectedCount === selectableCount;
           selectAllResetCheckbox.indeterminate = selectedCount > 0 && selectedCount < selectableCount;
+        }
+      };
+
+      const addParticipant = async () => {
+        isAddingParticipant = true;
+        syncResetSelectionControls();
+        setStatus('Adding participant...', true);
+
+        try {
+          const response = await fetchParticipantApi('', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'add_participant' })
+          });
+
+          if (!response.ok) {
+            let message = 'Failed to add participant.';
+            try {
+              const data = await response.json();
+              if (data && data.error) message = data.error;
+            } catch {}
+            throw new Error(message);
+          }
+
+          const data = await response.json();
+          const addedRow = data && data.row && typeof data.row === 'object' ? data.row : null;
+          if (addedRow) {
+            rowsState = rowsState
+              .filter((row) => String(row.participant_id || '').trim() !== String(addedRow.participant_id || '').trim())
+              .concat(addedRow)
+              .sort((left, right) => participantSortValue(left && left.participant_id) - participantSortValue(right && right.participant_id));
+          }
+
+          const groupLabel = String(addedRow && addedRow.allocation_group || '').trim().toLowerCase() === 'physical'
+            ? 'physical'
+            : 'digital';
+          const participantLabel = String(addedRow && addedRow.participant_id || '').trim() || 'participant';
+          setStatus(`Added ${participantLabel} (${groupLabel}).`, true);
+          renderRows();
+        } catch (error) {
+          setStatus(error.message || 'Failed to add participant.', false);
+          await loadRows();
+        } finally {
+          isAddingParticipant = false;
+          syncResetSelectionControls();
         }
       };
 
@@ -632,6 +692,7 @@
       };
 
       refreshButton.addEventListener('click', loadRows);
+      addParticipantButton.addEventListener('click', addParticipant);
       if (selectAllResetCheckbox) {
         selectAllResetCheckbox.addEventListener('change', () => {
           const participantIds = rowsState.map((row) => String(row.participant_id || '').trim()).filter(Boolean);
