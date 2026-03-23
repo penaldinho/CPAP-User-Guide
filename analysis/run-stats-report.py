@@ -476,20 +476,144 @@ LEFT JOIN short_form_metrics sfm
 ORDER BY t.participant_id, t.task_id, t.task_instance_seq;
 """
 
+QUESTIONNAIRE_COMMENTS_QUERY = """
+WITH participant_pool AS (
+  SELECT DISTINCT participant_id
+  FROM (
+    SELECT participant_id FROM analysis_participant_allocation
+    UNION ALL
+    SELECT participant_id FROM analysis_telemetry_events
+    UNION ALL
+    SELECT participant_id FROM analysis_physical_trial_events
+    UNION ALL
+    SELECT participant_id FROM analysis_observer_notes
+    UNION ALL
+    SELECT participant_id FROM analysis_observer_step_marks
+    UNION ALL
+    SELECT participant_id FROM analysis_short_form_result_scores
+    UNION ALL
+    SELECT participant_id FROM analysis_pre_trial_questionnaire
+    UNION ALL
+    SELECT participant_id FROM analysis_post_trial_questionnaire
+  ) src
+  WHERE NULLIF(TRIM(participant_id), '') IS NOT NULL
+),
+mode_guess AS (
+  SELECT
+    participant_id,
+    CASE
+      WHEN SUM(CASE WHEN trial_mode = 'physical' THEN 1 ELSE 0 END) > SUM(CASE WHEN trial_mode = 'digital' THEN 1 ELSE 0 END)
+        THEN 'physical'
+      WHEN SUM(CASE WHEN trial_mode = 'digital' THEN 1 ELSE 0 END) > 0
+        THEN 'digital'
+      ELSE NULL
+    END AS inferred_mode
+  FROM (
+    SELECT participant_id, trial_mode FROM analysis_telemetry_events
+    UNION ALL
+    SELECT participant_id, trial_mode FROM analysis_physical_trial_events
+    UNION ALL
+    SELECT participant_id, trial_mode FROM analysis_short_form_results
+    UNION ALL
+    SELECT participant_id, trial_mode FROM analysis_observer_notes
+    UNION ALL
+    SELECT participant_id, trial_mode FROM analysis_observer_step_marks
+  ) modes
+  WHERE NULLIF(TRIM(participant_id), '') IS NOT NULL
+  GROUP BY participant_id
+),
+participants AS (
+  SELECT
+    p.participant_id,
+    COALESCE(pa.allocation_group, mg.inferred_mode, 'digital') AS allocation_group
+  FROM participant_pool p
+  LEFT JOIN analysis_participant_allocation pa
+    ON pa.participant_id = p.participant_id
+  LEFT JOIN mode_guess mg
+    ON mg.participant_id = p.participant_id
+)
+SELECT
+  p.participant_id,
+  p.allocation_group,
+  pre.q10_format_preference AS pre_format_preference,
+  pre.q10_format_mix_details AS pre_format_mix_details,
+  pre.free_text_notes AS pre_free_text_notes,
+  post.q11_format_preference AS post_format_preference,
+  post.q11_format_mix_details AS post_format_mix_details,
+  post.free_text_notes AS post_free_text_notes
+FROM participants p
+LEFT JOIN analysis_pre_trial_questionnaire pre
+  ON pre.participant_id = p.participant_id
+LEFT JOIN analysis_post_trial_questionnaire post
+  ON post.participant_id = p.participant_id
+WHERE NULLIF(TRIM(COALESCE(pre.q10_format_mix_details, '')), '') IS NOT NULL
+   OR NULLIF(TRIM(COALESCE(pre.free_text_notes, '')), '') IS NOT NULL
+   OR NULLIF(TRIM(COALESCE(post.q11_format_mix_details, '')), '') IS NOT NULL
+   OR NULLIF(TRIM(COALESCE(post.free_text_notes, '')), '') IS NOT NULL
+ORDER BY p.allocation_group ASC, p.participant_id ASC;
+"""
+
+OUTCOME_FAMILIES = {
+  'continuous_bounded': {
+    'label': 'Continuous bounded summary outcome',
+    'primary_test': 'Two-sided permutation test on the mean difference',
+    'sensitivity_test': None,
+    'effect_size': "Cliff's delta",
+    'why': 'The permutation test provides a low-assumption group comparison while reporting mean/SD and median/IQR summaries.',
+  },
+  'continuous_time': {
+    'label': 'Continuous timing outcome',
+    'primary_test': 'Two-sided permutation test on the mean difference',
+    'sensitivity_test': 'Mann–Whitney U test',
+    'effect_size': "Cliff's delta",
+    'why': 'Timing measures can be skewed in small samples, so the permutation test is used as the primary analysis with Mann–Whitney U as a sensitivity check.',
+  },
+  'count': {
+    'label': 'Count outcome',
+    'primary_test': 'Two-sided permutation test on the mean difference',
+    'sensitivity_test': 'Mann–Whitney U test',
+    'effect_size': "Cliff's delta",
+    'why': 'Counts are discrete and zero-heavy here, so the permutation test is used as the primary analysis with Mann–Whitney U as a sensitivity check.',
+  },
+  'proportion': {
+    'label': 'Bounded proportion outcome',
+    'primary_test': 'Two-sided permutation test on the mean difference',
+    'sensitivity_test': None,
+    'effect_size': "Cliff's delta",
+    'why': 'Accuracy measures are bounded between 0 and 1. The permutation approach is used with a nonparametric effect size. No sensitivity test is added due to ceiling effects.',
+  },
+  'ordinal': {
+    'label': 'Ordinal Likert-style outcome',
+    'primary_test': 'Mann–Whitney U test',
+    'sensitivity_test': 'Two-sided permutation test on the mean difference',
+    'effect_size': "Cliff's delta",
+    'why': 'Mann–Whitney U respects the ordinal nature of Likert scales by comparing ranks rather than assuming equal intervals. The permutation test on the mean difference is reported as a sensitivity analysis.',
+  },
+  'prepost_change': {
+    'label': 'Between-group comparison of matched pre/post change scores',
+    'primary_test': 'Two-sided permutation test on the mean change difference',
+    'sensitivity_test': None,
+    'within_test': 'Wilcoxon signed-rank test',
+    'effect_size': "Cliff's delta on change scores",
+    'why': 'The between-group permutation test compares how much each group changed from baseline to post-trial. Within-group Wilcoxon signed-rank tests assess whether each group individually changed from baseline.',
+  },
+}
+
+
 OUTCOMES = [
-    {"key": "scenario_avg_score", "label": "Scenario average score", "better": "higher"},
-  {"key": "scenario_total_time_seconds", "label": "Scenario total time (s)", "better": "lower"},
-    {"key": "scenario_error_count", "label": "Scenario error count", "better": "lower"},
-    {"key": "scenario_major_error_count", "label": "Scenario major error count", "better": "lower"},
-    {"key": "scenario_help_count", "label": "Scenario help count", "better": "lower"},
-    {"key": "step_accuracy", "label": "Scenario step accuracy", "better": "higher"},
-    {"key": "short_form_binary_accuracy", "label": "Short-form binary accuracy", "better": "higher"},
-    {"key": "short_form_proportion_accuracy", "label": "Short-form proportion accuracy", "better": "higher"},
-  {"key": "short_form_avg_duration_seconds", "label": "Short-form average duration (s)", "better": "lower"},
-    {"key": "q2_info_ease", "label": "Post-trial ease finding information", "better": "higher"},
-    {"key": "q5_confidence_setup", "label": "Post-trial confidence setup", "better": "higher"},
-    {"key": "q7_mental_effort", "label": "Post-trial mental effort", "better": "lower"},
-    {"key": "q8_tlx_frustration", "label": "Post-trial frustration", "better": "lower"},
+  {"key": "scenario_avg_score", "label": "Scenario average score", "better": "higher", "family": "continuous_bounded"},
+  {"key": "scenario_total_time_seconds", "label": "Scenario total time (s)", "better": "lower", "family": "continuous_time"},
+  {"key": "scenario_error_count", "label": "Scenario error count", "better": "lower", "family": "count"},
+  {"key": "scenario_major_error_count", "label": "Scenario major error count", "better": "lower", "family": "count"},
+  {"key": "scenario_help_count", "label": "Scenario help count", "better": "lower", "family": "count"},
+  {"key": "step_accuracy", "label": "Scenario step accuracy", "better": "higher", "family": "proportion"},
+  {"key": "short_form_binary_accuracy", "label": "Short-form binary accuracy", "better": "higher", "family": "proportion"},
+  {"key": "short_form_proportion_accuracy", "label": "Short-form proportion accuracy", "better": "higher", "family": "proportion"},
+  {"key": "short_form_avg_duration_seconds", "label": "Short-form average duration (s)", "better": "lower", "family": "continuous_time"},
+  {"key": "q2_info_ease", "label": "Post-trial ease finding information", "better": "higher", "family": "ordinal"},
+  {"key": "q5_confidence_setup", "label": "Post-trial confidence setup", "better": "higher", "family": "ordinal"},
+  {"key": "q7_mental_effort", "label": "Post-trial mental effort", "better": "lower", "family": "ordinal"},
+  {"key": "q8_tlx_frustration", "label": "Post-trial frustration", "better": "lower", "family": "ordinal"},
 ]
 
 STARTER_FIGURES = [
@@ -533,14 +657,21 @@ PREPOST_COMPARATORS = [
         'pre_key_digital': 'q7_digital_guidance',
         'pre_key_physical': 'q8_physical_guidance',
         'post_key': 'q5_confidence_setup',
+    'better': 'higher',
+    'family': 'prepost_change',
     },
     {
         'key': 'troubleshooting_confidence',
         'label': 'Troubleshooting confidence (pre → post)',
         'pre_key': 'q9_problem_solving',
         'post_key': 'q6_confidence_troubleshooting',
+    'better': 'higher',
+    'family': 'prepost_change',
     },
 ]
+
+OUTCOME_BY_KEY = {outcome['key']: outcome for outcome in OUTCOMES}
+PREPOST_COMPARATOR_BY_KEY = {comparator['key']: comparator for comparator in PREPOST_COMPARATORS}
 
 
 def load_dotenv(dotenv_path: Path) -> None:
@@ -651,6 +782,121 @@ def permutation_p_value(group_a: list[float], group_b: list[float], iterations: 
     return (extreme + 1) / (iterations + 1)
 
 
+def mann_whitney_u(group_a: list[float], group_b: list[float]) -> dict[str, float | None]:
+    """Two-sided Mann-Whitney U test (exact for small samples).
+
+    Returns {'U': U statistic, 'p': two-sided p-value}.
+    Uses a normal approximation with continuity correction for the
+    p-value when both groups have n >= 2.
+    """
+    if len(group_a) < 2 or len(group_b) < 2:
+        return {'U': None, 'p': None}
+    n_a = len(group_a)
+    n_b = len(group_b)
+    # Count pairwise comparisons
+    u_a = 0.0
+    for a_val in group_a:
+        for b_val in group_b:
+            if a_val > b_val:
+                u_a += 1.0
+            elif a_val == b_val:
+                u_a += 0.5
+    u_b = (n_a * n_b) - u_a
+    u_stat = min(u_a, u_b)
+    # Normal approximation with continuity correction
+    mu = (n_a * n_b) / 2.0
+    # Handle ties for variance
+    combined = sorted(group_a + group_b)
+    n_total = n_a + n_b
+    # Count tie groups
+    tie_correction = 0.0
+    i = 0
+    while i < n_total:
+        j = i + 1
+        while j < n_total and combined[j] == combined[i]:
+            j += 1
+        t = j - i  # size of tie group
+        if t > 1:
+            tie_correction += (t ** 3 - t)
+        i = j
+    sigma_sq = ((n_a * n_b) / 12.0) * ((n_total + 1) - tie_correction / (n_total * (n_total - 1)))
+    if sigma_sq <= 0:
+        return {'U': u_stat, 'p': 1.0}
+    sigma = math.sqrt(sigma_sq)
+    z = (abs(u_stat - mu) - 0.5) / sigma  # continuity correction
+    if z < 0:
+        z = 0.0
+    # Two-sided p-value from standard normal
+    p_value = 2.0 * (1.0 - _normal_cdf(z))
+    return {'U': u_stat, 'p': min(p_value, 1.0)}
+
+
+def _normal_cdf(z: float) -> float:
+    """Standard normal CDF using the error function."""
+    return 0.5 * (1.0 + math.erf(z / math.sqrt(2.0)))
+
+
+def wilcoxon_signed_rank(pre: list[float], post: list[float]) -> dict[str, float | int | None]:
+    """Wilcoxon signed-rank test for paired observations.
+
+    Returns {'T': test statistic (smaller of W+ and W-),
+             'p': two-sided p-value,
+             'n_pairs': number of non-zero-difference pairs}.
+    Uses normal approximation with continuity correction.
+    """
+    if len(pre) != len(post) or len(pre) < 2:
+        return {'T': None, 'p': None, 'n_pairs': 0}
+    # Compute differences, drop zeros
+    diffs = []
+    for pre_val, post_val in zip(pre, post):
+        d = post_val - pre_val
+        if d != 0.0:
+            diffs.append(d)
+    n_pairs = len(diffs)
+    if n_pairs < 2:
+        return {'T': None, 'p': None, 'n_pairs': n_pairs}
+    # Rank absolute differences
+    abs_diffs = [(abs(d), i) for i, d in enumerate(diffs)]
+    abs_diffs.sort(key=lambda x: x[0])
+    ranks = [0.0] * n_pairs
+    i = 0
+    while i < n_pairs:
+        j = i + 1
+        while j < n_pairs and abs_diffs[j][0] == abs_diffs[i][0]:
+            j += 1
+        avg_rank = sum(range(i + 1, j + 1)) / (j - i)
+        for k in range(i, j):
+            ranks[abs_diffs[k][1]] = avg_rank
+        i = j
+    # Sum of positive and negative ranks
+    w_plus = sum(ranks[i] for i in range(n_pairs) if diffs[i] > 0)
+    w_minus = sum(ranks[i] for i in range(n_pairs) if diffs[i] < 0)
+    t_stat = min(w_plus, w_minus)
+    # Normal approximation with continuity correction
+    mu = n_pairs * (n_pairs + 1) / 4.0
+    # Tie correction for variance
+    tie_correction = 0.0
+    abs_vals_sorted = sorted(abs(d) for d in diffs)
+    i = 0
+    while i < n_pairs:
+        j = i + 1
+        while j < n_pairs and abs_vals_sorted[j] == abs_vals_sorted[i]:
+            j += 1
+        t = j - i
+        if t > 1:
+            tie_correction += (t ** 3 - t)
+        i = j
+    sigma_sq = (n_pairs * (n_pairs + 1) * (2 * n_pairs + 1)) / 24.0 - tie_correction / 48.0
+    if sigma_sq <= 0:
+        return {'T': t_stat, 'p': 1.0, 'n_pairs': n_pairs}
+    sigma = math.sqrt(sigma_sq)
+    z = (abs(t_stat - mu) - 0.5) / sigma
+    if z < 0:
+        z = 0.0
+    p_value = 2.0 * (1.0 - _normal_cdf(z))
+    return {'T': t_stat, 'p': min(p_value, 1.0), 'n_pairs': n_pairs}
+
+
 def summarize(values: list[float]) -> dict[str, float | int | None]:
     if not values:
         return {"n": 0, "mean": None, "sd": None, "median": None, "q1": None, "q3": None}
@@ -697,6 +943,15 @@ def format_median_iqr(median_value: Any, q1_value: Any, q3_value: Any, digits: i
     return f'{median_text} [{q1_text}, {q3_text}]'
 
 
+def normalize_text(value: Any) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    if not text:
+        return None
+    return ' '.join(text.split())
+
+
 def build_report_ready_rows(test_rows: list[dict[str, Any]]) -> list[dict[str, str | int]]:
     rows: list[dict[str, str | int]] = []
     for row in test_rows:
@@ -710,9 +965,81 @@ def build_report_ready_rows(test_rows: list[dict[str, Any]]) -> list[dict[str, s
             'Physical median [Q1, Q3]': format_median_iqr(row['physical_median'], row['physical_q1'], row['physical_q3']),
             'Mean diff (D-P)': format_number(row['mean_diff']),
             'Permutation p': format_number(row['permutation_p_value'], 4),
+            'Mann-Whitney U p': format_number(row.get('mann_whitney_p'), 4),
             "Cliff's delta": format_number(row['cliffs_delta']),
         })
     return rows
+
+
+def build_questionnaire_comments_markdown(comment_rows: list[dict[str, Any]], generated_at: str) -> str:
+    participant_sections: list[str] = []
+
+    for row in comment_rows:
+        pre_format_preference = normalize_text(row.get('pre_format_preference'))
+        pre_format_mix_details = normalize_text(row.get('pre_format_mix_details'))
+        pre_free_text_notes = normalize_text(row.get('pre_free_text_notes'))
+        post_format_preference = normalize_text(row.get('post_format_preference'))
+        post_format_mix_details = normalize_text(row.get('post_format_mix_details'))
+        post_free_text_notes = normalize_text(row.get('post_free_text_notes'))
+
+        has_pre = any([pre_format_preference, pre_format_mix_details, pre_free_text_notes])
+        has_post = any([post_format_preference, post_format_mix_details, post_free_text_notes])
+        if not has_pre and not has_post:
+            continue
+
+        participant_id = str(row.get('participant_id') or '').strip() or 'Unknown participant'
+        allocation_group = str(row.get('allocation_group') or 'unknown').strip() or 'unknown'
+
+        participant_sections.extend([
+            f'## {participant_id} ({allocation_group})',
+            '',
+        ])
+
+        if has_pre:
+            participant_sections.extend([
+                '### Pre-trial',
+                '',
+            ])
+            if pre_format_preference:
+                participant_sections.append(f'- Format preference: {pre_format_preference}')
+            if pre_format_mix_details:
+                participant_sections.append(f'- Format preference details: {pre_format_mix_details}')
+            if pre_free_text_notes:
+                participant_sections.append(f'- Additional notes: {pre_free_text_notes}')
+            participant_sections.append('')
+
+        if has_post:
+            participant_sections.extend([
+                '### Post-trial',
+                '',
+            ])
+            if post_format_preference:
+                participant_sections.append(f'- Format preference: {post_format_preference}')
+            if post_format_mix_details:
+                participant_sections.append(f'- Format preference details: {post_format_mix_details}')
+            if post_free_text_notes:
+                participant_sections.append(f'- Additional notes: {post_free_text_notes}')
+            participant_sections.append('')
+
+    lines = [
+        '# Questionnaire Free-Text Comments',
+        '',
+        f'Generated at: {generated_at}',
+        f'Participants with text responses: {len([line for line in participant_sections if line.startswith("## ")])}',
+        '',
+        'This file collects the latest free-text questionnaire responses exposed by the analysis questionnaire views.',
+        '',
+    ]
+
+    if not participant_sections:
+        lines.extend([
+            'No pre-trial or post-trial free-text comments were found in the analysis questionnaire views.',
+            '',
+        ])
+    else:
+        lines.extend(participant_sections)
+
+    return '\n'.join(lines)
 
 
 def to_markdown_table(rows: list[dict[str, Any]]) -> str:
@@ -862,6 +1189,9 @@ def build_prepost_summary_rows(prepost_rows: list[dict[str, Any]]) -> list[dict[
         if digital_change_summary['mean'] is not None and physical_change_summary['mean'] is not None:
             change_diff = float(digital_change_summary['mean']) - float(physical_change_summary['mean'])
 
+        digital_wilcoxon = wilcoxon_signed_rank(digital_pre, digital_post)
+        physical_wilcoxon = wilcoxon_signed_rank(physical_pre, physical_post)
+
         summary_rows.append({
             'comparator_key': comparator['key'],
             'comparator_label': comparator['label'],
@@ -872,6 +1202,9 @@ def build_prepost_summary_rows(prepost_rows: list[dict[str, Any]]) -> list[dict[
             'digital_post_sd': digital_post_summary['sd'],
             'digital_change_mean': digital_change_summary['mean'],
             'digital_change_sd': digital_change_summary['sd'],
+            'digital_wilcoxon_T': digital_wilcoxon['T'],
+            'digital_wilcoxon_p': digital_wilcoxon['p'],
+            'digital_wilcoxon_n_pairs': digital_wilcoxon['n_pairs'],
             'physical_n': physical_change_summary['n'],
             'physical_pre_mean': physical_pre_summary['mean'],
             'physical_pre_sd': physical_pre_summary['sd'],
@@ -879,6 +1212,9 @@ def build_prepost_summary_rows(prepost_rows: list[dict[str, Any]]) -> list[dict[
             'physical_post_sd': physical_post_summary['sd'],
             'physical_change_mean': physical_change_summary['mean'],
             'physical_change_sd': physical_change_summary['sd'],
+            'physical_wilcoxon_T': physical_wilcoxon['T'],
+            'physical_wilcoxon_p': physical_wilcoxon['p'],
+            'physical_wilcoxon_n_pairs': physical_wilcoxon['n_pairs'],
             'mean_change_diff': change_diff,
             'permutation_p_change': permutation_p_value(digital_change, physical_change),
             'cliffs_delta_change': cliffs_delta(digital_change, physical_change),
@@ -896,15 +1232,205 @@ def build_prepost_summary_markdown_rows(summary_rows: list[dict[str, Any]]) -> l
             'Digital pre mean ± SD': format_mean_sd(row['digital_pre_mean'], row['digital_pre_sd']),
             'Digital post mean ± SD': format_mean_sd(row['digital_post_mean'], row['digital_post_sd']),
             'Digital change mean ± SD': format_mean_sd(row['digital_change_mean'], row['digital_change_sd']),
+            'Digital Wilcoxon p': format_number(row.get('digital_wilcoxon_p'), 4),
             'Physical n': row['physical_n'],
             'Physical pre mean ± SD': format_mean_sd(row['physical_pre_mean'], row['physical_pre_sd']),
             'Physical post mean ± SD': format_mean_sd(row['physical_post_mean'], row['physical_post_sd']),
             'Physical change mean ± SD': format_mean_sd(row['physical_change_mean'], row['physical_change_sd']),
+            'Physical Wilcoxon p': format_number(row.get('physical_wilcoxon_p'), 4),
             'Mean change diff (D-P)': format_number(row['mean_change_diff']),
             'Permutation p': format_number(row['permutation_p_change'], 4),
             "Cliff's delta": format_number(row['cliffs_delta_change']),
         })
     return rows
+
+
+def describe_cliffs_delta_strength(delta_value: Any) -> str:
+    if delta_value is None:
+        return 'not available'
+    magnitude = abs(float(delta_value))
+    if magnitude < 0.147:
+        return 'negligible'
+    if magnitude < 0.33:
+        return 'small'
+    if magnitude < 0.474:
+        return 'moderate'
+    return 'large'
+
+
+def describe_between_group_direction(mean_diff: Any, better: str) -> str:
+    if mean_diff is None:
+        return 'The direction of the group difference could not be estimated.'
+
+    difference = float(mean_diff)
+    if difference == 0:
+        return 'The group means were equal in this sample.'
+
+    if difference > 0:
+        raw_direction = 'higher in the digital group than in the physical group'
+        favored_group = 'digital' if better == 'higher' else 'physical'
+    else:
+        raw_direction = 'lower in the digital group than in the physical group'
+        favored_group = 'digital' if better == 'lower' else 'physical'
+
+    return f'The outcome was {raw_direction}, which favors the {favored_group} group on this metric.'
+
+
+def describe_change_direction(change_diff: Any, better: str) -> str:
+    if change_diff is None:
+        return 'The between-group difference in change could not be estimated.'
+
+    difference = float(change_diff)
+    if difference == 0:
+        return 'Both groups showed the same mean change in this sample.'
+
+    if difference > 0:
+        raw_direction = 'The digital group improved more than the physical group on average.'
+        favored_group = 'digital' if better == 'higher' else 'physical'
+    else:
+        raw_direction = 'The physical group improved more than the digital group on average.'
+        favored_group = 'physical' if better == 'higher' else 'digital'
+
+    return f'{raw_direction} This direction favors the {favored_group} group on this comparator.'
+
+
+def describe_significance(p_value: Any) -> str:
+    if p_value is None:
+        return 'There were not enough observations in both groups to compute the inferential comparison.'
+
+    probability = float(p_value)
+    if probability < 0.05:
+        return f'The permutation p-value was {format_number(probability, 4)}, which is below the conventional 0.05 threshold and suggests evidence of a between-group difference.'
+
+    return f'The permutation p-value was {format_number(probability, 4)}, which does not cross the conventional 0.05 threshold, so this first-pass analysis does not show clear evidence of a between-group difference.'
+
+
+def describe_mwu_significance(p_value: Any) -> str:
+    if p_value is None:
+        return 'The Mann\u2013Whitney U test could not be computed.'
+    probability = float(p_value)
+    if probability < 0.05:
+        return f'The Mann\u2013Whitney U p-value was {format_number(probability, 4)}, which is below the 0.05 threshold.'
+    return f'The Mann\u2013Whitney U p-value was {format_number(probability, 4)}, which does not cross the 0.05 threshold.'
+
+
+def build_between_group_analysis_section(test_rows: list[dict[str, Any]]) -> list[str]:
+    lines = [
+        '## Between-group outcomes',
+        '',
+        'Each section below is auto-generated from the current pipeline outputs. For ordinal outcomes, Mann\u2013Whitney U is used as the primary test with the permutation test as a sensitivity analysis. For continuous and count outcomes, the permutation test remains the primary analysis with Mann\u2013Whitney U as a sensitivity check.',
+        '',
+    ]
+
+    for row in test_rows:
+        metadata = OUTCOME_BY_KEY.get(str(row['outcome_key']))
+        if metadata is None:
+            continue
+
+        family = OUTCOME_FAMILIES[str(metadata['family'])]
+        sensitivity_label = family.get('sensitivity_test')
+
+        test_lines = [
+            f"### {row['label']}",
+            '',
+            f"- Outcome type: {family['label']}",
+            f"- Primary analysis: {family['primary_test']}",
+        ]
+        if sensitivity_label:
+            test_lines.append(f"- Sensitivity analysis: {sensitivity_label}")
+        test_lines.extend([
+            f"- Effect size reported: {family['effect_size']}",
+            f"- Rationale: {family['why']}",
+            f"- Null hypothesis: there is no difference between the digital and physical groups for {str(row['label']).lower()}.",
+            f"- Alternative hypothesis: there is a difference between the digital and physical groups for {str(row['label']).lower()}.",
+            f"- Digital group summary: n = {row['digital_n']}, mean \u00b1 SD = {format_mean_sd(row['digital_mean'], row['digital_sd'])}, median [Q1, Q3] = {format_median_iqr(row['digital_median'], row['digital_q1'], row['digital_q3'])}.",
+            f"- Physical group summary: n = {row['physical_n']}, mean \u00b1 SD = {format_mean_sd(row['physical_mean'], row['physical_sd'])}, median [Q1, Q3] = {format_median_iqr(row['physical_median'], row['physical_q1'], row['physical_q3'])}.",
+            f"- Permutation test: mean difference (digital \u2212 physical) = {format_number(row['mean_diff'])}, permutation p = {format_number(row['permutation_p_value'], 4)}.",
+            f"- Mann\u2013Whitney U test: U = {format_number(row.get('mann_whitney_U'), 1)}, p = {format_number(row.get('mann_whitney_p'), 4)}.",
+            f"- Effect size: Cliff's delta = {format_number(row['cliffs_delta'])} ({describe_cliffs_delta_strength(row['cliffs_delta'])}).",
+            f"- Directional interpretation: {describe_between_group_direction(row['mean_diff'], str(metadata['better']))}",
+            f"- Statistical interpretation: {describe_significance(row['permutation_p_value'])} {describe_mwu_significance(row.get('mann_whitney_p'))}",
+            '',
+        ])
+        lines.extend(test_lines)
+
+    return lines
+
+
+def describe_wilcoxon_within_group(group_label: str, wilcoxon_p: Any, wilcoxon_T: Any, n_pairs: Any) -> str:
+    if wilcoxon_p is None:
+        return f'The within-group Wilcoxon signed-rank test for the {group_label} group could not be computed (n_pairs = {n_pairs or 0}).'
+    p = float(wilcoxon_p)
+    if p < 0.05:
+        return f'The {group_label} group showed a statistically significant within-group change (Wilcoxon T = {format_number(wilcoxon_T, 1)}, p = {format_number(p, 4)}, n_pairs = {n_pairs}).'
+    return f'The {group_label} group did not show a statistically significant within-group change (Wilcoxon T = {format_number(wilcoxon_T, 1)}, p = {format_number(p, 4)}, n_pairs = {n_pairs}).'
+
+
+def build_prepost_analysis_section(summary_rows: list[dict[str, Any]]) -> list[str]:
+    lines = [
+        '## Pre/post matched questionnaire comparators',
+        '',
+        'These sections compare change scores between groups using a permutation test and report within-group paired Wilcoxon signed-rank tests to assess whether each group individually changed from baseline.',
+        '',
+    ]
+
+    for row in summary_rows:
+        metadata = PREPOST_COMPARATOR_BY_KEY.get(str(row['comparator_key']))
+        if metadata is None:
+            continue
+
+        family = OUTCOME_FAMILIES[str(metadata['family'])]
+        lines.extend([
+            f"### {row['comparator_label']}",
+            '',
+            f"- Outcome type: {family['label']}",
+            f"- Between-group analysis: {family['primary_test']}",
+            f"- Within-group analysis: {family.get('within_test', 'N/A')}",
+            f"- Effect size reported: {family['effect_size']}",
+            f"- Rationale: {family['why']}",
+            f"- Null hypothesis (between): the mean change from baseline to post-trial is the same in the digital and physical groups for {str(row['comparator_label']).lower()}.",
+            f"- Alternative hypothesis (between): the mean change from baseline to post-trial differs between the digital and physical groups for {str(row['comparator_label']).lower()}.",
+            f"- Digital group summary: n = {row['digital_n']}, pre mean \u00b1 SD = {format_mean_sd(row['digital_pre_mean'], row['digital_pre_sd'])}, post mean \u00b1 SD = {format_mean_sd(row['digital_post_mean'], row['digital_post_sd'])}, change mean \u00b1 SD = {format_mean_sd(row['digital_change_mean'], row['digital_change_sd'])}.",
+            f"- Physical group summary: n = {row['physical_n']}, pre mean \u00b1 SD = {format_mean_sd(row['physical_pre_mean'], row['physical_pre_sd'])}, post mean \u00b1 SD = {format_mean_sd(row['physical_post_mean'], row['physical_post_sd'])}, change mean \u00b1 SD = {format_mean_sd(row['physical_change_mean'], row['physical_change_sd'])}.",
+            f"- Between-group test: mean change difference (digital \u2212 physical) = {format_number(row['mean_change_diff'])}, permutation p = {format_number(row['permutation_p_change'], 4)}, Cliff's delta = {format_number(row['cliffs_delta_change'])} ({describe_cliffs_delta_strength(row['cliffs_delta_change'])}).",
+            f"- Within-group test (digital): {describe_wilcoxon_within_group('digital', row.get('digital_wilcoxon_p'), row.get('digital_wilcoxon_T'), row.get('digital_wilcoxon_n_pairs'))}",
+            f"- Within-group test (physical): {describe_wilcoxon_within_group('physical', row.get('physical_wilcoxon_p'), row.get('physical_wilcoxon_T'), row.get('physical_wilcoxon_n_pairs'))}",
+            f"- Directional interpretation: {describe_change_direction(row['mean_change_diff'], str(metadata['better']))}",
+            f"- Statistical interpretation: {describe_significance(row['permutation_p_change'])}",
+            '',
+        ])
+
+    return lines
+
+
+def build_statistical_analysis_report(test_rows: list[dict[str, Any]], prepost_summary_rows: list[dict[str, Any]], generated_at: str) -> str:
+    lines = [
+        '# Automated Statistical Analysis Notes',
+        '',
+        f'Generated at: {generated_at}',
+        '',
+        'This report provides per-metric statistical write-ups using permutation tests, Mann\u2013Whitney U tests, Cliff\'s delta effect sizes, and within-group Wilcoxon signed-rank tests where applicable.',
+        '',
+        '## Scope',
+        '',
+        '- Between-group outcomes use permutation tests and Mann\u2013Whitney U tests. For ordinal outcomes, Mann\u2013Whitney U is the primary test; for other outcome types, the permutation test is primary.',
+        '- Pre/post comparators use between-group permutation tests on change scores and within-group Wilcoxon signed-rank tests to assess whether each group individually changed from baseline.',
+        '- No formal multiple-comparison correction is applied; results should be interpreted with appropriate caution given the 15 comparisons.',
+        '',
+    ]
+
+    lines.extend(build_between_group_analysis_section(test_rows))
+    lines.extend(build_prepost_analysis_section(prepost_summary_rows))
+    lines.extend([
+        '## Notes',
+        '',
+        '- Ordinal (Likert-scale) outcomes use Mann\u2013Whitney U as the primary analysis because it respects rank ordering without assuming equal intervals.',
+        '- Continuous and count outcomes use the permutation test as primary with Mann\u2013Whitney U as a sensitivity check.',
+        '- Within-group Wilcoxon signed-rank tests on pre/post comparators address whether each group individually changed from baseline, complementing the between-group comparison.',
+        '- Because several outcomes are small-sample, bounded, ordinal, or count-based, this narrative should be read together with the descriptive summaries rather than as a p-value-only report.',
+        '',
+    ])
+    return '\n'.join(lines)
 
 
 def to_csv(rows: list[dict[str, Any]]) -> str:
@@ -2109,6 +2635,10 @@ def fetch_task_rows(database_url: str) -> list[dict[str, Any]]:
   return fetch_query_rows(database_url, TASK_LEVEL_QUERY)
 
 
+def fetch_questionnaire_comment_rows(database_url: str) -> list[dict[str, Any]]:
+  return fetch_query_rows(database_url, QUESTIONNAIRE_COMMENTS_QUERY)
+
+
 def normalize_participant_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     normalized_rows: list[dict[str, Any]] = []
     for row in rows:
@@ -2144,6 +2674,7 @@ def main() -> int:
     page_usage_rows = fetch_page_usage_rows(database_url)
     raw_task_rows = fetch_task_rows(database_url)
     scenario_transition_rows = fetch_scenario_transition_rows(database_url)
+    questionnaire_comment_rows = fetch_questionnaire_comment_rows(database_url)
     allocation_group_by_participant = {
       str(row.get('participant_id') or '').strip(): str(row.get('allocation_group') or '').strip()
       for row in participant_rows
@@ -2169,6 +2700,7 @@ def main() -> int:
         if digital_summary['mean'] is not None and physical_summary['mean'] is not None:
             mean_diff = float(digital_summary['mean']) - float(physical_summary['mean'])
 
+        mwu_result = mann_whitney_u(digital_values, physical_values)
         test_rows.append({
             'outcome_key': outcome['key'],
             'label': outcome['label'],
@@ -2188,6 +2720,8 @@ def main() -> int:
             'mean_diff': mean_diff,
             'permutation_p_value': permutation_p_value(digital_values, physical_values),
             'cliffs_delta': cliffs_delta(digital_values, physical_values),
+            'mann_whitney_U': mwu_result['U'],
+            'mann_whitney_p': mwu_result['p'],
         })
 
     group_summary_rows: list[dict[str, Any]] = [
@@ -2231,6 +2765,8 @@ def main() -> int:
     prepost_summary_csv = to_csv(prepost_summary_rows)
     prepost_summary_md = to_markdown_table(build_prepost_summary_markdown_rows(prepost_summary_rows))
     report = build_report(participant_rows, test_rows, group_summary_rows, generated_at, figure_outputs)
+    statistical_analysis_report = build_statistical_analysis_report(test_rows, prepost_summary_rows, generated_at)
+    questionnaire_comments_md = build_questionnaire_comments_markdown(questionnaire_comment_rows, generated_at)
 
     participant_file = TABLES_DIR / 'participant-level-latest.csv'
     tests_file = TABLES_DIR / 'outcome-tests-latest.csv'
@@ -2244,6 +2780,8 @@ def main() -> int:
     prepost_summary_csv_file = TABLES_DIR / 'questionnaire-prepost-summary-latest.csv'
     prepost_summary_md_file = TABLES_DIR / 'questionnaire-prepost-summary-latest.md'
     report_file = REPORTS_DIR / 'stats-report-latest.md'
+    statistical_analysis_report_file = REPORTS_DIR / 'statistical-analysis-report-latest.md'
+    questionnaire_comments_file = REPORTS_DIR / 'questionnaire-comments-latest.md'
 
     participant_file.write_text(participant_csv, encoding='utf8')
     tests_file.write_text(tests_csv, encoding='utf8')
@@ -2257,11 +2795,14 @@ def main() -> int:
     prepost_summary_csv_file.write_text(prepost_summary_csv, encoding='utf8')
     prepost_summary_md_file.write_text(prepost_summary_md, encoding='utf8')
     report_file.write_text(report, encoding='utf8')
+    statistical_analysis_report_file.write_text(statistical_analysis_report, encoding='utf8')
+    questionnaire_comments_file.write_text(questionnaire_comments_md, encoding='utf8')
 
     print('Stats report generated successfully.')
     if cleared_outputs:
       print(f'- Cleared {len(cleared_outputs)} previous analysis output(s).')
     print(f'- {report_file}')
+    print(f'- {statistical_analysis_report_file}')
     print(f'- {participant_file}')
     print(f'- {tests_file}')
     print(f'- {summary_file}')
@@ -2273,6 +2814,7 @@ def main() -> int:
     print(f'- {prepost_participant_file}')
     print(f'- {prepost_summary_csv_file}')
     print(f'- {prepost_summary_md_file}')
+    print(f'- {questionnaire_comments_file}')
     for figure in figure_outputs:
       print(f"- {figure['path']}")
     return 0

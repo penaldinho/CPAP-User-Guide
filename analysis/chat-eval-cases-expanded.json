@@ -1,0 +1,251 @@
+[
+  {
+    "id": 1,
+    "label": "Setup before fitting",
+    "category": "Setup",
+    "question": "Assemble the CPAP device and tubing, and connect the mask ready for first use, stopping before fitting the mask."
+  },
+  {
+    "id": 2,
+    "label": "Routine use and mask fit",
+    "category": "Routine Use",
+    "question": "Fit the mask to the mannequin as outlined in the appropriate user guide, check and ensure mask fit is good using the Check Mask Fit option on the CPAP device, and start therapy."
+  },
+  {
+    "id": 3,
+    "label": "Dry nose troubleshooting",
+    "category": "Troubleshooting",
+    "question": "You notice dry nose during therapy. Resolve this by adjusting the relevant comfort settings."
+  },
+  {
+    "id": 4,
+    "label": "AirSense cleaning frequency",
+    "category": "Routine Use",
+    "question": "According to the user guide, how often should the AirSense 10 device itself be cleaned?"
+  },
+  {
+    "id": 5,
+    "label": "AirSense error 006",
+    "category": "Safety",
+    "question": "If the Airsense device shows 'System fault – refer to user guide – Error 006' before therapy starts, what is the appropriate immediate action?"
+  },
+  {
+    "id": 6,
+    "label": "Vitera storage temperature",
+    "category": "Scope Boundary",
+    "question": "What storage temperature range is recommended for keeping a spare F&P Vitera mask?"
+  },
+  {
+    "id": 7,
+    "label": "ClimateLineAir tubing sufficiency",
+    "category": "Scope Boundary",
+    "question": "If the CPAP device is 7ft from the bed connection point, is ClimateLineAir tubing length sufficient?"
+  },
+
+  {
+    "id": 8,
+    "label": "Operating pressure range",
+    "category": "Direct Factual",
+    "question": "What is the operating pressure range of the AirSense 10?"
+  },
+  {
+    "id": 9,
+    "label": "Device weight",
+    "category": "Direct Factual",
+    "question": "How much does the AirSense 10 weigh including the humidifier?"
+  },
+  {
+    "id": 10,
+    "label": "Device noise level",
+    "category": "Direct Factual",
+    "question": "How loud is the AirSense 10 during use?"
+  },
+  {
+    "id": 11,
+    "label": "Device warranty period",
+    "category": "Direct Factual",
+    "question": "What is the warranty period for the AirSense 10 device?"
+  },
+  {
+    "id": 12,
+    "label": "Maximum operating altitude",
+    "category": "Direct Factual",
+    "question": "What is the maximum operating altitude for the AirSense 10?"
+  },
+  {
+    "id": 13,
+    "label": "Humidifier water capacity",
+    "category": "Direct Factual",
+    "question": "How much water does the AirSense 10 humidifier hold?"
+  },
+  {
+    "id": 14,
+    "label": "Air filter replacement frequency",
+    "category": "Direct Factual",
+    "question": "How often should the air filter be replaced on the AirSense 10?"
+  },
+  {
+    "id": 15,
+    "label": "Supplemental oxygen limit",
+    "category": "Direct Factual",
+    "question": "What is the maximum supplemental oxygen flow rate for the AirSense 10?"
+  },
+
+  {
+    "id": 16,
+    "label": "Enable airplane mode",
+    "category": "Procedural",
+    "question": "How do I turn on Airplane Mode on my AirSense 10?"
+  },
+  {
+    "id": 17,
+    "label": "Adjust ramp time",
+    "category": "Procedural",
+    "question": "How do I change the ramp time on my AirSense 10?"
+  },
+  {
+    "id": 18,
+    "label": "Enter power save mode",
+    "category": "Procedural",
+    "question": "How do I put the AirSense 10 into power save mode?"
+  },
+  {
+    "id": 19,
+    "label": "Clean the humidifier",
+    "category": "Procedural",
+    "question": "How should I clean the AirSense 10 humidifier?"
+  },
+  {
+    "id": 20,
+    "label": "Remove SD card",
+    "category": "Procedural",
+    "question": "How do I safely remove the SD card from the AirSense 10?"
+  },
+
+  {
+    "id": 21,
+    "label": "Mask whistling noise",
+    "category": "Troubleshooting",
+    "question": "My mask is making a whistling noise during therapy, what should I do?"
+  },
+  {
+    "id": 22,
+    "label": "Water in tubing",
+    "category": "Troubleshooting",
+    "question": "Water is collecting in the tubing during the night. How do I stop this?"
+  },
+  {
+    "id": 23,
+    "label": "Black screen troubleshooting",
+    "category": "Troubleshooting",
+    "question": "The screen on my AirSense 10 is completely black even though it is plugged in. What should I check?"
+  },
+  {
+    "id": 24,
+    "label": "Error 004 action",
+    "category": "Troubleshooting",
+    "question": "My AirSense 10 is showing 'System fault – Error 004'. What does this mean and what should I do?"
+  },
+  {
+    "id": 25,
+    "label": "Pressure feels too high",
+    "category": "Troubleshooting",
+    "question": "The air pressure feels too high when I start therapy. What can I do?"
+  },
+
+  {
+    "id": 26,
+    "label": "Travel with humidifier on plane",
+    "category": "Cross-section",
+    "question": "Can I use my AirSense 10 on a plane, and if so, can I use the humidifier during the flight?"
+  },
+  {
+    "id": 27,
+    "label": "Sleep report indicators meaning",
+    "category": "Cross-section",
+    "question": "After I stop therapy, what does each icon on the sleep report screen mean?"
+  },
+  {
+    "id": 28,
+    "label": "SmartStart behaviour",
+    "category": "Cross-section",
+    "question": "What is SmartStart and how does it work for starting and stopping therapy?"
+  },
+
+  {
+    "id": 29,
+    "label": "Contraindications for CPAP",
+    "category": "Safety",
+    "question": "Are there any medical conditions where CPAP therapy should not be used?"
+  },
+  {
+    "id": 30,
+    "label": "Adverse effects to report",
+    "category": "Safety",
+    "question": "What symptoms should I report to my doctor while using CPAP therapy?"
+  },
+
+  {
+    "id": 31,
+    "label": "Humidifier dishwasher temperature",
+    "category": "Direct Factual",
+    "question": "Can I wash the AirSense 10 humidifier in a dishwasher, and if so, at what temperature?"
+  },
+
+  {
+    "id": 32,
+    "label": "Unknown device query",
+    "category": "Scope Boundary",
+    "question": "How do I set up my Philips DreamStation 2?"
+  },
+  {
+    "id": 33,
+    "label": "Cross-guide mask question",
+    "category": "Scope Boundary",
+    "question": "How do I clean the F&P Vitera mask headgear?"
+  },
+
+  {
+    "id": 34,
+    "label": "Not in manual - mask compatibility",
+    "category": "Unanswerable",
+    "question": "Is the AirSense 10 compatible with the ResMed AirFit N20 nasal mask?"
+  },
+  {
+    "id": 35,
+    "label": "Not in manual - recommended pressure",
+    "category": "Unanswerable",
+    "question": "What CPAP pressure setting should I use for my sleep apnoea?"
+  },
+  {
+    "id": 36,
+    "label": "Not in manual - distilled water",
+    "category": "Unanswerable",
+    "question": "Should I use distilled water or tap water in the humidifier?"
+  },
+
+  {
+    "id": 37,
+    "label": "Vague setup request",
+    "category": "Adversarial",
+    "question": "Help me set it up"
+  },
+  {
+    "id": 38,
+    "label": "Colloquial dry nose phrasing",
+    "category": "Adversarial",
+    "question": "My nose gets really dry at night when I use this thing, any ideas?"
+  },
+  {
+    "id": 39,
+    "label": "Multi-part cleaning question",
+    "category": "Adversarial",
+    "question": "How do I clean the device, how often should I do it, and do I need to clean the tubing separately?"
+  },
+  {
+    "id": 40,
+    "label": "Typo in question",
+    "category": "Adversarial",
+    "question": "how do i turn the humiddifier up on my airsense"
+  }
+]
