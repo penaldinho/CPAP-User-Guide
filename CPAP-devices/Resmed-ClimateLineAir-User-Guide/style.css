@@ -1225,8 +1225,9 @@ body.image-lightbox-open {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 24px;
+  padding: 24px 24px calc(24px + var(--mtg-task-safe-area-bottom, 0px));
   background: rgba(18, 24, 38, 0.92);
+  box-sizing: border-box;
 }
 
 .image-lightbox[hidden] {
@@ -1236,7 +1237,7 @@ body.image-lightbox-open {
 .image-lightbox-dialog {
   position: relative;
   width: min(92vw, 1100px);
-  max-height: 90vh;
+  max-height: calc(90vh - var(--mtg-task-safe-area-bottom, 0px));
   padding: 8px 12px 10px;
 }
 
@@ -1244,7 +1245,7 @@ body.image-lightbox-open {
   display: block;
   width: auto;
   max-width: 100%;
-  max-height: min(62vh, calc(90vh - 180px));
+  max-height: min(62vh, calc(90vh - 180px - var(--mtg-task-safe-area-bottom, 0px)));
   height: auto;
   margin: 0 auto;
   border-radius: 16px;
@@ -1291,7 +1292,7 @@ body.image-lightbox-open {
   }
 
   .image-lightbox {
-    padding: 16px;
+    padding: 16px 16px calc(16px + var(--mtg-task-safe-area-bottom, 0px));
   }
 
   .image-lightbox-dialog {
@@ -1305,7 +1306,7 @@ body.image-lightbox-open {
   }
 
   .image-lightbox-image {
-    max-height: min(52vh, calc(90vh - 210px));
+    max-height: min(52vh, calc(90vh - 210px - var(--mtg-task-safe-area-bottom, 0px)));
   }
 
   .image-lightbox-caption {

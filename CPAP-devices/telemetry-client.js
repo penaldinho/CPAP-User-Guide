@@ -280,6 +280,7 @@
     const safeAreaPx = Math.max(0, Math.ceil(coveredHeight + additionalGap));
     const nextPaddingBottom = Math.max(0, Math.ceil((baseBodyPaddingBottomPx || 0) + safeAreaPx));
     document.body.style.paddingBottom = `${nextPaddingBottom}px`;
+    document.documentElement.style.setProperty('--mtg-task-safe-area-bottom', `${safeAreaPx}px`);
     updateChatDockForTaskCardOverlap();
   };
 
