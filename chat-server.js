@@ -3172,6 +3172,57 @@ const getOutOfScopeGuideResponse = (message, guideKeys) => {
   return `Your question mentions ${conflictingGuideName}, but this chat is currently scoped to ${activeGuideName}. I can only answer from the selected guide. Please switch guides or ask a ${activeGuideName} question.`;
 };
 
+const getOtherGuideChatbotSuggestion = (guideKeys) => {
+  if (!Array.isArray(guideKeys) || guideKeys.length !== 1) {
+    return null;
+  }
+
+  const activeGuideKey = guideKeys[0];
+  const activeGuide = guideConfigs[activeGuideKey];
+  if (!activeGuide || !activeGuide.family) {
+    return null;
+  }
+
+  const alternatives = Object.entries(guideConfigs)
+    .filter(([guideKey, guide]) => guide.family === activeGuide.family && guideKey !== activeGuideKey)
+    .map(([, guide]) => guide.name)
+    .filter(Boolean);
+
+  if (!alternatives.length) {
+    return null;
+  }
+
+  if (alternatives.length === 1) {
+    return `Please check the ${alternatives[0]} chatbot for advice if your question relates to that manual instead.`;
+  }
+
+  const lastGuide = alternatives[alternatives.length - 1];
+  const leadingGuides = alternatives.slice(0, -1);
+  return `Please check the ${leadingGuides.join(', ')} or ${lastGuide} chatbot for advice if your question relates to one of those manuals instead.`;
+};
+
+const appendOtherGuideSuggestionIfNeeded = (response, guideKeys) => {
+  if (!responseIndicatesNoDirectInstruction(response)) {
+    return response;
+  }
+
+  const suggestion = getOtherGuideChatbotSuggestion(guideKeys);
+  if (!suggestion) {
+    return response;
+  }
+
+  const normalizedResponse = String(response || '').trim();
+  if (!normalizedResponse) {
+    return suggestion;
+  }
+
+  if (normalizedResponse.toLowerCase().includes(suggestion.toLowerCase())) {
+    return normalizedResponse;
+  }
+
+  return `${normalizedResponse} ${suggestion}`;
+};
+
 const isSpecOrNumericQuestion = (message) => {
   const text = String(message || '').toLowerCase();
   if (!text) return false;
@@ -3561,6 +3612,8 @@ app.post('/api/chat', async (req, res) => {
     if (scopeValidationFallback) {
       response = scopeValidationFallback;
     }
+
+    response = appendOtherGuideSuggestionIfNeeded(response, guideKeys);
 
     const image = responseIndicatesNoDirectInstruction(response)
       ? null

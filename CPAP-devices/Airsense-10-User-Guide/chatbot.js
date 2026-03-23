@@ -14,9 +14,9 @@ class ChatBot {
       ? (this.chatContainer.dataset.chatDefaultHeight || this.chatContainer.style.height || '600px')
       : '600px';
     this.guideNames = {
-      'airsense-10': 'AirSense 10',
+      'airsense-10': 'ResMed AirSense 10 CPAP Device',
       'fp-vitera': 'F&P Vitera Full Face Mask',
-      'climatelineair': 'ResMed ClimateLineAir'
+      'climatelineair': 'ResMed ClimateLineAir Tubing'
     };
     this.chatPaths = {
       'airsense-10': '/CPAP-devices/Airsense-10-User-Guide/chat.html',
