@@ -171,6 +171,7 @@ pre_q AS (
       q7_digital_guidance,
       q8_physical_guidance,
       q9_problem_solving,
+      q10_format_preference,
       ROW_NUMBER() OVER (PARTITION BY participant_id ORDER BY received_at DESC, id DESC) AS rn
     FROM analysis_pre_trial_questionnaire
   ) ranked
@@ -191,6 +192,7 @@ post_q AS (
       q8_tlx_frustration,
       q9_tlx_perceived_performance,
       q10_tlx_temporal_demand,
+      q11_format_preference,
       ROW_NUMBER() OVER (PARTITION BY participant_id ORDER BY received_at DESC, id DESC) AS rn
     FROM analysis_post_trial_questionnaire
   ) ranked
@@ -236,6 +238,8 @@ SELECT
   post.q8_tlx_frustration,
   post.q9_tlx_perceived_performance,
   post.q10_tlx_temporal_demand,
+  pre.q10_format_preference AS pre_format_preference,
+  post.q11_format_preference AS post_format_preference,
   COALESCE(db.digital_page_view_count, 0) AS digital_page_view_count,
   COALESCE(db.digital_search_count, 0) AS digital_search_count,
   COALESCE(db.digital_chat_count, 0) AS digital_chat_count
@@ -365,6 +369,72 @@ GROUP BY task_id, task_label, source_step, source_page, target_step, target_page
 ORDER BY task_id, source_step ASC, transition_count DESC, source_page ASC, target_page ASC;
 """
 
+PATHWAY_INSTANCE_QUERY = """
+WITH page_views AS (
+  SELECT
+    e.participant_id,
+    e.task_id,
+    e.task_instance_seq,
+    COALESCE(NULLIF(TRIM(e.task_label), ''), e.task_id) AS task_label,
+    NULLIF(TRIM(SPLIT_PART(SPLIT_PART(e.page_path, '?', 1), '#', 1)), '') AS page_path,
+    ROW_NUMBER() OVER (
+      PARTITION BY e.participant_id, e.task_id, e.task_instance_seq
+      ORDER BY e.event_at ASC, e.id ASC
+    ) AS page_seq
+  FROM telemetry_task_events_enriched e
+  INNER JOIN analysis_participant_allocation pa
+    ON pa.participant_id = e.participant_id
+    AND pa.allocation_group = 'digital'
+  WHERE e.event_type = 'page_view'
+    AND (e.task_id LIKE 'scenario_card_%' OR e.task_id LIKE 'short_form_q%')
+    AND NULLIF(TRIM(SPLIT_PART(SPLIT_PART(e.page_path, '?', 1), '#', 1)), '') IS NOT NULL
+),
+deduped_page_views AS (
+  SELECT *
+  FROM (
+    SELECT
+      pv.*,
+      LAG(pv.page_path) OVER (
+        PARTITION BY pv.participant_id, pv.task_id, pv.task_instance_seq
+        ORDER BY pv.page_seq ASC
+      ) AS previous_page_path
+    FROM page_views pv
+  ) ranked
+  WHERE ranked.previous_page_path IS DISTINCT FROM ranked.page_path
+     OR ranked.previous_page_path IS NULL
+),
+sequenced_page_views AS (
+  SELECT
+    participant_id,
+    task_id,
+    task_instance_seq,
+    task_label,
+    page_path,
+    ROW_NUMBER() OVER (
+      PARTITION BY participant_id, task_id, task_instance_seq
+      ORDER BY page_seq ASC
+    ) AS deduped_page_seq,
+    LAG(page_path, 2) OVER (
+      PARTITION BY participant_id, task_id, task_instance_seq
+      ORDER BY page_seq ASC
+    ) AS two_steps_back_page_path
+  FROM deduped_page_views
+)
+SELECT
+  participant_id,
+  task_id,
+  task_instance_seq,
+  MIN(task_label) AS task_label,
+  COUNT(*)::BIGINT AS page_step_count,
+  COUNT(DISTINCT page_path)::BIGINT AS unique_page_count,
+  GREATEST(COUNT(*) - 1, 0)::BIGINT AS transition_count,
+  SUM(CASE WHEN two_steps_back_page_path = page_path THEN 1 ELSE 0 END)::BIGINT AS backtrack_count,
+  STRING_AGG(page_path, ' || ' ORDER BY deduped_page_seq ASC) AS page_pathway
+FROM sequenced_page_views
+GROUP BY participant_id, task_id, task_instance_seq
+ORDER BY task_id, participant_id, task_instance_seq;
+"""
+
 TASK_LEVEL_QUERY = """
 WITH task_instances AS (
   SELECT
@@ -383,14 +453,42 @@ WITH task_instances AS (
   FROM telemetry_task_instances
   WHERE UPPER(TRIM(COALESCE(participant_id, ''))) <> 'TEST'
 ),
+scenario_score_metrics AS (
+  SELECT
+    TRIM(participant_id) AS participant_id,
+    TRIM(task_id) AS task_id,
+    COALESCE(NULLIF(TRIM(trial_mode), ''), 'digital') AS trial_mode,
+    AVG(scenario_score::DOUBLE PRECISION) AS scenario_score
+  FROM analysis_observer_notes
+  WHERE action_type = 'scenario_score'
+    AND scenario_score IS NOT NULL
+  GROUP BY TRIM(participant_id), TRIM(task_id), COALESCE(NULLIF(TRIM(trial_mode), ''), 'digital')
+),
+chat_page_metrics AS (
+  SELECT
+    participant_id,
+    task_id,
+    task_instance_seq,
+    SUM(page_dwell_ms) FILTER (WHERE page_path ILIKE '%chat.html%')::BIGINT AS chat_page_dwell_ms,
+    SUM(page_view_count) FILTER (WHERE page_path ILIKE '%chat.html%')::BIGINT AS chat_page_view_count
+  FROM telemetry_task_page_metrics
+  GROUP BY participant_id, task_id, task_instance_seq
+),
+chat_event_metrics AS (
+  SELECT
+    participant_id,
+    task_id,
+    task_instance_seq,
+    COUNT(*) FILTER (WHERE event_type = 'chat_submit')::BIGINT AS chat_submit_count,
+    COUNT(*) FILTER (WHERE event_type = 'chat_response')::BIGINT AS chat_response_count
+  FROM telemetry_task_events_enriched
+  GROUP BY participant_id, task_id, task_instance_seq
+),
 observer_note_metrics AS (
   SELECT
     t.participant_id,
     t.task_id,
     t.task_instance_seq,
-    AVG(o.scenario_score::DOUBLE PRECISION) FILTER (
-      WHERE o.action_type = 'scenario_score' AND o.scenario_score IS NOT NULL
-    ) AS scenario_score,
     MAX(COALESCE(o.help_instances_count, 0)) FILTER (
       WHERE o.action_type = 'task_end'
     ) AS help_instances_count,
@@ -451,7 +549,30 @@ SELECT
   t.task_total_page_dwell_ms / 1000.0 AS task_total_page_dwell_seconds,
   t.task_event_count,
   t.task_page_count,
-  onm.scenario_score,
+  COALESCE(cpm.chat_page_dwell_ms, 0) / 1000.0 AS chat_page_dwell_seconds,
+  COALESCE(cpm.chat_page_view_count, 0) AS chat_page_view_count,
+  COALESCE(cem.chat_submit_count, 0) AS chat_submit_count,
+  COALESCE(cem.chat_response_count, 0) AS chat_response_count,
+  CASE
+    WHEN t.task_total_page_dwell_ms > 0
+      THEN COALESCE(cpm.chat_page_dwell_ms, 0)::DOUBLE PRECISION / t.task_total_page_dwell_ms::DOUBLE PRECISION
+    ELSE NULL
+  END AS chat_page_dwell_share,
+  CASE
+    WHEN COALESCE(cpm.chat_page_dwell_ms, 0) > 0
+      OR COALESCE(cem.chat_submit_count, 0) > 0
+      OR COALESCE(cem.chat_response_count, 0) > 0
+      THEN 1
+    ELSE 0
+  END AS chat_used_flag,
+  CASE
+    WHEN t.task_total_page_dwell_ms > 0
+      AND COALESCE(cpm.chat_page_dwell_ms, 0)::DOUBLE PRECISION / t.task_total_page_dwell_ms::DOUBLE PRECISION >= 0.5
+      AND COALESCE(cem.chat_submit_count, 0) > 0
+      THEN 1
+    ELSE 0
+  END AS chat_primary_flag,
+  ssm.scenario_score,
   COALESCE(onm.help_instances_count, 0) AS help_instances_count,
   COALESCE(onm.error_count, 0) AS error_count,
   COALESCE(onm.major_error_count, 0) AS major_error_count,
@@ -461,6 +582,18 @@ SELECT
   sfm.short_form_proportion_accuracy,
   sfm.short_form_duration_seconds
 FROM task_instances t
+LEFT JOIN scenario_score_metrics ssm
+  ON ssm.participant_id = TRIM(t.participant_id)
+  AND ssm.task_id = TRIM(t.task_id)
+  AND ssm.trial_mode = COALESCE(NULLIF(TRIM(t.trial_mode), ''), 'digital')
+LEFT JOIN chat_page_metrics cpm
+  ON cpm.participant_id = t.participant_id
+  AND cpm.task_id = t.task_id
+  AND cpm.task_instance_seq = t.task_instance_seq
+LEFT JOIN chat_event_metrics cem
+  ON cem.participant_id = t.participant_id
+  AND cem.task_id = t.task_id
+  AND cem.task_instance_seq = t.task_instance_seq
 LEFT JOIN observer_note_metrics onm
   ON onm.participant_id = t.participant_id
   AND onm.task_id = t.task_id
@@ -854,19 +987,36 @@ def wilcoxon_signed_rank(pre: list[float], post: list[float]) -> dict[str, float
             diffs.append(d)
     n_pairs = len(diffs)
     if n_pairs < 2:
-        return {'T': None, 'p': None, 'n_pairs': n_pairs}
+      return {'T': None, 'p': None, 'n_pairs': n_pairs}
     # Rank absolute differences
     abs_diffs = [(abs(d), i) for i, d in enumerate(diffs)]
     abs_diffs.sort(key=lambda x: x[0])
     ranks = [0.0] * n_pairs
     i = 0
     while i < n_pairs:
+      j = i + 1
+      while j < n_pairs and abs_diffs[j][0] == abs_diffs[i][0]:
+        j += 1
+      avg_rank = sum(range(i + 1, j + 1)) / (j - i)
+      for k in range(i, j):
+        ranks[abs_diffs[k][1]] = avg_rank
+      i = j
+    # Sum of positive and negative ranks
+    w_plus = sum(ranks[i] for i in range(n_pairs) if diffs[i] > 0)
+    w_minus = sum(ranks[i] for i in range(n_pairs) if diffs[i] < 0)
+    t_stat = min(w_plus, w_minus)
+    # Normal approximation with continuity correction
+    mu = n_pairs * (n_pairs + 1) / 4.0
+    # Tie correction for variance
+    tie_correction = 0.0
+    abs_vals_sorted = sorted(abs(d) for d in diffs)
+    while i < n_pairs:
         j = i + 1
         while j < n_pairs and abs_diffs[j][0] == abs_diffs[i][0]:
-            j += 1
-        avg_rank = sum(range(i + 1, j + 1)) / (j - i)
-        for k in range(i, j):
-            ranks[abs_diffs[k][1]] = avg_rank
+          j += 1
+        t = j - i
+        if t > 1:
+          tie_correction += (t ** 3 - t)
         i = j
     # Sum of positive and negative ranks
     w_plus = sum(ranks[i] for i in range(n_pairs) if diffs[i] > 0)
@@ -895,6 +1045,283 @@ def wilcoxon_signed_rank(pre: list[float], post: list[float]) -> dict[str, float
         z = 0.0
     p_value = 2.0 * (1.0 - _normal_cdf(z))
     return {'T': t_stat, 'p': min(p_value, 1.0), 'n_pairs': n_pairs}
+
+
+def benjamini_hochberg(p_values: list[float | None]) -> list[float | None]:
+    """Apply Benjamini-Hochberg FDR correction to a list of p-values.
+
+    Returns adjusted p-values in the same order. None entries are preserved.
+    """
+    indexed = [(i, p) for i, p in enumerate(p_values) if p is not None]
+    if not indexed:
+        return list(p_values)
+    indexed.sort(key=lambda x: x[1])
+    m = len(indexed)
+    adjusted = [0.0] * m
+    for rank_idx, (original_idx, p) in enumerate(indexed):
+        adjusted[rank_idx] = p * m / (rank_idx + 1)
+    # Enforce monotonicity (step-up): walk backwards, carry forward the minimum
+    for k in range(m - 2, -1, -1):
+        adjusted[k] = min(adjusted[k], adjusted[k + 1])
+    result: list[float | None] = [None] * len(p_values)
+    for rank_idx, (original_idx, _p) in enumerate(indexed):
+        result[original_idx] = min(adjusted[rank_idx], 1.0)
+    return result
+
+
+def bootstrap_cliffs_delta_ci(
+    group_a: list[float],
+    group_b: list[float],
+    n_boot: int = 2000,
+    alpha: float = 0.05,
+) -> dict[str, float | None]:
+    """Bootstrap 95% CI for Cliff's delta."""
+    if len(group_a) < 2 or len(group_b) < 2:
+        return {'ci_lower': None, 'ci_upper': None}
+    rng = random.Random(42)
+    deltas: list[float] = []
+    for _ in range(n_boot):
+        boot_a = [group_a[rng.randint(0, len(group_a) - 1)] for _ in range(len(group_a))]
+        boot_b = [group_b[rng.randint(0, len(group_b) - 1)] for _ in range(len(group_b))]
+        d = cliffs_delta(boot_a, boot_b)
+        if d is not None:
+            deltas.append(d)
+    if not deltas:
+        return {'ci_lower': None, 'ci_upper': None}
+    deltas.sort()
+    lo_idx = max(0, int(math.floor((alpha / 2) * len(deltas))))
+    hi_idx = min(len(deltas) - 1, int(math.floor((1 - alpha / 2) * len(deltas))))
+    return {'ci_lower': deltas[lo_idx], 'ci_upper': deltas[hi_idx]}
+
+
+def spearman_rho(x_values: list[float], y_values: list[float]) -> dict[str, float | None]:
+    """Spearman rank correlation with two-sided p-value (t-approximation)."""
+    n = len(x_values)
+    if n < 3 or len(y_values) != n:
+        return {'rho': None, 'p': None, 'n': n if n == len(y_values) else 0}
+
+    def _rank(vals: list[float]) -> list[float]:
+        indexed = sorted(range(len(vals)), key=lambda i: vals[i])
+        ranks = [0.0] * len(vals)
+        i = 0
+        while i < len(vals):
+            j = i + 1
+            while j < len(vals) and vals[indexed[j]] == vals[indexed[i]]:
+                j += 1
+            avg_rank = sum(range(i + 1, j + 1)) / (j - i)
+            for k in range(i, j):
+                ranks[indexed[k]] = avg_rank
+            i = j
+        return ranks
+
+    rx = _rank(x_values)
+    ry = _rank(y_values)
+    mean_rx = sum(rx) / n
+    mean_ry = sum(ry) / n
+    cov = sum((rx[i] - mean_rx) * (ry[i] - mean_ry) for i in range(n))
+    sd_x = math.sqrt(sum((rx[i] - mean_rx) ** 2 for i in range(n)))
+    sd_y = math.sqrt(sum((ry[i] - mean_ry) ** 2 for i in range(n)))
+    if sd_x == 0 or sd_y == 0:
+        return {'rho': 0.0, 'p': 1.0, 'n': n}
+    rho = cov / (sd_x * sd_y)
+    # t-approximation for p-value
+    t_stat = rho * math.sqrt((n - 2) / (1 - rho ** 2)) if abs(rho) < 1.0 else float('inf')
+    # Two-sided p from t-distribution approximation using normal for simplicity
+    df = n - 2
+    if df <= 0:
+        return {'rho': rho, 'p': 1.0, 'n': n}
+    # Use regularized incomplete beta for t-distribution CDF
+    x_val = df / (df + t_stat ** 2)
+    p_value = _regularized_incomplete_beta(df / 2.0, 0.5, x_val) if abs(t_stat) < float('inf') else 0.0
+    return {'rho': rho, 'p': min(p_value, 1.0), 'n': n}
+
+
+def _regularized_incomplete_beta(a: float, b: float, x: float) -> float:
+    """Approximate regularized incomplete beta function I_x(a, b) via continued fraction.
+
+    Used for t-distribution p-value computation.
+    """
+    if x <= 0.0:
+        return 0.0
+    if x >= 1.0:
+        return 1.0
+    # Use Lentz's continued fraction for better convergence
+    # For the t-distribution two-tailed p-value: p = I_x(df/2, 1/2)
+    # where x = df / (df + t^2)
+    max_iter = 200
+    tiny = 1e-30
+    front = math.exp(
+        math.lgamma(a + b) - math.lgamma(a) - math.lgamma(b)
+        + a * math.log(x) + b * math.log(1.0 - x)
+    ) / a
+
+    # Use continued fraction (Lentz's method)
+    f = 1.0
+    c = 1.0
+    d = 1.0 - (a + b) * x / (a + 1.0)
+    if abs(d) < tiny:
+        d = tiny
+    d = 1.0 / d
+    f = d
+
+    for m in range(1, max_iter + 1):
+        # Even step
+        numerator = m * (b - m) * x / ((a + 2 * m - 1) * (a + 2 * m))
+        d = 1.0 + numerator * d
+        if abs(d) < tiny:
+            d = tiny
+        c = 1.0 + numerator / c
+        if abs(c) < tiny:
+            c = tiny
+        d = 1.0 / d
+        f *= c * d
+
+        # Odd step
+        numerator = -(a + m) * (a + b + m) * x / ((a + 2 * m) * (a + 2 * m + 1))
+        d = 1.0 + numerator * d
+        if abs(d) < tiny:
+            d = tiny
+        c = 1.0 + numerator / c
+        if abs(c) < tiny:
+            c = tiny
+        d = 1.0 / d
+        delta = c * d
+        f *= delta
+
+        if abs(delta - 1.0) < 1e-10:
+            break
+
+    return front * f
+
+
+def friedman_test(groups_data: list[list[float]]) -> dict[str, float | None]:
+    """Friedman test for k related samples (non-parametric repeated measures).
+
+    Input: list of k lists, each of length n (same participants in each condition).
+    Returns {'chi2': test statistic, 'p': p-value, 'k': number of conditions, 'n': number of subjects}.
+    """
+    k = len(groups_data)
+    if k < 2:
+        return {'chi2': None, 'p': None, 'k': k, 'n': 0}
+    n = len(groups_data[0])
+    if n < 2 or any(len(g) != n for g in groups_data):
+        return {'chi2': None, 'p': None, 'k': k, 'n': n}
+
+    # Rank within each subject (row)
+    rank_sums = [0.0] * k
+    for subject_idx in range(n):
+        values = [(groups_data[cond][subject_idx], cond) for cond in range(k)]
+        values.sort(key=lambda x: x[0])
+        # Assign average ranks for ties
+        ranks = [0.0] * k
+        i = 0
+        while i < k:
+            j = i + 1
+            while j < k and values[j][0] == values[i][0]:
+                j += 1
+            avg_rank = sum(range(i + 1, j + 1)) / (j - i)
+            for m in range(i, j):
+                ranks[values[m][1]] = avg_rank
+            i = j
+        for cond in range(k):
+            rank_sums[cond] += ranks[cond]
+
+    mean_rank = (k + 1) / 2.0
+    ss = sum((rs / n - mean_rank) ** 2 for rs in rank_sums)
+    chi2 = (12.0 * n / (k * (k + 1))) * ss
+
+    # p-value from chi-squared distribution with k-1 degrees of freedom
+    df = k - 1
+    p_value = 1.0 - _chi2_cdf(chi2, df)
+    return {'chi2': chi2, 'p': p_value, 'k': k, 'n': n}
+
+
+def _chi2_cdf(x: float, df: int) -> float:
+    """Chi-squared CDF using regularized lower incomplete gamma function."""
+    if x <= 0:
+        return 0.0
+    return _lower_incomplete_gamma_regularized(df / 2.0, x / 2.0)
+
+
+def _lower_incomplete_gamma_regularized(a: float, x: float) -> float:
+    """Regularized lower incomplete gamma function P(a, x) via series expansion."""
+    if x <= 0:
+        return 0.0
+    if x < a + 1:
+        # Series expansion
+        term = 1.0 / a
+        total = term
+        for n in range(1, 300):
+            term *= x / (a + n)
+            total += term
+            if abs(term) < abs(total) * 1e-12:
+                break
+        return total * math.exp(-x + a * math.log(x) - math.lgamma(a))
+    else:
+        # Continued fraction (upper gamma, then subtract)
+        f = 1.0
+        c = 1.0
+        d = x - a + 1.0
+        if abs(d) < 1e-30:
+            d = 1e-30
+        d = 1.0 / d
+        f = d
+        for n in range(1, 300):
+            an = -n * (n - a)
+            bn = x - a + 1.0 + 2.0 * n
+            d = bn + an * d
+            if abs(d) < 1e-30:
+                d = 1e-30
+            c = bn + an / c
+            if abs(c) < 1e-30:
+                c = 1e-30
+            d = 1.0 / d
+            delta = c * d
+            f *= delta
+            if abs(delta - 1.0) < 1e-12:
+                break
+        upper = math.exp(-x + a * math.log(x) - math.lgamma(a)) * f
+        return 1.0 - upper
+
+
+def fisher_exact_2x2(table: list[list[int]]) -> dict[str, float | None]:
+    """Fisher's exact test for a 2x2 contingency table.
+
+    table = [[a, b], [c, d]]
+    Returns {'odds_ratio': OR, 'p': two-sided p-value}.
+    """
+    a, b = table[0]
+    c, d = table[1]
+    n = a + b + c + d
+    if n == 0:
+        return {'odds_ratio': None, 'p': None}
+
+    def _hypergeom_pmf(k: int, n_total: int, K: int, n_draw: int) -> float:
+        """P(X = k) for hypergeometric distribution."""
+        if k < max(0, n_draw - (n_total - K)) or k > min(n_draw, K):
+            return 0.0
+        log_p = (
+            math.lgamma(K + 1) - math.lgamma(k + 1) - math.lgamma(K - k + 1)
+            + math.lgamma(n_total - K + 1) - math.lgamma(n_draw - k + 1) - math.lgamma(n_total - K - n_draw + k + 1)
+            - math.lgamma(n_total + 1) + math.lgamma(n_draw + 1) + math.lgamma(n_total - n_draw + 1)
+        )
+        return math.exp(log_p)
+
+    row1 = a + b
+    col1 = a + c
+    n_draw = row1
+    K = col1
+
+    observed_p = _hypergeom_pmf(a, n, K, n_draw)
+    # Two-sided: sum probabilities as extreme or more extreme than observed
+    p_value = 0.0
+    for k in range(max(0, n_draw - (n - K)), min(n_draw, K) + 1):
+        pk = _hypergeom_pmf(k, n, K, n_draw)
+        if pk <= observed_p * (1 + 1e-7):  # small tolerance for floating-point
+            p_value += pk
+
+    odds_ratio = (a * d) / (b * c) if b > 0 and c > 0 else None
+    return {'odds_ratio': odds_ratio, 'p': min(p_value, 1.0)}
 
 
 def summarize(values: list[float]) -> dict[str, float | int | None]:
@@ -967,6 +1394,419 @@ def build_report_ready_rows(test_rows: list[dict[str, Any]]) -> list[dict[str, s
             'Permutation p': format_number(row['permutation_p_value'], 4),
             'Mann-Whitney U p': format_number(row.get('mann_whitney_p'), 4),
             "Cliff's delta": format_number(row['cliffs_delta']),
+        })
+    return rows
+
+
+def build_participant_characteristics_rows(participant_rows: list[dict[str, Any]]) -> list[dict[str, str]]:
+    digital_rows = [row for row in participant_rows if str(row.get('allocation_group') or '').strip() == 'digital']
+    physical_rows = [row for row in participant_rows if str(row.get('allocation_group') or '').strip() == 'physical']
+
+    def summarize_values(rows: list[dict[str, Any]], key: str) -> dict[str, float | int | None]:
+        values = [float(row[key]) for row in rows if to_number(row.get(key)) is not None]
+        return summarize(values)
+
+    def mean_sd_with_n(rows: list[dict[str, Any]], key: str) -> str:
+        summary = summarize_values(rows, key)
+        text = format_mean_sd(summary['mean'], summary['sd'])
+        return f'{text} (n={summary["n"]})' if text != 'NA' else 'NA'
+
+    def median_iqr_with_n(rows: list[dict[str, Any]], key: str) -> str:
+        summary = summarize_values(rows, key)
+        text = format_median_iqr(summary['median'], summary['q1'], summary['q3'])
+        return f'{text} (n={summary["n"]})' if text != 'NA' else 'NA'
+
+    configs = [
+        {'label': 'Participants, n', 'kind': 'count'},
+        {'label': 'Age (years), mean ± SD', 'key': 'q1_age_years', 'kind': 'continuous'},
+        {'label': 'Digital literacy (1-5), median [Q1, Q3]', 'key': 'q6_digital_literacy', 'kind': 'ordinal'},
+        {'label': 'Confidence using digital guidance (1-5), median [Q1, Q3]', 'key': 'q7_digital_guidance', 'kind': 'ordinal'},
+        {'label': 'Confidence using physical guidance (1-5), median [Q1, Q3]', 'key': 'q8_physical_guidance', 'kind': 'ordinal'},
+        {'label': 'Problem-solving confidence (1-5), median [Q1, Q3]', 'key': 'q9_problem_solving', 'kind': 'ordinal'},
+    ]
+
+    rows: list[dict[str, str]] = []
+    for config in configs:
+        if config['kind'] == 'count':
+            rows.append({
+                'Characteristic': config['label'],
+                'Digital': str(len(digital_rows)),
+                'Physical': str(len(physical_rows)),
+                'Total': str(len(participant_rows)),
+            })
+            continue
+
+        key = str(config['key'])
+        formatter = mean_sd_with_n if config['kind'] == 'continuous' else median_iqr_with_n
+        rows.append({
+            'Characteristic': config['label'],
+            'Digital': formatter(digital_rows, key),
+            'Physical': formatter(physical_rows, key),
+            'Total': formatter(participant_rows, key),
+        })
+
+    return rows
+
+
+def build_baseline_equivalence_rows(participant_rows: list[dict[str, Any]]) -> list[dict[str, str]]:
+    """Test baseline equivalence between groups on demographics and pre-trial measures."""
+    digital_rows = [row for row in participant_rows if str(row.get('allocation_group') or '').strip() == 'digital']
+    physical_rows = [row for row in participant_rows if str(row.get('allocation_group') or '').strip() == 'physical']
+
+    characteristics = [
+        {'label': 'Age (years)', 'key': 'q1_age_years', 'test': 'mwu'},
+        {'label': 'Digital literacy (1-5)', 'key': 'q6_digital_literacy', 'test': 'mwu'},
+        {'label': 'Confidence: digital guidance (1-5)', 'key': 'q7_digital_guidance', 'test': 'mwu'},
+        {'label': 'Confidence: physical guidance (1-5)', 'key': 'q8_physical_guidance', 'test': 'mwu'},
+        {'label': 'Problem-solving confidence (1-5)', 'key': 'q9_problem_solving', 'test': 'mwu'},
+    ]
+
+    rows: list[dict[str, str]] = []
+    for char in characteristics:
+        d_vals = [float(r[char['key']]) for r in digital_rows if to_number(r.get(char['key'])) is not None]
+        p_vals = [float(r[char['key']]) for r in physical_rows if to_number(r.get(char['key'])) is not None]
+        d_summary = summarize(d_vals)
+        p_summary = summarize(p_vals)
+        mwu = mann_whitney_u(d_vals, p_vals)
+        rows.append({
+            'Characteristic': char['label'],
+            'Digital median [Q1, Q3]': format_median_iqr(d_summary['median'], d_summary['q1'], d_summary['q3']),
+            'Physical median [Q1, Q3]': format_median_iqr(p_summary['median'], p_summary['q1'], p_summary['q3']),
+            'Mann-Whitney U': format_number(mwu['U'], 1),
+            'p-value': format_number(mwu['p'], 4),
+        })
+    return rows
+
+
+def build_fdr_corrected_rows(test_rows: list[dict[str, Any]]) -> list[dict[str, str]]:
+    """Apply Benjamini-Hochberg FDR correction to primary p-values."""
+    p_values = [row.get('permutation_p_value') for row in test_rows]
+    adjusted = benjamini_hochberg(p_values)
+    rows: list[dict[str, str]] = []
+    for i, row in enumerate(test_rows):
+        rows.append({
+            'Outcome': str(row['label']),
+            'Raw p': format_number(row.get('permutation_p_value'), 4),
+            'BH-adjusted p': format_number(adjusted[i], 4),
+            'Significant (adj.)': 'Yes' if adjusted[i] is not None and adjusted[i] < 0.05 else 'No',
+        })
+    return rows
+
+
+def build_effect_size_ci_rows(test_rows: list[dict[str, Any]], digital_rows: list[dict[str, Any]], physical_rows: list[dict[str, Any]], outcomes: list[dict[str, str]]) -> list[dict[str, str]]:
+    """Bootstrap 95% CIs for Cliff's delta for each outcome."""
+    rows: list[dict[str, str]] = []
+    for outcome, test_row in zip(outcomes, test_rows):
+        d_vals = [float(r[outcome['key']]) for r in digital_rows if to_number(r.get(outcome['key'])) is not None]
+        p_vals = [float(r[outcome['key']]) for r in physical_rows if to_number(r.get(outcome['key'])) is not None]
+        ci = bootstrap_cliffs_delta_ci(d_vals, p_vals)
+        rows.append({
+            'Outcome': str(test_row['label']),
+            "Cliff's delta": format_number(test_row['cliffs_delta']),
+            '95% CI lower': format_number(ci['ci_lower']),
+            '95% CI upper': format_number(ci['ci_upper']),
+        })
+    return rows
+
+
+def build_learning_effects_rows(task_rows: list[dict[str, Any]]) -> list[dict[str, str]]:
+    """Friedman test for learning effects across scenarios within each group."""
+    scenario_ids = ['scenario_card_1', 'scenario_card_2', 'scenario_card_3']
+    groups = ['digital', 'physical']
+    metric_key = 'task_total_duration_seconds'
+    rows: list[dict[str, str]] = []
+
+    for group in groups:
+        # Build participant × scenario matrix (only participants with all 3 scenarios)
+        group_tasks = [r for r in task_rows if str(r.get('allocation_group') or '').strip() == group and str(r.get('task_id') or '') in scenario_ids]
+        by_participant: dict[str, dict[str, float]] = {}
+        for r in group_tasks:
+            pid = str(r.get('participant_id') or '').strip()
+            tid = str(r.get('task_id') or '').strip()
+            val = to_number(r.get(metric_key))
+            if pid and tid and val is not None:
+                by_participant.setdefault(pid, {})[tid] = float(val)
+
+        # Keep only participants with all 3 scenarios
+        complete = {pid: vals for pid, vals in by_participant.items() if all(sid in vals for sid in scenario_ids)}
+        if len(complete) < 2:
+            rows.append({
+                'Group': group.title(),
+                'Metric': 'Scenario duration (s)',
+                'n (complete)': str(len(complete)),
+                'Sc1 median': 'NA',
+                'Sc2 median': 'NA',
+                'Sc3 median': 'NA',
+                'Friedman chi2': 'NA',
+                'p-value': 'NA',
+            })
+            continue
+
+        scenario_data = [[complete[pid][sid] for pid in sorted(complete)] for sid in scenario_ids]
+        medians = [format_number(median(sd), 1) for sd in scenario_data]
+        result = friedman_test(scenario_data)
+        rows.append({
+            'Group': group.title(),
+            'Metric': 'Scenario duration (s)',
+            'n (complete)': str(result['n']),
+            'Sc1 median': medians[0],
+            'Sc2 median': medians[1],
+            'Sc3 median': medians[2],
+            'Friedman chi2': format_number(result['chi2']),
+            'p-value': format_number(result['p'], 4),
+        })
+
+    return rows
+
+
+def build_completion_rate_rows(task_rows: list[dict[str, Any]]) -> list[dict[str, str]]:
+    """Fisher's exact test comparing full completion (score=2) rates between groups by scenario."""
+    scenario_ids = ['scenario_card_1', 'scenario_card_2', 'scenario_card_3']
+    rows: list[dict[str, str]] = []
+
+    for sid in scenario_ids:
+        scenario_tasks = [r for r in task_rows if str(r.get('task_id') or '') == sid and to_number(r.get('scenario_score')) is not None]
+        digital_tasks = [r for r in scenario_tasks if str(r.get('allocation_group') or '') == 'digital']
+        physical_tasks = [r for r in scenario_tasks if str(r.get('allocation_group') or '') == 'physical']
+
+        d_full = sum(1 for r in digital_tasks if float(r['scenario_score']) == 2)
+        d_other = len(digital_tasks) - d_full
+        p_full = sum(1 for r in physical_tasks if float(r['scenario_score']) == 2)
+        p_other = len(physical_tasks) - p_full
+
+        table = [[d_full, d_other], [p_full, p_other]]
+        result = fisher_exact_2x2(table)
+        d_pct = f"{100 * d_full / len(digital_tasks):.0f}%" if digital_tasks else 'NA'
+        p_pct = f"{100 * p_full / len(physical_tasks):.0f}%" if physical_tasks else 'NA'
+
+        label = f"Scenario {sid.removeprefix('scenario_card_')}"
+        rows.append({
+            'Scenario': label,
+            'Digital full (n)': f"{d_full}/{len(digital_tasks)} ({d_pct})",
+            'Physical full (n)': f"{p_full}/{len(physical_tasks)} ({p_pct})",
+            'Odds ratio': format_number(result['odds_ratio']),
+            "Fisher's p": format_number(result['p'], 4),
+        })
+
+    # Overall across all scenarios
+    all_digital = [r for r in task_rows if r.get('task_id', '').startswith('scenario_card_') and str(r.get('allocation_group') or '') == 'digital' and to_number(r.get('scenario_score')) is not None]
+    all_physical = [r for r in task_rows if r.get('task_id', '').startswith('scenario_card_') and str(r.get('allocation_group') or '') == 'physical' and to_number(r.get('scenario_score')) is not None]
+    d_full_all = sum(1 for r in all_digital if float(r['scenario_score']) == 2)
+    p_full_all = sum(1 for r in all_physical if float(r['scenario_score']) == 2)
+    table_all = [[d_full_all, len(all_digital) - d_full_all], [p_full_all, len(all_physical) - p_full_all]]
+    result_all = fisher_exact_2x2(table_all)
+    d_pct_all = f"{100 * d_full_all / len(all_digital):.0f}%" if all_digital else 'NA'
+    p_pct_all = f"{100 * p_full_all / len(all_physical):.0f}%" if all_physical else 'NA'
+    rows.append({
+        'Scenario': 'All scenarios',
+        'Digital full (n)': f"{d_full_all}/{len(all_digital)} ({d_pct_all})",
+        'Physical full (n)': f"{p_full_all}/{len(all_physical)} ({p_pct_all})",
+        'Odds ratio': format_number(result_all['odds_ratio']),
+        "Fisher's p": format_number(result_all['p'], 4),
+    })
+
+    return rows
+
+
+def build_format_preference_shift_rows(participant_rows: list[dict[str, Any]]) -> list[dict[str, str]]:
+    """Tabulate pre→post format preference shifts by group."""
+    groups: dict[str, list[tuple[str, str]]] = {}
+    for row in participant_rows:
+        pre_pref = normalize_text(row.get('pre_format_preference'))
+        post_pref = normalize_text(row.get('post_format_preference'))
+        if pre_pref is None or post_pref is None:
+            continue
+        group = str(row.get('allocation_group') or 'unknown').strip()
+        groups.setdefault(group, []).append((pre_pref.lower(), post_pref.lower()))
+
+    rows: list[dict[str, str]] = []
+    for group_name in ('digital', 'physical'):
+        pairs = groups.get(group_name, [])
+        n = len(pairs)
+        same = sum(1 for pre, post in pairs if pre == post)
+        changed = n - same
+        rows.append({
+            'Group': group_name.title(),
+            'n': str(n),
+            'Same preference': str(same),
+            'Changed preference': str(changed),
+            '% changed': f"{100 * changed / n:.0f}%" if n > 0 else 'NA',
+        })
+
+    # Breakdown of shifts
+    for group_name in ('digital', 'physical'):
+        pairs = groups.get(group_name, [])
+        shift_counts: dict[str, int] = {}
+        for pre, post in pairs:
+            if pre != post:
+                key = f"{pre} → {post}"
+                shift_counts[key] = shift_counts.get(key, 0) + 1
+        for shift, count in sorted(shift_counts.items(), key=lambda x: -x[1]):
+            rows.append({
+                'Group': f"  {group_name.title()} shift",
+                'n': str(count),
+                'Same preference': '',
+                'Changed preference': shift,
+                '% changed': '',
+            })
+
+    return rows
+
+
+def build_chat_impact_rows(task_rows: list[dict[str, Any]], participant_rows: list[dict[str, Any]]) -> list[dict[str, str]]:
+    """Compare outcomes for chat-users vs non-chat-users within the digital group."""
+    digital_pids = {
+        str(r.get('participant_id') or '').strip()
+        for r in participant_rows
+        if str(r.get('allocation_group') or '') == 'digital'
+    }
+
+    # Classify participants by whether they ever used chat
+    chat_pids: set[str] = set()
+    for r in task_rows:
+        pid = str(r.get('participant_id') or '').strip()
+        if pid in digital_pids and r.get('chat_used_flag'):
+            chat_pids.add(pid)
+    no_chat_pids = digital_pids - chat_pids
+
+    digital_participants = [r for r in participant_rows if str(r.get('participant_id') or '').strip() in digital_pids]
+    chat_participants = [r for r in digital_participants if str(r.get('participant_id') or '').strip() in chat_pids]
+    no_chat_participants = [r for r in digital_participants if str(r.get('participant_id') or '').strip() in no_chat_pids]
+
+    metrics = [
+        {'label': 'Scenario total time (s)', 'key': 'scenario_total_time_seconds'},
+        {'label': 'Scenario average score', 'key': 'scenario_avg_score'},
+        {'label': 'Scenario error count', 'key': 'scenario_error_count'},
+        {'label': 'Short-form proportion accuracy', 'key': 'short_form_proportion_accuracy'},
+        {'label': 'Short-form avg duration (s)', 'key': 'short_form_avg_duration_seconds'},
+    ]
+
+    rows: list[dict[str, str]] = []
+    rows.append({
+        'Metric': 'Participants, n',
+        'Chat users': str(len(chat_participants)),
+        'Chat users median [Q1, Q3]': '',
+        'Non-chat users': str(len(no_chat_participants)),
+        'Non-chat median [Q1, Q3]': '',
+        'Mann-Whitney U': '',
+        'p-value': '',
+        "Cliff's delta": '',
+    })
+
+    for metric in metrics:
+        chat_vals = [float(r[metric['key']]) for r in chat_participants if to_number(r.get(metric['key'])) is not None]
+        no_chat_vals = [float(r[metric['key']]) for r in no_chat_participants if to_number(r.get(metric['key'])) is not None]
+        chat_summary = summarize(chat_vals)
+        no_chat_summary = summarize(no_chat_vals)
+        mwu = mann_whitney_u(chat_vals, no_chat_vals)
+        delta = cliffs_delta(chat_vals, no_chat_vals)
+        rows.append({
+            'Metric': metric['label'],
+            'Chat users': str(chat_summary['n']),
+            'Chat users median [Q1, Q3]': format_median_iqr(chat_summary['median'], chat_summary['q1'], chat_summary['q3']),
+            'Non-chat users': str(no_chat_summary['n']),
+            'Non-chat median [Q1, Q3]': format_median_iqr(no_chat_summary['median'], no_chat_summary['q1'], no_chat_summary['q3']),
+            'Mann-Whitney U': format_number(mwu['U'], 1),
+            'p-value': format_number(mwu['p'], 4),
+            "Cliff's delta": format_number(delta),
+        })
+
+    return rows
+
+
+def build_navigation_correlation_rows(pathway_instance_rows: list[dict[str, Any]], task_rows: list[dict[str, Any]]) -> list[dict[str, str]]:
+    """Spearman correlations between navigation metrics and performance within digital group."""
+    # Build lookup: (participant_id, task_id) -> pathway metrics
+    pathway_by_key: dict[tuple[str, str], dict[str, Any]] = {}
+    for r in pathway_instance_rows:
+        pid = str(r.get('participant_id') or '').strip()
+        tid = str(r.get('task_id') or '').strip()
+        if pid and tid:
+            pathway_by_key[(pid, tid)] = r
+
+    scenario_task_rows = [
+        r for r in task_rows
+        if str(r.get('task_id') or '').startswith('scenario_card_')
+        and str(r.get('allocation_group') or '') == 'digital'
+    ]
+
+    correlations = [
+        {'nav_key': 'unique_page_count', 'perf_key': 'task_total_duration_seconds', 'label': 'Unique pages vs duration'},
+        {'nav_key': 'transition_count', 'perf_key': 'task_total_duration_seconds', 'label': 'Transitions vs duration'},
+        {'nav_key': 'backtrack_count', 'perf_key': 'task_total_duration_seconds', 'label': 'Backtracks vs duration'},
+        {'nav_key': 'unique_page_count', 'perf_key': 'scenario_score', 'label': 'Unique pages vs score'},
+        {'nav_key': 'backtrack_count', 'perf_key': 'scenario_score', 'label': 'Backtracks vs score'},
+    ]
+
+    rows: list[dict[str, str]] = []
+    for corr in correlations:
+        nav_vals: list[float] = []
+        perf_vals: list[float] = []
+        for r in scenario_task_rows:
+            pid = str(r.get('participant_id') or '').strip()
+            tid = str(r.get('task_id') or '').strip()
+            pathway = pathway_by_key.get((pid, tid))
+            if pathway is None:
+                continue
+            nav_val = to_number(pathway.get(corr['nav_key']))
+            perf_val = to_number(r.get(corr['perf_key']))
+            if nav_val is not None and perf_val is not None:
+                nav_vals.append(float(nav_val))
+                perf_vals.append(float(perf_val))
+
+        result = spearman_rho(nav_vals, perf_vals)
+        rows.append({
+            'Correlation': corr['label'],
+            'n': str(result['n']),
+            "Spearman's rho": format_number(result['rho']),
+            'p-value': format_number(result['p'], 4),
+        })
+
+    return rows
+
+
+def build_power_analysis_rows(test_rows: list[dict[str, Any]], n_digital: int, n_physical: int) -> list[dict[str, str]]:
+    """Post-hoc sensitivity analysis: minimum detectable Cliff's delta at 80% power."""
+    # For Mann-Whitney / permutation approaches, power is approximately:
+    # Given n1, n2, alpha=0.05 two-sided, the minimum detectable delta
+    # from a normal approximation of the MWU statistic.
+    # P(reject H0) = Phi(z_observed - z_alpha/2) where
+    # z_observed = delta * sqrt(n1*n2 / (n1+n2+1)) / sqrt(1/12 * (1 + ... ))
+    # Simplified: use the relationship that for 80% power, we need z ≈ 2.8
+    # delta_min ≈ 2.8 * sqrt((n1+n2+1)/(3*n1*n2))
+    # This is approximate but gives a useful indicative value.
+    n1 = n_digital
+    n2 = n_physical
+    rows: list[dict[str, str]] = []
+    if n1 >= 2 and n2 >= 2:
+        # z_alpha/2 (two-sided 0.05) = 1.96, z_beta (80% power) = 0.842
+        z_total = 1.96 + 0.842  # 2.802
+        delta_min = z_total * math.sqrt((n1 + n2 + 1) / (3 * n1 * n2))
+        delta_min = min(delta_min, 1.0)  # cap at 1.0 (maximum Cliff's delta)
+        strength = describe_cliffs_delta_strength(delta_min)
+        rows.append({
+            'Parameter': 'Digital group n',
+            'Value': str(n1),
+        })
+        rows.append({
+            'Parameter': 'Physical group n',
+            'Value': str(n2),
+        })
+        rows.append({
+            'Parameter': 'Alpha (two-sided)',
+            'Value': '0.05',
+        })
+        rows.append({
+            'Parameter': 'Target power',
+            'Value': '0.80',
+        })
+        rows.append({
+            'Parameter': "Minimum detectable |Cliff's delta|",
+            'Value': f"{format_number(delta_min)} ({strength})",
+        })
+        rows.append({
+            'Parameter': 'Interpretation',
+            'Value': f"This study can reliably detect {strength} or larger effects at 80% power.",
         })
     return rows
 
@@ -1132,6 +1972,81 @@ def build_task_summary_markdown_rows(task_summary_rows: list[dict[str, Any]]) ->
             'Short-form accuracy mean ± SD': format_mean_sd(row['short_form_accuracy_mean'], row['short_form_accuracy_sd']),
         })
     return rows
+
+
+def format_pathway_sequence(page_pathway: str, max_length: int = 92) -> str:
+    pages = [format_page_node_label(page.strip()) for page in str(page_pathway or '').split('||') if page.strip()]
+    if not pages:
+        return 'NA'
+    return shorten_label(' -> '.join(pages), max_length)
+
+
+def build_pathway_summary_rows(pathway_instance_rows: list[dict[str, Any]], task_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    task_lookup = {
+        (
+            str(row.get('participant_id') or '').strip(),
+            str(row.get('task_id') or '').strip(),
+            int(to_number(row.get('task_instance_seq')) or 0),
+        ): row
+        for row in task_rows
+    }
+
+    grouped: dict[tuple[str, str], list[dict[str, Any]]] = {}
+    for row in pathway_instance_rows:
+        task_id = str(row.get('task_id') or '').strip()
+        task_label = str(row.get('task_label') or '').strip()
+        if not task_id:
+            continue
+        grouped.setdefault((task_id, task_label), []).append(row)
+
+    summary_rows: list[dict[str, Any]] = []
+    for (task_id, task_label), rows in sorted(grouped.items(), key=lambda item: sort_task_ids(item[0][0])):
+        unique_page_values = [float(row['unique_page_count']) for row in rows if to_number(row.get('unique_page_count')) is not None]
+        transition_values = [float(row['transition_count']) for row in rows if to_number(row.get('transition_count')) is not None]
+        backtrack_instance_count = sum(1 for row in rows if (to_number(row.get('backtrack_count')) or 0) > 0)
+        pathway_counter: dict[str, int] = {}
+        chat_used_count = 0
+        chat_primary_count = 0
+
+        for row in rows:
+            pathway = str(row.get('page_pathway') or '').strip()
+            if pathway:
+                pathway_counter[pathway] = pathway_counter.get(pathway, 0) + 1
+
+            lookup_key = (
+                str(row.get('participant_id') or '').strip(),
+                task_id,
+                int(to_number(row.get('task_instance_seq')) or 0),
+            )
+            task_metrics = task_lookup.get(lookup_key, {})
+            if int(to_number(task_metrics.get('chat_used_flag')) or 0) == 1:
+                chat_used_count += 1
+            if int(to_number(task_metrics.get('chat_primary_flag')) or 0) == 1:
+                chat_primary_count += 1
+
+        top_pathway = 'NA'
+        top_pathway_count = 0
+        if pathway_counter:
+            top_pathway, top_pathway_count = max(pathway_counter.items(), key=lambda item: (item[1], item[0]))
+
+        row_count = len(rows)
+        unique_page_mean = sum(unique_page_values) / len(unique_page_values) if unique_page_values else None
+        transition_mean = sum(transition_values) / len(transition_values) if transition_values else None
+
+        summary_rows.append({
+            'Task': build_task_axis_label(task_id, task_label),
+            'Task ID': task_id,
+            'n': row_count,
+            'Avg unique pages': format_number(unique_page_mean),
+            'Avg transitions': format_number(transition_mean),
+            'Backtracking %': format_number((backtrack_instance_count / row_count * 100.0) if row_count else None),
+            'Most common pathway': format_pathway_sequence(top_pathway),
+            'Top pathway %': format_number((top_pathway_count / row_count * 100.0) if row_count else None),
+            'Chat used %': format_number((chat_used_count / row_count * 100.0) if row_count else None),
+            'Chat primary %': format_number((chat_primary_count / row_count * 100.0) if row_count else None),
+        })
+
+    return summary_rows
 
 
 def build_prepost_participant_rows(participant_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -1869,6 +2784,83 @@ def create_group_distribution_figure(rows: list[dict[str, Any]], key: str, title
     return fig
 
 
+def is_clean_scenario_task(row: dict[str, Any]) -> bool:
+  task_id = str(row.get('task_id') or '').strip()
+  if not task_id.startswith('scenario_card_'):
+    return False
+
+  scenario_score = to_number(row.get('scenario_score'))
+  return scenario_score is not None and float(scenario_score) == 2.0
+
+
+def is_clean_short_form_task(row: dict[str, Any]) -> bool:
+  task_id = str(row.get('task_id') or '').strip()
+  if not task_id.startswith('short_form_q'):
+    return False
+
+  binary_accuracy = to_number(row.get('short_form_binary_accuracy'))
+  error_count = to_number(row.get('error_count'))
+
+  return (
+    binary_accuracy is not None
+    and float(binary_accuracy) >= 1.0
+    and float(error_count or 0) == 0.0
+  )
+
+
+def build_clean_scenario_total_rows(task_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+  scenario_task_ids = sorted(
+    {
+      str(row.get('task_id') or '').strip()
+      for row in task_rows
+      if str(row.get('task_id') or '').strip().startswith('scenario_card_')
+    },
+    key=sort_task_ids,
+  )
+  if not scenario_task_ids:
+    return []
+
+  participants: dict[str, dict[str, Any]] = {}
+  for row in task_rows:
+    participant_id = str(row.get('participant_id') or '').strip()
+    task_id = str(row.get('task_id') or '').strip()
+    if not participant_id or task_id not in scenario_task_ids:
+      continue
+
+    entry = participants.setdefault(participant_id, {
+      'participant_id': participant_id,
+      'allocation_group': str(row.get('allocation_group') or '').strip(),
+      'tasks': {},
+    })
+    entry['tasks'][task_id] = row
+
+  cleaned_rows: list[dict[str, Any]] = []
+  for participant_id, entry in participants.items():
+    group_name = str(entry.get('allocation_group') or '').strip()
+    if group_name not in {'digital', 'physical'}:
+      continue
+
+    participant_tasks = entry['tasks']
+    if any(task_id not in participant_tasks for task_id in scenario_task_ids):
+      continue
+
+    ordered_rows = [participant_tasks[task_id] for task_id in scenario_task_ids]
+    if not all(is_clean_scenario_task(row) for row in ordered_rows):
+      continue
+
+    durations = [to_number(row.get('task_total_duration_seconds')) for row in ordered_rows]
+    if any(duration is None for duration in durations):
+      continue
+
+    cleaned_rows.append({
+      'participant_id': participant_id,
+      'allocation_group': group_name,
+      'clean_scenario_total_time_seconds': float(sum(float(duration) for duration in durations if duration is not None)),
+    })
+
+  return cleaned_rows
+
+
 def create_digital_trait_scatter_figure(
   participant_rows: list[dict[str, Any]],
   x_key: str,
@@ -1916,6 +2908,13 @@ def create_digital_trait_scatter_figure(
       line_x = [x_min, x_max]
       line_y = [(slope * value) + intercept for value in line_x]
       ax.plot(line_x, line_y, color='#0f172a', linewidth=1.6, linestyle='--', alpha=0.8, zorder=2)
+
+  # Add Spearman rho annotation
+  if len(x_values) >= 3:
+    rho_result = spearman_rho(x_values, y_values)
+    if rho_result['rho'] is not None:
+      rho_text = f"\u03C1 = {rho_result['rho']:.3f}, p = {rho_result['p']:.4f}, n = {rho_result['n']}"
+      ax.text(0.02, 0.02, rho_text, transform=ax.transAxes, fontsize=9, color='#475569', verticalalignment='bottom')
 
   y_span = max(y_values) - min(y_values)
   label_offset = max(3.0, y_span * 0.015)
@@ -2042,6 +3041,13 @@ def create_participant_metric_scatter_figure(
       line_y = [(slope * value) + intercept for value in line_x]
       ax.plot(line_x, line_y, color='#0f172a', linewidth=1.6, linestyle='--', alpha=0.8, zorder=2)
 
+  # Add Spearman rho annotation
+  if len(x_values) >= 3:
+    rho_result = spearman_rho(x_values, y_values)
+    if rho_result['rho'] is not None:
+      rho_text = f"\u03C1 = {rho_result['rho']:.3f}, p = {rho_result['p']:.4f}, n = {rho_result['n']}"
+      ax.text(0.02, 0.02, rho_text, transform=ax.transAxes, fontsize=9, color='#475569', verticalalignment='bottom')
+
   x_padding = max(0.25, (x_span * 0.08) if x_span > 0 else 0.5)
   ax.set_xlim(x_min - x_padding, x_max + x_padding)
   ax.set_title(title)
@@ -2055,84 +3061,251 @@ def create_participant_metric_scatter_figure(
 
 
 def create_task_duration_by_group_figure(task_rows: list[dict[str, Any]], task_prefix: str, duration_key: str, title: str, ylabel: str) -> Any | None:
-    groups = [('digital', '#2563eb'), ('physical', '#dc2626')]
-    grouped_tasks: dict[str, dict[str, Any]] = {}
+  groups = [('digital', '#2563eb'), ('physical', '#dc2626')]
+  grouped_tasks: dict[str, dict[str, Any]] = {}
+  outcome_markers = {
+    2.0: 'o',
+    1.0: '^',
+    0.0: 'x',
+  }
+  show_outcome_markers = task_prefix.startswith('scenario_card_')
+  show_chat_markers = True
 
-    for row in task_rows:
-        task_id = str(row.get('task_id') or '').strip()
-        group_name = str(row.get('allocation_group') or '').strip()
-        duration_value = to_number(row.get(duration_key))
-        if not task_id.startswith(task_prefix) or group_name not in {'digital', 'physical'} or duration_value is None:
-            continue
+  for row in task_rows:
+    task_id = str(row.get('task_id') or '').strip()
+    group_name = str(row.get('allocation_group') or '').strip()
+    duration_value = to_number(row.get(duration_key))
+    if not task_id.startswith(task_prefix) or group_name not in {'digital', 'physical'} or duration_value is None:
+      continue
 
-        task_entry = grouped_tasks.setdefault(task_id, {
-            'task_label': str(row.get('task_label') or '').strip(),
-            'digital': [],
-            'physical': [],
-        })
-        if not task_entry['task_label']:
-            task_entry['task_label'] = str(row.get('task_label') or '').strip()
-        task_entry[group_name].append(float(duration_value))
+    task_entry = grouped_tasks.setdefault(task_id, {
+      'task_label': str(row.get('task_label') or '').strip(),
+      'digital': [],
+      'physical': [],
+    })
+    if not task_entry['task_label']:
+      task_entry['task_label'] = str(row.get('task_label') or '').strip()
 
-    ordered_task_ids = [
-        task_id
-        for task_id in sorted(grouped_tasks.keys(), key=sort_task_ids)
-        if grouped_tasks[task_id]['digital'] or grouped_tasks[task_id]['physical']
+    marker = 'o'
+    if show_outcome_markers:
+      scenario_score = to_number(row.get('scenario_score'))
+      if scenario_score is not None:
+        marker = outcome_markers.get(float(scenario_score), 'o')
+
+    task_entry[group_name].append({
+      'duration': float(duration_value),
+      'marker': marker,
+      'chat_used': bool(to_number(row.get('chat_used_flag')) or 0),
+      'chat_primary': bool(to_number(row.get('chat_primary_flag')) or 0),
+    })
+
+  ordered_task_ids = [
+    task_id
+    for task_id in sorted(grouped_tasks.keys(), key=sort_task_ids)
+    if grouped_tasks[task_id]['digital'] or grouped_tasks[task_id]['physical']
+  ]
+  if not ordered_task_ids:
+    return None
+
+  fig_width = max(8.0, len(ordered_task_ids) * 2.4)
+  fig, ax = plt.subplots(figsize=(fig_width, 6))
+  box_values: list[list[float]] = []
+  box_positions: list[float] = []
+  box_colors: list[str] = []
+  point_groups: list[list[dict[str, Any]]] = []
+  tick_positions: list[float] = []
+  tick_labels: list[str] = []
+
+  for index, task_id in enumerate(ordered_task_ids, start=1):
+    task_entry = grouped_tasks[task_id]
+    tick_positions.append(float(index))
+    tick_labels.append(build_task_axis_label(task_id, str(task_entry['task_label'] or '')))
+    for offset, (group_name, color) in zip((-0.18, 0.18), groups):
+      points = list(task_entry[group_name])
+      if not points:
+        continue
+      box_values.append([point['duration'] for point in points])
+      box_positions.append(index + offset)
+      box_colors.append(color)
+      point_groups.append(points)
+
+  if not box_values:
+    plt.close(fig)
+    return None
+
+  bp = ax.boxplot(box_values, positions=box_positions, patch_artist=True, widths=0.28, showfliers=False)
+  for patch, color in zip(bp['boxes'], box_colors):
+    patch.set(facecolor=color, alpha=0.28, edgecolor=color, linewidth=1.5)
+  for whisker, color in zip(bp['whiskers'], [color for color in box_colors for _ in (0, 1)]):
+    whisker.set(color=color, linewidth=1.2)
+  for cap, color in zip(bp['caps'], [color for color in box_colors for _ in (0, 1)]):
+    cap.set(color=color, linewidth=1.2)
+  for median_line in bp['medians']:
+    median_line.set(color='#111827', linewidth=1.5)
+
+  rng = random.Random(42)
+  for position, values, color, points in zip(box_positions, box_values, box_colors, point_groups):
+    jitter = [position + rng.uniform(-0.045, 0.045) for _ in values]
+    marker_points: dict[tuple[str, int], dict[str, list[float]]] = {}
+    for x_value, point in zip(jitter, points):
+      chat_level = 2 if point['chat_primary'] else 1 if point['chat_used'] else 0
+      marker_entry = marker_points.setdefault((point['marker'], chat_level), {'x': [], 'y': []})
+      marker_entry['x'].append(x_value)
+      marker_entry['y'].append(point['duration'])
+
+    for (marker, chat_level), coords in marker_points.items():
+      if chat_level == 2:
+        marker_size = 40
+        edge_color = '#111827'
+        line_width = 1.1
+      elif chat_level == 1:
+        marker_size = 31
+        edge_color = '#111827'
+        line_width = 0.8
+      else:
+        marker_size = 24
+        edge_color = 'white'
+        line_width = 0.35
+
+      if marker == 'x':
+        ax.scatter(
+          coords['x'],
+          coords['y'],
+          color=color,
+          alpha=0.9,
+          marker=marker,
+          s=marker_size + 6,
+          linewidths=1.0 if chat_level == 0 else 1.4 if chat_level == 1 else 1.8,
+          zorder=3,
+        )
+      else:
+        ax.scatter(
+          coords['x'],
+          coords['y'],
+          color=color,
+          alpha=0.78,
+          marker=marker,
+          s=marker_size,
+          edgecolors=edge_color,
+          linewidths=line_width,
+          zorder=3,
+        )
+    ax.scatter([position], [sum(values) / len(values)], color='#111827', marker='D', s=40, zorder=4)
+
+  ax.set_xticks(tick_positions)
+  ax.set_xticklabels(tick_labels)
+  ax.set_title(title)
+  ax.set_ylabel(ylabel)
+  ax.grid(axis='y', linestyle=':', alpha=0.4)
+  ax.set_xlim(0.5, len(tick_positions) + 0.5)
+
+  group_legend_handles = [plt.Rectangle((0, 0), 1, 1, facecolor=color, edgecolor=color, alpha=0.28) for _, color in groups]
+  group_legend = ax.legend(group_legend_handles, [group_name.title() for group_name, _ in groups], frameon=False, loc='upper right')
+  ax.add_artist(group_legend)
+
+  has_chat_used = any(point['chat_used'] for points in point_groups for point in points)
+  has_chat_primary = any(point['chat_primary'] for points in point_groups for point in points)
+  if show_chat_markers and (has_chat_used or has_chat_primary):
+    chat_handles = []
+    chat_labels = []
+    if has_chat_used:
+      chat_handles.append(plt.Line2D([0], [0], color='#6b7280', marker='o', markerfacecolor='#9ca3af', markeredgecolor='#111827', linestyle='None', markersize=6, markeredgewidth=0.8))
+      chat_labels.append('Chat used')
+    if has_chat_primary:
+      chat_handles.append(plt.Line2D([0], [0], color='#6b7280', marker='o', markerfacecolor='#9ca3af', markeredgecolor='#111827', linestyle='None', markersize=8, markeredgewidth=1.1))
+      chat_labels.append('Chat primary')
+    chat_legend = ax.legend(chat_handles, chat_labels, frameon=False, loc='lower left')
+    ax.add_artist(chat_legend)
+
+  if show_outcome_markers:
+    outcome_handles = [
+      plt.Line2D([0], [0], color='#374151', marker='o', markerfacecolor='#374151', markeredgecolor='white', linestyle='None', markersize=6),
+      plt.Line2D([0], [0], color='#374151', marker='^', markerfacecolor='#374151', markeredgecolor='white', linestyle='None', markersize=6),
+      plt.Line2D([0], [0], color='#374151', marker='x', linestyle='None', markersize=6, markeredgewidth=1.0),
     ]
-    if not ordered_task_ids:
-        return None
+    ax.legend(outcome_handles, ['Full completion', 'Partial completion', 'Failure'], frameon=False, loc='upper left')
 
-    fig_width = max(8.0, len(ordered_task_ids) * 2.4)
-    fig, ax = plt.subplots(figsize=(fig_width, 6))
-    box_values: list[list[float]] = []
-    box_positions: list[float] = []
-    box_colors: list[str] = []
-    tick_positions: list[float] = []
-    tick_labels: list[str] = []
+  fig.tight_layout()
+  return fig
 
-    for index, task_id in enumerate(ordered_task_ids, start=1):
-        task_entry = grouped_tasks[task_id]
-        tick_positions.append(float(index))
-        tick_labels.append(build_task_axis_label(task_id, str(task_entry['task_label'] or '')))
-        for offset, (group_name, color) in zip((-0.18, 0.18), groups):
-            values = list(task_entry[group_name])
-            if not values:
-                continue
-            box_values.append(values)
-            box_positions.append(index + offset)
-            box_colors.append(color)
 
-    if not box_values:
-        plt.close(fig)
-        return None
+def create_transition_matrix_heatmaps(transition_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+  """Create a transition matrix heatmap per scenario task from the same data used by the Sankeys."""
+  grouped: dict[str, dict[str, Any]] = {}
+  for row in transition_rows:
+    task_id = str(row.get('task_id') or '').strip()
+    source_page = str(row.get('source_page') or '').strip()
+    target_page = str(row.get('target_page') or '').strip()
+    count = int(to_number(row.get('transition_count')) or 0)
+    if not task_id.startswith('scenario_card_') or not source_page or not target_page or count <= 0:
+      continue
+    entry = grouped.setdefault(task_id, {
+      'task_label': str(row.get('task_label') or '').strip(),
+      'transitions': {},
+      'page_first_seen': {},
+    })
+    key = (source_page, target_page)
+    entry['transitions'][key] = entry['transitions'].get(key, 0) + count
+    for page in (source_page, target_page):
+      if page not in entry['page_first_seen']:
+        source_step = to_number(row.get('source_step'))
+        entry['page_first_seen'][page] = int(source_step) if source_step is not None else 999
 
-    bp = ax.boxplot(box_values, positions=box_positions, patch_artist=True, widths=0.28, showfliers=False)
-    for patch, color in zip(bp['boxes'], box_colors):
-        patch.set(facecolor=color, alpha=0.28, edgecolor=color, linewidth=1.5)
-    for whisker, color in zip(bp['whiskers'], [color for color in box_colors for _ in (0, 1)]):
-        whisker.set(color=color, linewidth=1.2)
-    for cap, color in zip(bp['caps'], [color for color in box_colors for _ in (0, 1)]):
-        cap.set(color=color, linewidth=1.2)
-    for median_line in bp['medians']:
-        median_line.set(color='#111827', linewidth=1.5)
+  outputs: list[dict[str, Any]] = []
+  for task_id in sorted(grouped.keys()):
+    entry = grouped[task_id]
+    transitions = entry['transitions']
+    if not transitions:
+      continue
 
-    rng = random.Random(42)
-    for position, values, color in zip(box_positions, box_values, box_colors):
-        jitter = [position + rng.uniform(-0.045, 0.045) for _ in values]
-        ax.scatter(jitter, values, color=color, alpha=0.78, s=24, edgecolors='white', linewidths=0.35, zorder=3)
-        ax.scatter([position], [sum(values) / len(values)], color='#111827', marker='D', s=40, zorder=4)
+    all_pages = sorted(entry['page_first_seen'].keys(), key=lambda p: entry['page_first_seen'][p])
+    labels = [format_page_node_label(p) for p in all_pages]
+    n = len(all_pages)
+    matrix = [[0] * n for _ in range(n)]
+    for (src, tgt), count in transitions.items():
+      if src in all_pages and tgt in all_pages:
+        i = all_pages.index(src)
+        j = all_pages.index(tgt)
+        matrix[i][j] += count
 
-    ax.set_xticks(tick_positions)
-    ax.set_xticklabels(tick_labels)
-    ax.set_title(title)
-    ax.set_ylabel(ylabel)
-    ax.grid(axis='y', linestyle=':', alpha=0.4)
-    ax.set_xlim(0.5, len(tick_positions) + 0.5)
+    max_val = max(max(row_vals) for row_vals in matrix) if matrix else 1
+    if max_val == 0:
+      max_val = 1
 
-    legend_handles = [plt.Rectangle((0, 0), 1, 1, facecolor=color, edgecolor=color, alpha=0.28) for _, color in groups]
-    ax.legend(legend_handles, [group_name.title() for group_name, _ in groups], frameon=False, loc='upper right')
+    fig_height = max(4.8, 0.55 * n + 1.6)
+    fig_width = max(5.6, 0.55 * n + 2.4)
+    fig, ax = plt.subplots(figsize=(fig_width, fig_height))
+
+    cmap = plt.cm.Blues  # type: ignore[attr-defined]
+    im = ax.imshow(matrix, cmap=cmap, aspect='auto', vmin=0, vmax=max_val, interpolation='nearest')
+
+    ax.set_xticks(range(n))
+    ax.set_yticks(range(n))
+    ax.set_xticklabels(labels, rotation=45, ha='right', fontsize=7)
+    ax.set_yticklabels(labels, fontsize=7)
+    ax.set_xlabel('To page', fontsize=9)
+    ax.set_ylabel('From page', fontsize=9)
+
+    for i in range(n):
+      for j in range(n):
+        val = matrix[i][j]
+        if val > 0:
+          text_color = 'white' if val > max_val * 0.6 else 'black'
+          ax.text(j, i, str(val), ha='center', va='center', fontsize=7, color=text_color)
+
+    task_label = entry['task_label'] or task_id
+    ax.set_title(f'Page transition matrix — {task_label}', fontsize=10, pad=10)
+    fig.colorbar(im, ax=ax, label='Transition count', shrink=0.8)
     fig.tight_layout()
-    return fig
+
+    scenario_number = task_id.replace('scenario_card_', '')
+    outputs.append({
+      'fig': fig,
+      'label': f'{task_label} page transition heatmap',
+      'stem': f'starter-digital-scenario-{scenario_number}-transition-heatmap',
+    })
+
+  return outputs
 
 
 def create_scenario_page_flow_sankey_figures(transition_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -2439,6 +3612,9 @@ def create_ranked_page_use_figure(page_usage_rows: list[dict[str, Any]], digital
 def generate_figures(participant_rows: list[dict[str, Any]], page_usage_rows: list[dict[str, Any]], task_rows: list[dict[str, Any]], scenario_transition_rows: list[dict[str, Any]]) -> list[dict[str, str]]:
   figure_outputs: list[dict[str, str]] = []
   participant_trial_span_seconds = compute_task_span_seconds_by_participant(task_rows, 'scenario_card_1', 'short_form_q4')
+  clean_scenario_task_rows = [row for row in task_rows if is_clean_scenario_task(row)]
+  clean_short_form_task_rows = [row for row in task_rows if is_clean_short_form_task(row)]
+  clean_scenario_total_rows = build_clean_scenario_total_rows(task_rows)
 
   for config in STARTER_FIGURES:
     fig = create_group_distribution_figure(participant_rows, config['key'], config['title'], config['ylabel'])
@@ -2447,6 +3623,19 @@ def generate_figures(participant_rows: list[dict[str, Any]], page_usage_rows: li
     latest = save_figure(fig, config['filename'])
     figure_outputs.append({
       'label': config['title'],
+      'path': str(latest),
+    })
+
+  clean_total_duration_fig = create_group_distribution_figure(
+    clean_scenario_total_rows,
+    'clean_scenario_total_time_seconds',
+    'Scenario total time by group (all scenarios scored 2)',
+    'Total time across scenarios (s)',
+  )
+  if clean_total_duration_fig is not None:
+    latest = save_figure(clean_total_duration_fig, 'starter-scenario-total-time-clean-only')
+    figure_outputs.append({
+      'label': 'Scenario total time by group (all scenarios scored 2)',
       'path': str(latest),
     })
 
@@ -2485,6 +3674,20 @@ def generate_figures(participant_rows: list[dict[str, Any]], page_usage_rows: li
       'path': str(latest),
     })
 
+  clean_scenario_duration_fig = create_task_duration_by_group_figure(
+    clean_scenario_task_rows,
+    'scenario_card_',
+    'task_total_duration_seconds',
+    'Scenario duration by scenario and group (scenario score = 2)',
+    'Duration (s)',
+  )
+  if clean_scenario_duration_fig is not None:
+    latest = save_figure(clean_scenario_duration_fig, 'starter-scenario-duration-by-scenario-clean-only')
+    figure_outputs.append({
+      'label': 'Scenario duration by scenario and group (scenario score = 2)',
+      'path': str(latest),
+    })
+
   question_duration_fig = create_task_duration_by_group_figure(
     task_rows,
     'short_form_q',
@@ -2496,6 +3699,20 @@ def generate_figures(participant_rows: list[dict[str, Any]], page_usage_rows: li
     latest = save_figure(question_duration_fig, 'starter-short-form-duration-by-question')
     figure_outputs.append({
       'label': 'Short-form question duration by question and group',
+      'path': str(latest),
+    })
+
+  clean_question_duration_fig = create_task_duration_by_group_figure(
+    clean_short_form_task_rows,
+    'short_form_q',
+    'short_form_duration_seconds',
+    'Short-form question duration by question and group (fully correct, no errors)',
+    'Duration (s)',
+  )
+  if clean_question_duration_fig is not None:
+    latest = save_figure(clean_question_duration_fig, 'starter-short-form-duration-by-question-clean-only')
+    figure_outputs.append({
+      'label': 'Short-form question duration by question and group (fully correct, no errors)',
       'path': str(latest),
     })
 
@@ -2538,10 +3755,35 @@ def generate_figures(participant_rows: list[dict[str, Any]], page_usage_rows: li
       'path': str(latest),
     })
 
+  heatmap_outputs = create_transition_matrix_heatmaps(scenario_transition_rows)
+  for output in heatmap_outputs:
+    latest = save_figure(output['fig'], str(output['stem']))
+    figure_outputs.append({
+      'label': str(output['label']),
+      'path': str(latest),
+    })
+
   return figure_outputs
 
 
-def build_report(participant_rows: list[dict[str, Any]], test_rows: list[dict[str, Any]], group_summary_rows: list[dict[str, Any]], generated_at: str, figure_outputs: list[dict[str, str]]) -> str:
+def build_report(
+    participant_rows: list[dict[str, Any]],
+    test_rows: list[dict[str, Any]],
+    group_summary_rows: list[dict[str, Any]],
+    generated_at: str,
+    figure_outputs: list[dict[str, str]],
+    pathway_summary_rows: list[dict[str, Any]],
+    participant_characteristics_rows: list[dict[str, Any]],
+    baseline_equivalence_rows: list[dict[str, str]] | None = None,
+    fdr_corrected_rows: list[dict[str, str]] | None = None,
+    effect_size_ci_rows: list[dict[str, str]] | None = None,
+    learning_effects_rows: list[dict[str, str]] | None = None,
+    completion_rate_rows: list[dict[str, str]] | None = None,
+    format_preference_rows: list[dict[str, str]] | None = None,
+    chat_impact_rows: list[dict[str, str]] | None = None,
+    navigation_correlation_rows: list[dict[str, str]] | None = None,
+    power_analysis_rows: list[dict[str, str]] | None = None,
+) -> str:
     group_counts = ', '.join(
         f"{row['group']}: n={row['n']}"
         for row in group_summary_rows
@@ -2559,12 +3801,21 @@ def build_report(participant_rows: list[dict[str, Any]], test_rows: list[dict[st
         f'Generated at: {generated_at}',
         f'Participants analyzed: {len(participant_rows)}',
         f'Group sizes: {group_counts or "NA"}',
-        '',
-        '## Summary table (group comparison)',
-        '',
-        "| Outcome | Digital n | Physical n | Digital mean | Physical mean | Mean diff (Digital - Physical) | Permutation p | Cliff's delta |",
-        '|---|---:|---:|---:|---:|---:|---:|---:|',
     ]
+
+    lines.extend(['', '## Participant characteristics', ''])
+    if not participant_characteristics_rows:
+      lines.append('No participant characteristics rows were available.')
+    else:
+      lines.extend(to_markdown_table(participant_characteristics_rows).strip().splitlines())
+
+    lines.extend([
+      '',
+      '## Summary table (group comparison)',
+      '',
+      "| Outcome | Digital n | Physical n | Digital mean | Physical mean | Mean diff (Digital - Physical) | Permutation p | Cliff's delta |",
+      '|---|---:|---:|---:|---:|---:|---:|---:|',
+    ])
 
     for row in test_rows:
         lines.append(
@@ -2583,6 +3834,71 @@ def build_report(participant_rows: list[dict[str, Any]], test_rows: list[dict[st
             lines.append(
                 f"- {row['label']}: mean difference = {format_number(row['mean_diff'])}, permutation p = {format_number(row['permutation_p_value'], 4)} ({row['better_direction_hint']})."
             )
+
+    lines.extend(['', '## Digital pathway metrics by task', ''])
+    lines.append('- Based on deduplicated page-view sequences within each digital task instance.')
+    lines.append('- Backtracking % is the share of task instances containing an A -> B -> A return pattern after consecutive duplicate page views are removed.')
+    lines.append('- Chat used % and Chat primary % come from the task-level telemetry classification in the task export.')
+    lines.append('')
+    if not pathway_summary_rows:
+      lines.append('No digital task pathway rows were available for summary.')
+    else:
+      lines.extend(to_markdown_table(pathway_summary_rows).strip().splitlines())
+
+    if baseline_equivalence_rows:
+      lines.extend(['', '## Baseline equivalence', ''])
+      lines.append('Mann-Whitney U tests comparing groups on pre-trial characteristics.')
+      lines.append('')
+      lines.extend(to_markdown_table(baseline_equivalence_rows).strip().splitlines())
+
+    if fdr_corrected_rows:
+      lines.extend(['', '## Multiple comparisons correction (Benjamini-Hochberg)', ''])
+      lines.append('FDR-adjusted p-values for all primary between-group outcome tests.')
+      lines.append('')
+      lines.extend(to_markdown_table(fdr_corrected_rows).strip().splitlines())
+
+    if effect_size_ci_rows:
+      lines.extend(['', "## Effect size confidence intervals (Cliff's delta)", ''])
+      lines.append('Bootstrap 95% CIs (2,000 resamples, seed=42).')
+      lines.append('')
+      lines.extend(to_markdown_table(effect_size_ci_rows).strip().splitlines())
+
+    if learning_effects_rows:
+      lines.extend(['', '## Learning effects across scenarios (Friedman test)', ''])
+      lines.append('Non-parametric repeated-measures test for duration changes across the 3 scenarios, per group.')
+      lines.append('')
+      lines.extend(to_markdown_table(learning_effects_rows).strip().splitlines())
+
+    if completion_rate_rows:
+      lines.extend(['', "## Task completion rates (Fisher's exact test)", ''])
+      lines.append('Full completion (score = 2) rates compared between groups by scenario.')
+      lines.append('')
+      lines.extend(to_markdown_table(completion_rate_rows).strip().splitlines())
+
+    if format_preference_rows:
+      lines.extend(['', '## Format preference shift (pre \u2192 post)', ''])
+      lines.append('Cross-tabulation of instruction format preference changes from pre-trial to post-trial.')
+      lines.append('')
+      lines.extend(to_markdown_table(format_preference_rows).strip().splitlines())
+
+    if chat_impact_rows:
+      lines.extend(['', '## Chat impact within digital group', ''])
+      lines.append('Exploratory comparison of digital participants who used chat vs those who did not.')
+      lines.append('Caution: small subgroup sizes limit statistical power.')
+      lines.append('')
+      lines.extend(to_markdown_table(chat_impact_rows).strip().splitlines())
+
+    if navigation_correlation_rows:
+      lines.extend(['', '## Navigation efficiency correlations (digital group)', ''])
+      lines.append("Spearman rank correlations between navigation metrics and task performance across all digital scenario instances.")
+      lines.append('')
+      lines.extend(to_markdown_table(navigation_correlation_rows).strip().splitlines())
+
+    if power_analysis_rows:
+      lines.extend(['', '## Post-hoc sensitivity analysis', ''])
+      lines.append('Approximate minimum detectable effect size given current sample sizes (MWU normal approximation).')
+      lines.append('')
+      lines.extend(to_markdown_table(power_analysis_rows).strip().splitlines())
 
     lines.extend([
         '',
@@ -2631,6 +3947,10 @@ def fetch_scenario_transition_rows(database_url: str) -> list[dict[str, Any]]:
   return fetch_query_rows(database_url, SCENARIO_PAGE_TRANSITIONS_QUERY)
 
 
+def fetch_pathway_instance_rows(database_url: str) -> list[dict[str, Any]]:
+  return fetch_query_rows(database_url, PATHWAY_INSTANCE_QUERY)
+
+
 def fetch_task_rows(database_url: str) -> list[dict[str, Any]]:
   return fetch_query_rows(database_url, TASK_LEVEL_QUERY)
 
@@ -2644,7 +3964,7 @@ def normalize_participant_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any
     for row in rows:
         normalized = dict(row)
         for key, value in list(normalized.items()):
-            if key in {'participant_id', 'allocation_group'}:
+            if key in {'participant_id', 'allocation_group', 'pre_format_preference', 'post_format_preference'}:
                 continue
             normalized[key] = to_number(value)
         normalized_rows.append(normalized)
@@ -2674,6 +3994,7 @@ def main() -> int:
     page_usage_rows = fetch_page_usage_rows(database_url)
     raw_task_rows = fetch_task_rows(database_url)
     scenario_transition_rows = fetch_scenario_transition_rows(database_url)
+    pathway_instance_rows = fetch_pathway_instance_rows(database_url)
     questionnaire_comment_rows = fetch_questionnaire_comment_rows(database_url)
     allocation_group_by_participant = {
       str(row.get('participant_id') or '').strip(): str(row.get('allocation_group') or '').strip()
@@ -2755,16 +4076,41 @@ def main() -> int:
     report_ready_rows = build_report_ready_rows(test_rows)
     report_ready_csv = to_csv(report_ready_rows)
     report_ready_md = to_markdown_table(report_ready_rows)
+    participant_characteristics_rows = build_participant_characteristics_rows(participant_rows)
+    participant_characteristics_csv = to_csv(participant_characteristics_rows)
+    participant_characteristics_md = to_markdown_table(participant_characteristics_rows)
     task_by_participant_csv = to_csv(task_rows)
     task_summary_rows = build_task_summary_rows(task_rows)
     task_summary_csv = to_csv(task_summary_rows)
     task_summary_md = to_markdown_table(build_task_summary_markdown_rows(task_summary_rows))
+    pathway_summary_rows = build_pathway_summary_rows(pathway_instance_rows, task_rows)
+    baseline_equivalence_rows = build_baseline_equivalence_rows(participant_rows)
+    fdr_corrected_rows = build_fdr_corrected_rows(test_rows)
+    effect_size_ci_rows = build_effect_size_ci_rows(test_rows, digital_rows, physical_rows, OUTCOMES)
+    learning_effects_rows = build_learning_effects_rows(task_rows)
+    completion_rate_rows = build_completion_rate_rows(task_rows)
+    format_preference_rows = build_format_preference_shift_rows(participant_rows)
+    chat_impact_rows = build_chat_impact_rows(task_rows, participant_rows)
+    navigation_correlation_rows = build_navigation_correlation_rows(pathway_instance_rows, task_rows)
+    power_analysis_rows = build_power_analysis_rows(test_rows, len(digital_rows), len(physical_rows))
     prepost_participant_rows = build_prepost_participant_rows(participant_rows)
     prepost_participant_csv = to_csv(prepost_participant_rows)
     prepost_summary_rows = build_prepost_summary_rows(prepost_participant_rows)
     prepost_summary_csv = to_csv(prepost_summary_rows)
     prepost_summary_md = to_markdown_table(build_prepost_summary_markdown_rows(prepost_summary_rows))
-    report = build_report(participant_rows, test_rows, group_summary_rows, generated_at, figure_outputs)
+    report = build_report(
+        participant_rows, test_rows, group_summary_rows, generated_at,
+        figure_outputs, pathway_summary_rows, participant_characteristics_rows,
+        baseline_equivalence_rows=baseline_equivalence_rows,
+        fdr_corrected_rows=fdr_corrected_rows,
+        effect_size_ci_rows=effect_size_ci_rows,
+        learning_effects_rows=learning_effects_rows,
+        completion_rate_rows=completion_rate_rows,
+        format_preference_rows=format_preference_rows,
+        chat_impact_rows=chat_impact_rows,
+        navigation_correlation_rows=navigation_correlation_rows,
+        power_analysis_rows=power_analysis_rows,
+    )
     statistical_analysis_report = build_statistical_analysis_report(test_rows, prepost_summary_rows, generated_at)
     questionnaire_comments_md = build_questionnaire_comments_markdown(questionnaire_comment_rows, generated_at)
 
@@ -2773,6 +4119,8 @@ def main() -> int:
     summary_file = TABLES_DIR / 'group-summary-latest.csv'
     report_ready_csv_file = TABLES_DIR / 'dissertation-summary-table-latest.csv'
     report_ready_md_file = TABLES_DIR / 'dissertation-summary-table-latest.md'
+    participant_characteristics_csv_file = TABLES_DIR / 'participant-characteristics-latest.csv'
+    participant_characteristics_md_file = TABLES_DIR / 'participant-characteristics-latest.md'
     task_by_participant_file = TABLES_DIR / 'task-by-participant-latest.csv'
     task_summary_csv_file = TABLES_DIR / 'task-summary-by-group-latest.csv'
     task_summary_md_file = TABLES_DIR / 'task-summary-by-group-latest.md'
@@ -2788,12 +4136,34 @@ def main() -> int:
     summary_file.write_text(summary_csv, encoding='utf8')
     report_ready_csv_file.write_text(report_ready_csv, encoding='utf8')
     report_ready_md_file.write_text(report_ready_md, encoding='utf8')
+    participant_characteristics_csv_file.write_text(participant_characteristics_csv, encoding='utf8')
+    participant_characteristics_md_file.write_text(participant_characteristics_md, encoding='utf8')
     task_by_participant_file.write_text(task_by_participant_csv, encoding='utf8')
     task_summary_csv_file.write_text(task_summary_csv, encoding='utf8')
     task_summary_md_file.write_text(task_summary_md, encoding='utf8')
     prepost_participant_file.write_text(prepost_participant_csv, encoding='utf8')
     prepost_summary_csv_file.write_text(prepost_summary_csv, encoding='utf8')
     prepost_summary_md_file.write_text(prepost_summary_md, encoding='utf8')
+
+    # Write new analysis tables
+    new_tables: list[tuple[str, list[dict[str, str]]]] = [
+        ('baseline-equivalence', baseline_equivalence_rows),
+        ('fdr-corrected-p-values', fdr_corrected_rows),
+        ('effect-size-ci', effect_size_ci_rows),
+        ('learning-effects', learning_effects_rows),
+        ('completion-rates', completion_rate_rows),
+        ('format-preference-shift', format_preference_rows),
+        ('chat-impact', chat_impact_rows),
+        ('navigation-correlations', navigation_correlation_rows),
+        ('power-analysis', power_analysis_rows),
+    ]
+    new_table_files: list[Path] = []
+    for table_stem, table_rows in new_tables:
+        if table_rows:
+            table_file = TABLES_DIR / f'{table_stem}-latest.csv'
+            table_file.write_text(to_csv(table_rows), encoding='utf8')
+            new_table_files.append(table_file)
+
     report_file.write_text(report, encoding='utf8')
     statistical_analysis_report_file.write_text(statistical_analysis_report, encoding='utf8')
     questionnaire_comments_file.write_text(questionnaire_comments_md, encoding='utf8')
@@ -2808,6 +4178,8 @@ def main() -> int:
     print(f'- {summary_file}')
     print(f'- {report_ready_csv_file}')
     print(f'- {report_ready_md_file}')
+    print(f'- {participant_characteristics_csv_file}')
+    print(f'- {participant_characteristics_md_file}')
     print(f'- {task_by_participant_file}')
     print(f'- {task_summary_csv_file}')
     print(f'- {task_summary_md_file}')
@@ -2815,6 +4187,8 @@ def main() -> int:
     print(f'- {prepost_summary_csv_file}')
     print(f'- {prepost_summary_md_file}')
     print(f'- {questionnaire_comments_file}')
+    for table_file in new_table_files:
+      print(f'- {table_file}')
     for figure in figure_outputs:
       print(f"- {figure['path']}")
     return 0
