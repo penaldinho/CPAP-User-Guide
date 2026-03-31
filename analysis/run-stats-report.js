@@ -9,6 +9,34 @@ const TABLES_DIR = path.join(OUTPUT_DIR, 'tables');
 const REPORTS_DIR = path.join(OUTPUT_DIR, 'reports');
 const FIGURES_DIR = path.join(OUTPUT_DIR, 'figures');
 const CHAT_EVAL_DIR = path.join(OUTPUT_DIR, 'chat-eval');
+const PARTICIPANT_ALLOCATION_PATH = path.join(__dirname, '..', 'data', 'participant-allocation.json');
+
+function loadCanonicalParticipantAllocations() {
+  if (!fs.existsSync(PARTICIPANT_ALLOCATION_PATH)) {
+    return new Map();
+  }
+
+  let parsed;
+  try {
+    parsed = JSON.parse(fs.readFileSync(PARTICIPANT_ALLOCATION_PATH, 'utf8'));
+  } catch {
+    return new Map();
+  }
+
+  const allocations = new Map();
+  for (const record of parsed) {
+    if (!record || typeof record !== 'object') continue;
+    const participantId = String(record.participant_id || '').trim();
+    const allocationGroup = String(record.allocation_group || '').trim();
+    if (!participantId || participantId.toUpperCase() === 'TEST' || !allocationGroup) continue;
+    allocations.set(participantId, allocationGroup);
+  }
+  return allocations;
+}
+
+function filterRowsToCanonicalParticipants(rows, canonicalAllocations) {
+  return rows.filter((row) => canonicalAllocations.has(String(row.participant_id || '').trim()));
+}
 
 const ANALYSIS_QUERY = `
 WITH participant_pool AS (
@@ -441,6 +469,11 @@ async function run() {
     throw new Error('DATABASE_URL is required. Example: set DATABASE_URL=postgres://user:pass@host:5432/dbname');
   }
 
+  const canonicalAllocations = loadCanonicalParticipantAllocations();
+  if (canonicalAllocations.size === 0) {
+    throw new Error('Canonical participant allocation list is empty or unavailable.');
+  }
+
   const pool = new Pool({
     connectionString: databaseUrl,
     ssl: process.env.PGSSLMODE === 'require' ? { rejectUnauthorized: false } : undefined
@@ -448,8 +481,9 @@ async function run() {
 
   try {
     const result = await pool.query(ANALYSIS_QUERY);
-    const participantRows = result.rows.map((row) => {
+    const participantRows = filterRowsToCanonicalParticipants(result.rows, canonicalAllocations).map((row) => {
       const normalized = { ...row };
+      normalized.allocation_group = canonicalAllocations.get(String(normalized.participant_id || '').trim()) || normalized.allocation_group;
       Object.keys(normalized).forEach((key) => {
         if (key === 'participant_id' || key === 'allocation_group') return;
         normalized[key] = toNumber(normalized[key]);

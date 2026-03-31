@@ -1546,3 +1546,45 @@ VALUES
   ('short_form_q4', 'a', 'v1', TRUE, 40, 'No-only accepted (binary question)', 'exact', 'no', NULL, NULL, 1.000),
   ('short_form_q4', 'a', 'v1', TRUE, 50, 'Comparison phrasing 7ft vs 2m', 'contains_all', '7 ft||2 m', NULL, NULL, 1.000)
 ON CONFLICT DO NOTHING;
+
+INSERT INTO short_form_rubric_rules (
+  question_id,
+  part_key,
+  rubric_version,
+  is_active,
+  rule_order,
+  rule_label,
+  match_type,
+  match_value,
+  numeric_min,
+  numeric_max,
+  score_value
+)
+SELECT
+  candidate.question_id,
+  candidate.part_key,
+  candidate.rubric_version,
+  candidate.is_active,
+  candidate.rule_order,
+  candidate.rule_label,
+  candidate.match_type,
+  candidate.match_value,
+  candidate.numeric_min,
+  candidate.numeric_max,
+  candidate.score_value
+FROM (
+  VALUES
+    ('short_form_q2', 'a', 'v1', TRUE, 65, 'Contact your provider', 'contains', 'contact your provider', NULL::NUMERIC, NULL::NUMERIC, 1.000::NUMERIC),
+    ('short_form_q2', 'a', 'v1', TRUE, 66, 'Contact provider typo-tolerant', 'regex', '(contact).*((care|car)\s*provid(?:er|e)|provider)', NULL::NUMERIC, NULL::NUMERIC, 1.000::NUMERIC),
+    ('short_form_q4', 'a', 'v1', TRUE, 35, 'No-prefixed answer accepted', 'regex', '^no', NULL::NUMERIC, NULL::NUMERIC, 1.000::NUMERIC),
+    ('short_form_q4', 'a', 'v1', TRUE, 36, 'Definitely not phrasing', 'regex', 'definitely\s*not', NULL::NUMERIC, NULL::NUMERIC, 1.000::NUMERIC),
+    ('short_form_q4', 'a', 'v1', TRUE, 25, 'ClimateLineAir length 6 feet 6 inches', 'regex', '(6\s*(feet|foot|ft)\s*6\s*(inch|inches|in))', NULL::NUMERIC, NULL::NUMERIC, 1.000::NUMERIC)
+) AS candidate(question_id, part_key, rubric_version, is_active, rule_order, rule_label, match_type, match_value, numeric_min, numeric_max, score_value)
+WHERE NOT EXISTS (
+  SELECT 1
+  FROM short_form_rubric_rules existing
+  WHERE existing.question_id = candidate.question_id
+    AND existing.part_key = candidate.part_key
+    AND existing.rubric_version = candidate.rubric_version
+    AND existing.rule_label = candidate.rule_label
+);

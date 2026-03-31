@@ -34,27 +34,12 @@ FIGURES_DIR = OUTPUT_DIR / 'figures'
 CHAT_EVAL_DIR = OUTPUT_DIR / 'chat-eval'
 WORKSPACE_DIR = Path(__file__).resolve().parent.parent
 DOTENV_PATH = WORKSPACE_DIR / '.env'
+PARTICIPANT_ALLOCATION_PATH = WORKSPACE_DIR / 'data' / 'participant-allocation.json'
 
 ANALYSIS_QUERY = """
 WITH participant_pool AS (
   SELECT DISTINCT participant_id
-  FROM (
-    SELECT participant_id FROM analysis_participant_allocation
-    UNION ALL
-    SELECT participant_id FROM analysis_telemetry_events
-    UNION ALL
-    SELECT participant_id FROM analysis_physical_trial_events
-    UNION ALL
-    SELECT participant_id FROM analysis_observer_notes
-    UNION ALL
-    SELECT participant_id FROM analysis_observer_step_marks
-    UNION ALL
-    SELECT participant_id FROM analysis_short_form_result_scores
-    UNION ALL
-    SELECT participant_id FROM analysis_pre_trial_questionnaire
-    UNION ALL
-    SELECT participant_id FROM analysis_post_trial_questionnaire
-  ) src
+  FROM analysis_participant_allocation
   WHERE NULLIF(TRIM(participant_id), '') IS NOT NULL
 ),
 mode_guess AS (
@@ -157,7 +142,7 @@ short_form AS (
     COUNT(*) AS short_form_question_count,
     AVG(COALESCE(all_parts_correct_binary, 0)::DOUBLE PRECISION) AS short_form_binary_accuracy,
     AVG(COALESCE(proportion_correct, 0)::DOUBLE PRECISION) AS short_form_proportion_accuracy,
-    AVG(NULLIF(duration_ms, 0)::DOUBLE PRECISION) / 1000.0 AS short_form_avg_duration_seconds
+    SUM(NULLIF(duration_ms, 0)::DOUBLE PRECISION) / 1000.0 AS short_form_total_duration_seconds
   FROM analysis_short_form_result_scores
   GROUP BY participant_id
 ),
@@ -222,7 +207,7 @@ SELECT
   sf.short_form_question_count,
   sf.short_form_binary_accuracy,
   sf.short_form_proportion_accuracy,
-  sf.short_form_avg_duration_seconds,
+  sf.short_form_total_duration_seconds,
   pre.q1_age_years,
   pre.q6_digital_literacy,
   pre.q7_digital_guidance,
@@ -489,6 +474,9 @@ observer_note_metrics AS (
     t.participant_id,
     t.task_id,
     t.task_instance_seq,
+    MAX(COALESCE(o.task_length_ms, 0)::DOUBLE PRECISION) FILTER (
+      WHERE o.action_type = 'task_end'
+    ) / 1000.0 AS observer_task_length_seconds,
     MAX(COALESCE(o.help_instances_count, 0)) FILTER (
       WHERE o.action_type = 'task_end'
     ) AS help_instances_count,
@@ -546,6 +534,7 @@ SELECT
   t.task_started_at,
   t.task_ended_at,
   t.task_total_duration_ms / 1000.0 AS task_total_duration_seconds,
+  onm.observer_task_length_seconds,
   t.task_total_page_dwell_ms / 1000.0 AS task_total_page_dwell_seconds,
   t.task_event_count,
   t.task_page_count,
@@ -559,9 +548,8 @@ SELECT
     ELSE NULL
   END AS chat_page_dwell_share,
   CASE
-    WHEN COALESCE(cpm.chat_page_dwell_ms, 0) > 0
-      OR COALESCE(cem.chat_submit_count, 0) > 0
-      OR COALESCE(cem.chat_response_count, 0) > 0
+    WHEN t.task_total_page_dwell_ms > 0
+      AND COALESCE(cpm.chat_page_dwell_ms, 0)::DOUBLE PRECISION / t.task_total_page_dwell_ms::DOUBLE PRECISION > 0.2
       THEN 1
     ELSE 0
   END AS chat_used_flag,
@@ -612,23 +600,7 @@ ORDER BY t.participant_id, t.task_id, t.task_instance_seq;
 QUESTIONNAIRE_COMMENTS_QUERY = """
 WITH participant_pool AS (
   SELECT DISTINCT participant_id
-  FROM (
-    SELECT participant_id FROM analysis_participant_allocation
-    UNION ALL
-    SELECT participant_id FROM analysis_telemetry_events
-    UNION ALL
-    SELECT participant_id FROM analysis_physical_trial_events
-    UNION ALL
-    SELECT participant_id FROM analysis_observer_notes
-    UNION ALL
-    SELECT participant_id FROM analysis_observer_step_marks
-    UNION ALL
-    SELECT participant_id FROM analysis_short_form_result_scores
-    UNION ALL
-    SELECT participant_id FROM analysis_pre_trial_questionnaire
-    UNION ALL
-    SELECT participant_id FROM analysis_post_trial_questionnaire
-  ) src
+  FROM analysis_participant_allocation
   WHERE NULLIF(TRIM(participant_id), '') IS NOT NULL
 ),
 mode_guess AS (
@@ -734,19 +706,22 @@ OUTCOME_FAMILIES = {
 
 
 OUTCOMES = [
-  {"key": "scenario_avg_score", "label": "Scenario average score", "better": "higher", "family": "continuous_bounded"},
-  {"key": "scenario_total_time_seconds", "label": "Scenario total time (s)", "better": "lower", "family": "continuous_time"},
-  {"key": "scenario_error_count", "label": "Scenario error count", "better": "lower", "family": "count"},
-  {"key": "scenario_major_error_count", "label": "Scenario major error count", "better": "lower", "family": "count"},
-  {"key": "scenario_help_count", "label": "Scenario help count", "better": "lower", "family": "count"},
-  {"key": "step_accuracy", "label": "Scenario step accuracy", "better": "higher", "family": "proportion"},
-  {"key": "short_form_binary_accuracy", "label": "Short-form binary accuracy", "better": "higher", "family": "proportion"},
-  {"key": "short_form_proportion_accuracy", "label": "Short-form proportion accuracy", "better": "higher", "family": "proportion"},
-  {"key": "short_form_avg_duration_seconds", "label": "Short-form average duration (s)", "better": "lower", "family": "continuous_time"},
-  {"key": "q2_info_ease", "label": "Post-trial ease finding information", "better": "higher", "family": "ordinal"},
-  {"key": "q5_confidence_setup", "label": "Post-trial confidence setup", "better": "higher", "family": "ordinal"},
-  {"key": "q7_mental_effort", "label": "Post-trial mental effort", "better": "lower", "family": "ordinal"},
-  {"key": "q8_tlx_frustration", "label": "Post-trial frustration", "better": "lower", "family": "ordinal"},
+  {"key": "scenario_avg_score", "label": "Scenario average score", "better": "higher", "family": "continuous_bounded", "domain": "task_performance"},
+  {"key": "scenario_total_time_seconds", "label": "Scenario total time (s)", "better": "lower", "family": "continuous_time", "domain": "task_performance"},
+  {"key": "scenario_error_count", "label": "Scenario error count", "better": "lower", "family": "count", "domain": "task_performance"},
+  {"key": "scenario_help_count", "label": "Scenario help count", "better": "lower", "family": "count", "domain": "task_performance"},
+  {"key": "short_form_proportion_accuracy", "label": "Information retrieval accuracy", "better": "higher", "family": "proportion", "domain": "information_retrieval"},
+  {"key": "short_form_total_duration_seconds", "label": "Information retrieval total time (s)", "better": "lower", "family": "continuous_time", "domain": "information_retrieval"},
+  {"key": "q1_instructions_ease", "label": "Post-trial instructions easy to understand", "better": "higher", "family": "ordinal", "domain": "usability"},
+  {"key": "q2_info_ease", "label": "Post-trial ease finding information", "better": "higher", "family": "ordinal", "domain": "usability"},
+  {"key": "q3_step_by_step_help", "label": "Post-trial step-by-step help", "better": "higher", "family": "ordinal", "domain": "usability"},
+  {"key": "q4_instructions_satisfaction", "label": "Post-trial instructions satisfaction", "better": "higher", "family": "ordinal", "domain": "usability"},
+  {"key": "q5_confidence_setup", "label": "Post-trial confidence setup", "better": "higher", "family": "ordinal", "domain": "confidence"},
+  {"key": "q6_confidence_troubleshooting", "label": "Post-trial confidence troubleshooting", "better": "higher", "family": "ordinal", "domain": "confidence"},
+  {"key": "q7_mental_effort", "label": "Post-trial mental effort", "better": "lower", "family": "ordinal", "domain": "workload"},
+  {"key": "q8_tlx_frustration", "label": "Post-trial frustration", "better": "lower", "family": "ordinal", "domain": "workload"},
+  {"key": "q9_tlx_perceived_performance", "label": "Post-trial perceived performance", "better": "higher", "family": "ordinal", "domain": "workload"},
+  {"key": "q10_tlx_temporal_demand", "label": "Post-trial temporal demand", "better": "lower", "family": "ordinal", "domain": "workload"},
 ]
 
 STARTER_FIGURES = [
@@ -763,24 +738,71 @@ STARTER_FIGURES = [
     'filename': 'starter-scenario-error-count',
   },
   {
+    'key': 'short_form_total_duration_seconds',
+    'title': 'Information retrieval question total time by group',
+    'ylabel': 'Total time (s)',
+    'filename': 'starter-information-retrieval-duration',
+  },
+  {
     'key': 'short_form_proportion_accuracy',
-    'title': 'Short-form proportion accuracy by group',
+    'title': 'Information retrieval question accuracy by group',
     'ylabel': 'Proportion correct',
     'filename': 'starter-short-form-accuracy',
   },
 ]
 
+DEFAULT_GROUP_CONFIGS = [
+  ('digital', '#2563eb'),
+  ('physical', '#dc2626'),
+]
+
+CHAT_SUBGROUP_CONFIGS = [
+  ('chat_primary', '#0f766e'),
+  ('other_digital', '#d97706'),
+]
+
+CHAT_SUBGROUP_FIGURES = [
+  {
+    'key': 'scenario_total_time_seconds',
+    'title': 'Scenario total time by chat-primary subgroup',
+    'ylabel': 'Total time (s)',
+    'filename': 'starter-chat-subgroup-scenario-total-time',
+  },
+  {
+    'key': 'short_form_total_duration_seconds',
+    'title': 'Information retrieval question total time by chat-primary subgroup',
+    'ylabel': 'Total time (s)',
+    'filename': 'starter-chat-subgroup-information-retrieval-duration',
+  },
+  {
+    'key': 'short_form_proportion_accuracy',
+    'title': 'Information retrieval question accuracy by chat-primary subgroup',
+    'ylabel': 'Proportion correct',
+    'filename': 'starter-chat-subgroup-short-form-accuracy',
+  },
+]
+
 POST_TRIAL_LIKERT_ITEMS = [
-  ('q1_instructions_ease', 'Instructions easy'),
-  ('q2_info_ease', 'Info easy to find'),
-  ('q3_step_by_step_help', 'Step-by-step help'),
-  ('q4_instructions_satisfaction', 'Instructions satisfaction'),
-  ('q5_confidence_setup', 'Confidence setup'),
-  ('q6_confidence_troubleshooting', 'Confidence troubleshoot'),
-  ('q7_mental_effort', 'Mental effort'),
-  ('q8_tlx_frustration', 'Frustration'),
-  ('q9_tlx_perceived_performance', 'Perceived performance'),
-  ('q10_tlx_temporal_demand', 'Temporal demand'),
+  # Usability & satisfaction (higher = better, no reversal needed)
+  ('q1_instructions_ease', 'Instructions easy', False),
+  ('q2_info_ease', 'Info easy to find', False),
+  ('q3_step_by_step_help', 'Step-by-step help', False),
+  ('q4_instructions_satisfaction', 'Instructions satisfaction', False),
+  # Confidence (higher = better)
+  ('q5_confidence_setup', 'Confidence setup', False),
+  ('q6_confidence_troubleshooting', 'Confidence troubleshoot', False),
+  # NASA-TLX items (higher = worse on original scale; reversed so right = favourable)
+  ('q7_mental_effort', 'Mental effort (R)', True),
+  ('q8_tlx_frustration', 'Frustration (R)', True),
+  ('q9_tlx_perceived_performance', 'Perceived performance', False),
+  ('q10_tlx_temporal_demand', 'Temporal demand (R)', True),
+]
+
+# Visual group boundaries for the Likert chart (insert a gap after these indices)
+POST_TRIAL_LIKERT_GROUPS = [
+    (0, 4, 'Usability'),
+    (4, 6, 'Confidence'),
+    (6, 10, 'NASA-TLX'),
 ]
 
 PREPOST_COMPARATORS = [
@@ -826,6 +848,38 @@ def load_dotenv(dotenv_path: Path) -> None:
             value = value[1:-1]
 
         os.environ[key] = value
+
+
+def load_canonical_participant_allocations() -> dict[str, str]:
+    if not PARTICIPANT_ALLOCATION_PATH.exists():
+        return {}
+
+    try:
+        raw_records = json.loads(PARTICIPANT_ALLOCATION_PATH.read_text(encoding='utf8'))
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+    allocations: dict[str, str] = {}
+    for record in raw_records:
+        if not isinstance(record, dict):
+            continue
+
+        participant_id = str(record.get('participant_id') or '').strip()
+        allocation_group = str(record.get('allocation_group') or '').strip()
+        if not participant_id or participant_id.upper() == 'TEST' or not allocation_group:
+            continue
+
+        allocations[participant_id] = allocation_group
+    return allocations
+
+
+def filter_rows_to_canonical_participants(rows: list[dict[str, Any]], canonical_ids: set[str]) -> list[dict[str, Any]]:
+    filtered_rows: list[dict[str, Any]] = []
+    for row in rows:
+        participant_id = str(row.get('participant_id') or '').strip()
+        if participant_id in canonical_ids:
+            filtered_rows.append(row)
+    return filtered_rows
 
 
 def to_number(value: Any) -> float | int | None:
@@ -1493,6 +1547,45 @@ def build_fdr_corrected_rows(test_rows: list[dict[str, Any]]) -> list[dict[str, 
     return rows
 
 
+DOMAIN_LABELS = {
+    'task_performance': 'Task performance',
+    'information_retrieval': 'Information retrieval',
+    'usability': 'Usability',
+    'confidence': 'Confidence',
+    'workload': 'Workload (NASA-TLX)',
+}
+
+
+def build_domain_fdr_corrected_rows(test_rows: list[dict[str, Any]]) -> list[dict[str, str]]:
+    """Apply Benjamini-Hochberg FDR correction within outcome domains."""
+    # Group indices by domain
+    domain_indices: dict[str, list[int]] = {}
+    for i, row in enumerate(test_rows):
+        domain = OUTCOMES[i].get('domain', 'other')
+        domain_indices.setdefault(domain, []).append(i)
+
+    # Apply BH within each domain
+    domain_adjusted: list[float | None] = [None] * len(test_rows)
+    for domain, indices in domain_indices.items():
+        p_values = [test_rows[i].get('permutation_p_value') for i in indices]
+        adjusted = benjamini_hochberg(p_values)
+        for j, idx in enumerate(indices):
+            domain_adjusted[idx] = adjusted[j]
+
+    rows: list[dict[str, str]] = []
+    for i, row in enumerate(test_rows):
+        domain = OUTCOMES[i].get('domain', 'other')
+        rows.append({
+            'Outcome': str(row['label']),
+            'Domain': DOMAIN_LABELS.get(domain, domain),
+            'Domain n': str(len(domain_indices.get(domain, []))),
+            'Raw p': format_number(row.get('permutation_p_value'), 4),
+            'Domain BH-adjusted p': format_number(domain_adjusted[i], 4),
+            'Significant (domain adj.)': 'Yes' if domain_adjusted[i] is not None and domain_adjusted[i] < 0.05 else 'No',
+        })
+    return rows
+
+
 def build_effect_size_ci_rows(test_rows: list[dict[str, Any]], digital_rows: list[dict[str, Any]], physical_rows: list[dict[str, Any]], outcomes: list[dict[str, str]]) -> list[dict[str, str]]:
     """Bootstrap 95% CIs for Cliff's delta for each outcome."""
     rows: list[dict[str, str]] = []
@@ -1654,18 +1747,18 @@ def build_format_preference_shift_rows(participant_rows: list[dict[str, Any]]) -
 
 
 def build_chat_impact_rows(task_rows: list[dict[str, Any]], participant_rows: list[dict[str, Any]]) -> list[dict[str, str]]:
-    """Compare outcomes for chat-users vs non-chat-users within the digital group."""
+    """Compare outcomes for chat-primary users vs other digital participants."""
     digital_pids = {
         str(r.get('participant_id') or '').strip()
         for r in participant_rows
         if str(r.get('allocation_group') or '') == 'digital'
     }
 
-    # Classify participants by whether they ever used chat
+    # Classify participants by whether chat was primary on any task.
     chat_pids: set[str] = set()
     for r in task_rows:
         pid = str(r.get('participant_id') or '').strip()
-        if pid in digital_pids and r.get('chat_used_flag'):
+        if pid in digital_pids and r.get('chat_primary_flag'):
             chat_pids.add(pid)
     no_chat_pids = digital_pids - chat_pids
 
@@ -1677,17 +1770,17 @@ def build_chat_impact_rows(task_rows: list[dict[str, Any]], participant_rows: li
         {'label': 'Scenario total time (s)', 'key': 'scenario_total_time_seconds'},
         {'label': 'Scenario average score', 'key': 'scenario_avg_score'},
         {'label': 'Scenario error count', 'key': 'scenario_error_count'},
-        {'label': 'Short-form proportion accuracy', 'key': 'short_form_proportion_accuracy'},
-        {'label': 'Short-form avg duration (s)', 'key': 'short_form_avg_duration_seconds'},
+      {'label': 'Information retrieval accuracy', 'key': 'short_form_proportion_accuracy'},
+      {'label': 'Information retrieval total time (s)', 'key': 'short_form_total_duration_seconds'},
     ]
 
     rows: list[dict[str, str]] = []
     rows.append({
         'Metric': 'Participants, n',
-        'Chat users': str(len(chat_participants)),
-        'Chat users median [Q1, Q3]': '',
-        'Non-chat users': str(len(no_chat_participants)),
-        'Non-chat median [Q1, Q3]': '',
+        'Chat-primary users': str(len(chat_participants)),
+        'Chat-primary median [Q1, Q3]': '',
+        'Other digital users': str(len(no_chat_participants)),
+        'Other digital median [Q1, Q3]': '',
         'Mann-Whitney U': '',
         'p-value': '',
         "Cliff's delta": '',
@@ -1702,10 +1795,10 @@ def build_chat_impact_rows(task_rows: list[dict[str, Any]], participant_rows: li
         delta = cliffs_delta(chat_vals, no_chat_vals)
         rows.append({
             'Metric': metric['label'],
-            'Chat users': str(chat_summary['n']),
-            'Chat users median [Q1, Q3]': format_median_iqr(chat_summary['median'], chat_summary['q1'], chat_summary['q3']),
-            'Non-chat users': str(no_chat_summary['n']),
-            'Non-chat median [Q1, Q3]': format_median_iqr(no_chat_summary['median'], no_chat_summary['q1'], no_chat_summary['q3']),
+            'Chat-primary users': str(chat_summary['n']),
+            'Chat-primary median [Q1, Q3]': format_median_iqr(chat_summary['median'], chat_summary['q1'], chat_summary['q3']),
+            'Other digital users': str(no_chat_summary['n']),
+            'Other digital median [Q1, Q3]': format_median_iqr(no_chat_summary['median'], no_chat_summary['q1'], no_chat_summary['q3']),
             'Mann-Whitney U': format_number(mwu['U'], 1),
             'p-value': format_number(mwu['p'], 4),
             "Cliff's delta": format_number(delta),
@@ -1715,54 +1808,63 @@ def build_chat_impact_rows(task_rows: list[dict[str, Any]], participant_rows: li
 
 
 def build_navigation_correlation_rows(pathway_instance_rows: list[dict[str, Any]], task_rows: list[dict[str, Any]]) -> list[dict[str, str]]:
-    """Spearman correlations between navigation metrics and performance within digital group."""
-    # Build lookup: (participant_id, task_id) -> pathway metrics
-    pathway_by_key: dict[tuple[str, str], dict[str, Any]] = {}
-    for r in pathway_instance_rows:
-        pid = str(r.get('participant_id') or '').strip()
-        tid = str(r.get('task_id') or '').strip()
-        if pid and tid:
-            pathway_by_key[(pid, tid)] = r
+  """Spearman correlations between navigation metrics and performance within digital group."""
+  pathway_by_key: dict[tuple[str, str, int], dict[str, Any]] = {}
+  for row in pathway_instance_rows:
+    participant_id = str(row.get('participant_id') or '').strip()
+    task_id = str(row.get('task_id') or '').strip()
+    task_instance_seq = int(to_number(row.get('task_instance_seq')) or 0)
+    if participant_id and task_id:
+      pathway_by_key[(participant_id, task_id, task_instance_seq)] = row
 
-    scenario_task_rows = [
-        r for r in task_rows
-        if str(r.get('task_id') or '').startswith('scenario_card_')
-        and str(r.get('allocation_group') or '') == 'digital'
-    ]
+  scenario_task_rows = [
+    row for row in task_rows
+    if str(row.get('task_id') or '').startswith('scenario_card_')
+    and str(row.get('allocation_group') or '').strip() == 'digital'
+  ]
 
-    correlations = [
-        {'nav_key': 'unique_page_count', 'perf_key': 'task_total_duration_seconds', 'label': 'Unique pages vs duration'},
-        {'nav_key': 'transition_count', 'perf_key': 'task_total_duration_seconds', 'label': 'Transitions vs duration'},
-        {'nav_key': 'backtrack_count', 'perf_key': 'task_total_duration_seconds', 'label': 'Backtracks vs duration'},
-        {'nav_key': 'unique_page_count', 'perf_key': 'scenario_score', 'label': 'Unique pages vs score'},
-        {'nav_key': 'backtrack_count', 'perf_key': 'scenario_score', 'label': 'Backtracks vs score'},
-    ]
+  correlations = [
+    {'nav_key': 'unique_page_count', 'perf_key': 'task_total_duration_seconds', 'label': 'Unique pages vs duration'},
+    {'nav_key': 'transition_count', 'perf_key': 'task_total_duration_seconds', 'label': 'Transitions vs duration'},
+    {'nav_key': 'backtrack_count', 'perf_key': 'task_total_duration_seconds', 'label': 'Backtracks vs duration'},
+    {'nav_key': 'unique_page_count', 'perf_key': 'scenario_score', 'label': 'Unique pages vs score'},
+    {'nav_key': 'backtrack_count', 'perf_key': 'scenario_score', 'label': 'Backtracks vs score'},
+  ]
 
-    rows: list[dict[str, str]] = []
-    for corr in correlations:
-        nav_vals: list[float] = []
-        perf_vals: list[float] = []
-        for r in scenario_task_rows:
-            pid = str(r.get('participant_id') or '').strip()
-            tid = str(r.get('task_id') or '').strip()
-            pathway = pathway_by_key.get((pid, tid))
-            if pathway is None:
-                continue
-            nav_val = to_number(pathway.get(corr['nav_key']))
-            perf_val = to_number(r.get(corr['perf_key']))
-            if nav_val is not None and perf_val is not None:
-                nav_vals.append(float(nav_val))
-                perf_vals.append(float(perf_val))
+  rows: list[dict[str, str]] = []
+  for corr in correlations:
+    nav_vals: list[float] = []
+    perf_vals: list[float] = []
+    for row in scenario_task_rows:
+      participant_id = str(row.get('participant_id') or '').strip()
+      task_id = str(row.get('task_id') or '').strip()
+      task_instance_seq = int(to_number(row.get('task_instance_seq')) or 0)
+      pathway = pathway_by_key.get((participant_id, task_id, task_instance_seq), {})
 
-        result = spearman_rho(nav_vals, perf_vals)
-        rows.append({
-            'Correlation': corr['label'],
-            'n': str(result['n']),
-            "Spearman's rho": format_number(result['rho']),
-            'p-value': format_number(result['p'], 4),
-        })
+      nav_val = to_number(pathway.get(corr['nav_key']))
+      if nav_val is None:
+        task_page_count = to_number(row.get('task_page_count'))
+        if corr['nav_key'] == 'unique_page_count':
+          nav_val = task_page_count
+        elif corr['nav_key'] == 'transition_count' and task_page_count is not None:
+          nav_val = max(float(task_page_count) - 1.0, 0.0)
+        elif corr['nav_key'] == 'backtrack_count':
+          nav_val = 0.0
 
-    return rows
+      perf_val = to_number(row.get(corr['perf_key']))
+      if nav_val is not None and perf_val is not None:
+        nav_vals.append(float(nav_val))
+        perf_vals.append(float(perf_val))
+
+    result = spearman_rho(nav_vals, perf_vals)
+    rows.append({
+      'Correlation': corr['label'],
+      'n': str(result['n']),
+      "Spearman's rho": format_number(result['rho']),
+      'p-value': format_number(result['p'], 4),
+    })
+
+  return rows
 
 
 def build_power_analysis_rows(test_rows: list[dict[str, Any]], n_digital: int, n_physical: int) -> list[dict[str, str]]:
@@ -1969,7 +2071,7 @@ def build_task_summary_markdown_rows(task_summary_rows: list[dict[str, Any]]) ->
             'Help mean ± SD': format_mean_sd(row['help_mean'], row['help_sd']),
             'Scenario score mean ± SD': format_mean_sd(row['scenario_score_mean'], row['scenario_score_sd']),
             'Step accuracy mean ± SD': format_mean_sd(row['step_accuracy_mean'], row['step_accuracy_sd']),
-            'Short-form accuracy mean ± SD': format_mean_sd(row['short_form_accuracy_mean'], row['short_form_accuracy_sd']),
+            'Information retrieval accuracy mean ± SD': format_mean_sd(row['short_form_accuracy_mean'], row['short_form_accuracy_sd']),
         })
     return rows
 
@@ -1982,71 +2084,133 @@ def format_pathway_sequence(page_pathway: str, max_length: int = 92) -> str:
 
 
 def build_pathway_summary_rows(pathway_instance_rows: list[dict[str, Any]], task_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    task_lookup = {
-        (
-            str(row.get('participant_id') or '').strip(),
-            str(row.get('task_id') or '').strip(),
-            int(to_number(row.get('task_instance_seq')) or 0),
-        ): row
-        for row in task_rows
-    }
+  task_lookup = {
+    (
+      str(row.get('participant_id') or '').strip(),
+      str(row.get('task_id') or '').strip(),
+      int(to_number(row.get('task_instance_seq')) or 0),
+    ): row
+    for row in task_rows
+  }
+  pathway_lookup = {
+    (
+      str(row.get('participant_id') or '').strip(),
+      str(row.get('task_id') or '').strip(),
+      int(to_number(row.get('task_instance_seq')) or 0),
+    ): row
+    for row in pathway_instance_rows
+  }
 
-    grouped: dict[tuple[str, str], list[dict[str, Any]]] = {}
-    for row in pathway_instance_rows:
-        task_id = str(row.get('task_id') or '').strip()
-        task_label = str(row.get('task_label') or '').strip()
-        if not task_id:
-            continue
-        grouped.setdefault((task_id, task_label), []).append(row)
+  relevant_task_rows = [
+    row for row in task_rows
+    if str(row.get('trial_mode') or '').strip() == 'digital'
+    and (
+      str(row.get('task_id') or '').strip().startswith('scenario_card_')
+      or str(row.get('task_id') or '').strip().startswith('short_form_q')
+    )
+  ]
 
-    summary_rows: list[dict[str, Any]] = []
-    for (task_id, task_label), rows in sorted(grouped.items(), key=lambda item: sort_task_ids(item[0][0])):
-        unique_page_values = [float(row['unique_page_count']) for row in rows if to_number(row.get('unique_page_count')) is not None]
-        transition_values = [float(row['transition_count']) for row in rows if to_number(row.get('transition_count')) is not None]
-        backtrack_instance_count = sum(1 for row in rows if (to_number(row.get('backtrack_count')) or 0) > 0)
-        pathway_counter: dict[str, int] = {}
-        chat_used_count = 0
-        chat_primary_count = 0
+  # Keep one instance per participant-task. Prefer the instance with a recorded
+  # page-view pathway; otherwise fall back to the earliest recorded instance.
+  selected_task_rows: dict[tuple[str, str], dict[str, Any]] = {}
+  for row in relevant_task_rows:
+    participant_id = str(row.get('participant_id') or '').strip()
+    task_id = str(row.get('task_id') or '').strip()
+    instance_seq = int(to_number(row.get('task_instance_seq')) or 0)
+    participant_task_key = (participant_id, task_id)
+    existing = selected_task_rows.get(participant_task_key)
+    if existing is None:
+      selected_task_rows[participant_task_key] = row
+      continue
 
-        for row in rows:
-            pathway = str(row.get('page_pathway') or '').strip()
-            if pathway:
-                pathway_counter[pathway] = pathway_counter.get(pathway, 0) + 1
+    existing_key = (
+      str(existing.get('participant_id') or '').strip(),
+      str(existing.get('task_id') or '').strip(),
+      int(to_number(existing.get('task_instance_seq')) or 0),
+    )
+    current_key = (participant_id, task_id, instance_seq)
+    existing_has_pathway = existing_key in pathway_lookup
+    current_has_pathway = current_key in pathway_lookup
 
-            lookup_key = (
-                str(row.get('participant_id') or '').strip(),
-                task_id,
-                int(to_number(row.get('task_instance_seq')) or 0),
-            )
-            task_metrics = task_lookup.get(lookup_key, {})
-            if int(to_number(task_metrics.get('chat_used_flag')) or 0) == 1:
-                chat_used_count += 1
-            if int(to_number(task_metrics.get('chat_primary_flag')) or 0) == 1:
-                chat_primary_count += 1
+    if current_has_pathway and not existing_has_pathway:
+      selected_task_rows[participant_task_key] = row
+    elif current_has_pathway == existing_has_pathway and instance_seq < int(to_number(existing.get('task_instance_seq')) or 0):
+      selected_task_rows[participant_task_key] = row
 
-        top_pathway = 'NA'
-        top_pathway_count = 0
-        if pathway_counter:
-            top_pathway, top_pathway_count = max(pathway_counter.items(), key=lambda item: (item[1], item[0]))
+  grouped: dict[str, list[dict[str, Any]]] = {}
+  for row in selected_task_rows.values():
+    task_id = str(row.get('task_id') or '').strip()
+    if not task_id:
+      continue
+    grouped.setdefault(task_id, []).append(row)
 
-        row_count = len(rows)
-        unique_page_mean = sum(unique_page_values) / len(unique_page_values) if unique_page_values else None
-        transition_mean = sum(transition_values) / len(transition_values) if transition_values else None
+  summary_rows: list[dict[str, Any]] = []
+  for task_id, rows in sorted(grouped.items(), key=lambda item: sort_task_ids(item[0])):
+    unique_page_values: list[float] = []
+    transition_values: list[float] = []
+    backtrack_instance_count = 0
+    pathway_counter: dict[str, int] = {}
+    chat_primary_count = 0
+    task_label = next((str(row.get('task_label') or '').strip() for row in rows if str(row.get('task_label') or '').strip()), task_id)
 
-        summary_rows.append({
-            'Task': build_task_axis_label(task_id, task_label),
-            'Task ID': task_id,
-            'n': row_count,
-            'Avg unique pages': format_number(unique_page_mean),
-            'Avg transitions': format_number(transition_mean),
-            'Backtracking %': format_number((backtrack_instance_count / row_count * 100.0) if row_count else None),
-            'Most common pathway': format_pathway_sequence(top_pathway),
-            'Top pathway %': format_number((top_pathway_count / row_count * 100.0) if row_count else None),
-            'Chat used %': format_number((chat_used_count / row_count * 100.0) if row_count else None),
-            'Chat primary %': format_number((chat_primary_count / row_count * 100.0) if row_count else None),
-        })
+    for row in rows:
+      lookup_key = (
+        str(row.get('participant_id') or '').strip(),
+        task_id,
+        int(to_number(row.get('task_instance_seq')) or 0),
+      )
+      pathway_row = pathway_lookup.get(lookup_key, {})
 
-    return summary_rows
+      unique_page_count = to_number(pathway_row.get('unique_page_count'))
+      if unique_page_count is None:
+        unique_page_count = to_number(row.get('task_page_count'))
+      if unique_page_count is not None:
+        unique_page_values.append(float(unique_page_count))
+
+      transition_count = to_number(pathway_row.get('transition_count'))
+      if transition_count is None:
+        task_page_count = to_number(row.get('task_page_count'))
+        if task_page_count is not None:
+          transition_count = max(float(task_page_count) - 1.0, 0.0)
+      if transition_count is not None:
+        transition_values.append(float(transition_count))
+
+      backtrack_count = to_number(pathway_row.get('backtrack_count'))
+      if backtrack_count is None:
+        backtrack_count = 0.0
+      if backtrack_count > 0:
+        backtrack_instance_count += 1
+
+      pathway = str(pathway_row.get('page_pathway') or '').strip()
+      if pathway:
+        pathway_counter[pathway] = pathway_counter.get(pathway, 0) + 1
+
+      task_metrics = task_lookup.get(lookup_key, {})
+      if int(to_number(task_metrics.get('chat_primary_flag')) or 0) == 1:
+        chat_primary_count += 1
+
+    top_pathway = 'NA'
+    top_pathway_count = 0
+    if pathway_counter:
+      top_pathway, top_pathway_count = max(pathway_counter.items(), key=lambda item: (item[1], item[0]))
+
+    row_count = len(rows)
+    unique_page_mean = sum(unique_page_values) / len(unique_page_values) if unique_page_values else None
+    transition_mean = sum(transition_values) / len(transition_values) if transition_values else None
+
+    summary_rows.append({
+      'Task': build_task_axis_label(task_id, task_label),
+      'Task ID': task_id,
+      'n': row_count,
+      'Avg unique pages': format_number(unique_page_mean),
+      'Avg transitions': format_number(transition_mean),
+      'Backtracking %': format_number((backtrack_instance_count / row_count * 100.0) if row_count else None),
+      'Most common pathway': format_pathway_sequence(top_pathway),
+      'Top pathway %': format_number((top_pathway_count / row_count * 100.0) if row_count else None),
+      'Chat primary %': format_number((chat_primary_count / row_count * 100.0) if row_count else None),
+    })
+
+  return summary_rows
 
 
 def build_prepost_participant_rows(participant_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -2424,6 +2588,57 @@ def save_html_document(content: str, stem: str) -> Path:
   return latest_html
 
 
+def display_group_label(group_name: str) -> str:
+  normalized = str(group_name or '').strip().lower()
+  if normalized == 'physical':
+    return 'Paper'
+  if normalized == 'digital':
+    return 'Digital'
+  if normalized == 'chat_primary':
+    return 'Chat-primary'
+  if normalized == 'other_digital':
+    return 'Other digital'
+  return normalized.title()
+
+
+def build_chat_subgroup_map(
+  task_rows: list[dict[str, Any]],
+  participant_rows: list[dict[str, Any]],
+) -> dict[str, str]:
+  digital_participant_ids = {
+    str(row.get('participant_id') or '').strip()
+    for row in participant_rows
+    if str(row.get('allocation_group') or '').strip() == 'digital'
+  }
+  chat_primary_participant_ids = {
+    str(row.get('participant_id') or '').strip()
+    for row in task_rows
+    if str(row.get('participant_id') or '').strip() in digital_participant_ids
+    and int(to_number(row.get('chat_primary_flag')) or 0) == 1
+  }
+  return {
+    participant_id: ('chat_primary' if participant_id in chat_primary_participant_ids else 'other_digital')
+    for participant_id in digital_participant_ids
+  }
+
+
+def filter_rows_to_group_map(
+  rows: list[dict[str, Any]],
+  participant_group_map: dict[str, str],
+  group_field: str = 'analysis_group',
+) -> list[dict[str, Any]]:
+  filtered_rows: list[dict[str, Any]] = []
+  for row in rows:
+    participant_id = str(row.get('participant_id') or '').strip()
+    group_name = participant_group_map.get(participant_id)
+    if not group_name:
+      continue
+    normalized = dict(row)
+    normalized[group_field] = group_name
+    filtered_rows.append(normalized)
+  return filtered_rows
+
+
 def format_page_node_label(page_path: str) -> str:
   raw_path = decode_page_path(page_path).strip('/')
   if not raw_path:
@@ -2739,12 +2954,23 @@ def build_scenario_sankey_stem(task_id: str) -> str:
   return f"starter-{task_id.replace('_', '-')}-page-flow-sankey"
 
 
-def create_group_distribution_figure(rows: list[dict[str, Any]], key: str, title: str, ylabel: str) -> Any | None:
-    groups = [('digital', '#2563eb'), ('physical', '#dc2626')]
+def create_group_distribution_figure(
+  rows: list[dict[str, Any]],
+  key: str,
+  title: str,
+  ylabel: str,
+  group_configs: list[tuple[str, str]] | None = None,
+  group_field: str = 'allocation_group',
+) -> Any | None:
+    groups = group_configs or DEFAULT_GROUP_CONFIGS
     values_by_group: list[list[float]] = []
     colors: list[str] = []
     for group_name, color in groups:
-        values = [float(row[key]) for row in rows if row.get('allocation_group') == group_name and to_number(row.get(key)) is not None]
+        values = [
+          float(row[key])
+          for row in rows
+          if str(row.get(group_field) or '').strip() == group_name and to_number(row.get(key)) is not None
+        ]
         values_by_group.append(values)
         colors.append(color)
 
@@ -2762,7 +2988,7 @@ def create_group_distribution_figure(rows: list[dict[str, Any]], key: str, title
         valid_positions.append(idx)
         valid_values.append(values)
         valid_colors.append(color)
-        valid_labels.append(group_name.title())
+        valid_labels.append(display_group_label(group_name))
 
     bp = ax.boxplot(valid_values, positions=valid_positions, patch_artist=True, widths=0.5, showfliers=False)
     for patch, color in zip(bp['boxes'], valid_colors):
@@ -2782,6 +3008,167 @@ def create_group_distribution_figure(rows: list[dict[str, Any]], key: str, title
     ax.set_ylabel(ylabel)
     ax.grid(axis='y', linestyle=':', alpha=0.4)
     return fig
+
+
+def create_scenario_completion_rate_figure(
+  task_rows: list[dict[str, Any]],
+  group_configs: list[tuple[str, str]] | None = None,
+  group_field: str = 'allocation_group',
+  title: str = 'Scenario full-completion rates by group',
+) -> Any | None:
+  scenario_ids = ['scenario_card_1', 'scenario_card_2', 'scenario_card_3']
+  active_group_configs = group_configs or DEFAULT_GROUP_CONFIGS
+  labels: list[str] = []
+  rates_by_group: dict[str, list[float]] = {group: [] for group, _ in active_group_configs}
+  counts_by_group: dict[str, list[tuple[int, int]]] = {group: [] for group, _ in active_group_configs}
+
+  for scenario_id in scenario_ids:
+    scenario_rows = [
+      row for row in task_rows
+      if str(row.get('task_id') or '').strip() == scenario_id and to_number(row.get('scenario_score')) is not None
+    ]
+    if not scenario_rows:
+      continue
+
+    labels.append(f"Scenario {scenario_id.removeprefix('scenario_card_')}")
+    for group_name, _ in active_group_configs:
+      group_rows = [row for row in scenario_rows if str(row.get(group_field) or '').strip() == group_name]
+      full_count = sum(1 for row in group_rows if float(row['scenario_score']) == 2.0)
+      total_count = len(group_rows)
+      rate = (100.0 * full_count / total_count) if total_count else 0.0
+      rates_by_group[group_name].append(rate)
+      counts_by_group[group_name].append((full_count, total_count))
+
+  if not labels:
+    return None
+
+  fig, ax = plt.subplots(figsize=(8.2, 5.2))
+  x_positions = list(range(len(labels)))
+  bar_width = 0.36
+
+  for index, (group_name, color) in enumerate(active_group_configs):
+    offset = (-bar_width / 2) if index == 0 else (bar_width / 2)
+    positions = [x + offset for x in x_positions]
+    bars = ax.bar(
+      positions,
+      rates_by_group[group_name],
+      width=bar_width,
+      color=color,
+      alpha=0.82,
+      label=display_group_label(group_name),
+    )
+    for bar, (full_count, total_count) in zip(bars, counts_by_group[group_name]):
+      ax.text(
+        bar.get_x() + (bar.get_width() / 2),
+        bar.get_height() + 2.5,
+        f'{full_count}/{total_count}',
+        ha='center',
+        va='bottom',
+        fontsize=9,
+        color='#111827',
+      )
+
+  ax.set_xticks(x_positions)
+  ax.set_xticklabels(labels)
+  ax.set_ylim(0, 110)
+  ax.set_ylabel('Full-completion rate (%)')
+  ax.set_title(title)
+  ax.grid(axis='y', linestyle=':', alpha=0.35)
+  ax.legend(frameon=False)
+  return fig
+
+
+def create_information_retrieval_accuracy_by_question_figure(
+  task_rows: list[dict[str, Any]],
+  group_configs: list[tuple[str, str]] | None = None,
+  group_field: str = 'allocation_group',
+  title: str = 'Information retrieval question accuracy by question and group',
+) -> Any | None:
+  question_ids = ['short_form_q1', 'short_form_q2', 'short_form_q3', 'short_form_q4']
+  active_group_configs = group_configs or DEFAULT_GROUP_CONFIGS
+  labels: list[str] = []
+  rates_by_group: dict[str, list[float]] = {group: [] for group, _ in active_group_configs}
+  counts_by_group: dict[str, list[tuple[int, int]]] = {group: [] for group, _ in active_group_configs}
+
+  for question_id in question_ids:
+    question_rows_raw = [
+      row for row in task_rows
+      if str(row.get('task_id') or '').strip() == question_id and to_number(row.get('short_form_binary_accuracy')) is not None
+    ]
+    deduplicated_rows: list[dict[str, Any]] = []
+    seen_participants: set[str] = set()
+    for row in sorted(
+      question_rows_raw,
+      key=lambda item: (
+        str(item.get('participant_id') or '').strip(),
+        int(to_number(item.get('task_instance_seq')) or 0),
+      ),
+    ):
+      participant_id = str(row.get('participant_id') or '').strip()
+      if not participant_id or participant_id in seen_participants:
+        continue
+      seen_participants.add(participant_id)
+      deduplicated_rows.append(row)
+
+    question_rows = deduplicated_rows
+    if not question_rows:
+      continue
+
+    labels.append(build_task_axis_label(question_id, str(question_rows[0].get('task_label') or '')))
+    for group_name, _ in active_group_configs:
+      group_rows = [row for row in question_rows if str(row.get(group_field) or '').strip() == group_name]
+      correct_count = sum(1 for row in group_rows if float(row['short_form_binary_accuracy']) >= 1.0)
+      total_count = len(group_rows)
+      rate = (100.0 * correct_count / total_count) if total_count else 0.0
+      rates_by_group[group_name].append(rate)
+      counts_by_group[group_name].append((correct_count, total_count))
+
+  if not labels:
+    return None
+
+  fig, ax = plt.subplots(figsize=(8.6, 5.2))
+  x_positions = list(range(len(labels)))
+  bar_width = 0.36
+
+  for index, (group_name, color) in enumerate(active_group_configs):
+    offset = (-bar_width / 2) if index == 0 else (bar_width / 2)
+    positions = [x + offset for x in x_positions]
+    bars = ax.bar(
+      positions,
+      rates_by_group[group_name],
+      width=bar_width,
+      color=color,
+      alpha=0.82,
+      label=display_group_label(group_name),
+    )
+    for bar, (correct_count, total_count) in zip(bars, counts_by_group[group_name]):
+      ax.text(
+        bar.get_x() + (bar.get_width() / 2),
+        bar.get_height() + 2.5,
+        f'{correct_count}/{total_count}',
+        ha='center',
+        va='bottom',
+        fontsize=9,
+        color='#111827',
+      )
+
+  ax.set_xticks(x_positions)
+  ax.set_xticklabels(labels)
+  ax.set_ylim(0, 116)
+  ax.set_ylabel('Participants correct (%)')
+  ax.set_title(title)
+  ax.grid(axis='y', linestyle=':', alpha=0.35)
+  ax.legend(frameon=False, loc='upper center', bbox_to_anchor=(0.5, 1.01), ncol=2)
+  return fig
+
+
+def create_average_scenario_score_figure(participant_rows: list[dict[str, Any]]) -> Any | None:
+  return create_group_distribution_figure(
+    participant_rows,
+    'scenario_avg_score',
+    'Distribution of average scenario scores by group',
+    'Average scenario score',
+  )
 
 
 def is_clean_scenario_task(row: dict[str, Any]) -> bool:
@@ -2972,6 +3359,24 @@ def compute_task_span_seconds_by_participant(task_rows: list[dict[str, Any]], st
   return spans
 
 
+def build_participant_metric_rows(
+  participant_rows: list[dict[str, Any]],
+  metric_by_participant: dict[str, float],
+  metric_key: str,
+) -> list[dict[str, Any]]:
+  rows: list[dict[str, Any]] = []
+  for row in participant_rows:
+    participant_id = str(row.get('participant_id') or '').strip()
+    if not participant_id or participant_id not in metric_by_participant:
+      continue
+    rows.append({
+      'participant_id': participant_id,
+      'allocation_group': row.get('allocation_group'),
+      metric_key: metric_by_participant[participant_id],
+    })
+  return rows
+
+
 def create_participant_metric_scatter_figure(
   participant_rows: list[dict[str, Any]],
   metric_by_participant: dict[str, float],
@@ -3026,7 +3431,7 @@ def create_participant_metric_scatter_figure(
       edgecolors='white',
       linewidths=0.7,
       zorder=3,
-      label=group_name.title(),
+      label=display_group_label(group_name),
     )
 
   if len(set(x_values)) >= 2:
@@ -3060,29 +3465,41 @@ def create_participant_metric_scatter_figure(
   return fig
 
 
-def create_task_duration_by_group_figure(task_rows: list[dict[str, Any]], task_prefix: str, duration_key: str, title: str, ylabel: str) -> Any | None:
-  groups = [('digital', '#2563eb'), ('physical', '#dc2626')]
+def create_task_duration_by_group_figure(
+  task_rows: list[dict[str, Any]],
+  task_prefix: str,
+  duration_key: str,
+  title: str,
+  ylabel: str,
+  group_configs: list[tuple[str, str]] | None = None,
+  group_field: str = 'allocation_group',
+  show_chat_markers: bool = True,
+) -> Any | None:
+  groups = group_configs or DEFAULT_GROUP_CONFIGS
   grouped_tasks: dict[str, dict[str, Any]] = {}
+  valid_group_names = {name for name, _ in groups}
   outcome_markers = {
     2.0: 'o',
     1.0: '^',
     0.0: 'x',
   }
   show_outcome_markers = task_prefix.startswith('scenario_card_')
-  show_chat_markers = True
+  show_short_form_accuracy_markers = task_prefix.startswith('short_form_q')
 
   for row in task_rows:
     task_id = str(row.get('task_id') or '').strip()
-    group_name = str(row.get('allocation_group') or '').strip()
+    group_name = str(row.get(group_field) or '').strip()
     duration_value = to_number(row.get(duration_key))
-    if not task_id.startswith(task_prefix) or group_name not in {'digital', 'physical'} or duration_value is None:
+    if not task_id.startswith(task_prefix) or group_name not in valid_group_names or duration_value is None:
       continue
 
-    task_entry = grouped_tasks.setdefault(task_id, {
-      'task_label': str(row.get('task_label') or '').strip(),
-      'digital': [],
-      'physical': [],
-    })
+    task_entry = grouped_tasks.setdefault(
+      task_id,
+      {
+        'task_label': str(row.get('task_label') or '').strip(),
+        **{name: [] for name in valid_group_names},
+      },
+    )
     if not task_entry['task_label']:
       task_entry['task_label'] = str(row.get('task_label') or '').strip()
 
@@ -3091,18 +3508,21 @@ def create_task_duration_by_group_figure(task_rows: list[dict[str, Any]], task_p
       scenario_score = to_number(row.get('scenario_score'))
       if scenario_score is not None:
         marker = outcome_markers.get(float(scenario_score), 'o')
+    elif show_short_form_accuracy_markers:
+      short_form_binary_accuracy = to_number(row.get('short_form_binary_accuracy'))
+      if short_form_binary_accuracy is not None and float(short_form_binary_accuracy) < 1.0:
+        marker = 'x'
 
     task_entry[group_name].append({
       'duration': float(duration_value),
       'marker': marker,
-      'chat_used': bool(to_number(row.get('chat_used_flag')) or 0),
       'chat_primary': bool(to_number(row.get('chat_primary_flag')) or 0),
     })
 
   ordered_task_ids = [
     task_id
     for task_id in sorted(grouped_tasks.keys(), key=sort_task_ids)
-    if grouped_tasks[task_id]['digital'] or grouped_tasks[task_id]['physical']
+    if any(grouped_tasks[task_id].get(group_name) for group_name in valid_group_names)
   ]
   if not ordered_task_ids:
     return None
@@ -3148,17 +3568,13 @@ def create_task_duration_by_group_figure(task_rows: list[dict[str, Any]], task_p
     jitter = [position + rng.uniform(-0.045, 0.045) for _ in values]
     marker_points: dict[tuple[str, int], dict[str, list[float]]] = {}
     for x_value, point in zip(jitter, points):
-      chat_level = 2 if point['chat_primary'] else 1 if point['chat_used'] else 0
+      chat_level = 1 if point['chat_primary'] else 0
       marker_entry = marker_points.setdefault((point['marker'], chat_level), {'x': [], 'y': []})
       marker_entry['x'].append(x_value)
       marker_entry['y'].append(point['duration'])
 
     for (marker, chat_level), coords in marker_points.items():
-      if chat_level == 2:
-        marker_size = 40
-        edge_color = '#111827'
-        line_width = 1.1
-      elif chat_level == 1:
+      if chat_level == 1:
         marker_size = 31
         edge_color = '#111827'
         line_width = 0.8
@@ -3175,7 +3591,7 @@ def create_task_duration_by_group_figure(task_rows: list[dict[str, Any]], task_p
           alpha=0.9,
           marker=marker,
           s=marker_size + 6,
-          linewidths=1.0 if chat_level == 0 else 1.4 if chat_level == 1 else 1.8,
+          linewidths=1.0 if chat_level == 0 else 1.4,
           zorder=3,
         )
       else:
@@ -3200,22 +3616,21 @@ def create_task_duration_by_group_figure(task_rows: list[dict[str, Any]], task_p
   ax.set_xlim(0.5, len(tick_positions) + 0.5)
 
   group_legend_handles = [plt.Rectangle((0, 0), 1, 1, facecolor=color, edgecolor=color, alpha=0.28) for _, color in groups]
-  group_legend = ax.legend(group_legend_handles, [group_name.title() for group_name, _ in groups], frameon=False, loc='upper right')
+  group_legend = ax.legend(group_legend_handles, [display_group_label(group_name) for group_name, _ in groups], frameon=False, loc='upper right')
   ax.add_artist(group_legend)
 
-  has_chat_used = any(point['chat_used'] for points in point_groups for point in points)
   has_chat_primary = any(point['chat_primary'] for points in point_groups for point in points)
-  if show_chat_markers and (has_chat_used or has_chat_primary):
+  has_chat_legend = False
+  if show_chat_markers and has_chat_primary:
     chat_handles = []
     chat_labels = []
-    if has_chat_used:
-      chat_handles.append(plt.Line2D([0], [0], color='#6b7280', marker='o', markerfacecolor='#9ca3af', markeredgecolor='#111827', linestyle='None', markersize=6, markeredgewidth=0.8))
-      chat_labels.append('Chat used')
     if has_chat_primary:
       chat_handles.append(plt.Line2D([0], [0], color='#6b7280', marker='o', markerfacecolor='#9ca3af', markeredgecolor='#111827', linestyle='None', markersize=8, markeredgewidth=1.1))
       chat_labels.append('Chat primary')
-    chat_legend = ax.legend(chat_handles, chat_labels, frameon=False, loc='lower left')
+    chat_legend_loc = 'lower left' if show_outcome_markers else 'upper left'
+    chat_legend = ax.legend(chat_handles, chat_labels, frameon=False, loc=chat_legend_loc)
     ax.add_artist(chat_legend)
+    has_chat_legend = True
 
   if show_outcome_markers:
     outcome_handles = [
@@ -3224,6 +3639,22 @@ def create_task_duration_by_group_figure(task_rows: list[dict[str, Any]], task_p
       plt.Line2D([0], [0], color='#374151', marker='x', linestyle='None', markersize=6, markeredgewidth=1.0),
     ]
     ax.legend(outcome_handles, ['Full completion', 'Partial completion', 'Failure'], frameon=False, loc='upper left')
+  elif show_short_form_accuracy_markers and any(point['marker'] == 'x' for points in point_groups for point in points):
+    accuracy_handles = [
+      plt.Line2D([0], [0], color='#374151', marker='o', markerfacecolor='#374151', markeredgecolor='white', linestyle='None', markersize=6),
+      plt.Line2D([0], [0], color='#374151', marker='x', linestyle='None', markersize=6, markeredgewidth=1.0),
+    ]
+    if has_chat_legend:
+      ax.legend(
+        accuracy_handles,
+        ['Correct answer', 'Incorrect answer'],
+        frameon=False,
+        loc='upper left',
+        bbox_to_anchor=(0.0, 0.86),
+        borderaxespad=0.0,
+      )
+    else:
+      ax.legend(accuracy_handles, ['Correct answer', 'Incorrect answer'], frameon=False, loc='upper left')
 
   fig.tight_layout()
   return fig
@@ -3496,6 +3927,7 @@ def create_post_trial_likert_figure(rows: list[dict[str, Any]]) -> Any | None:
     if not any(grouped_rows.values()):
         return None
 
+    # Colours: after any reversal, 1 = most unfavourable, 5 = most favourable
     colors = {
         1: '#b91c1c',
         2: '#ef4444',
@@ -3503,43 +3935,78 @@ def create_post_trial_likert_figure(rows: list[dict[str, Any]]) -> Any | None:
         4: '#60a5fa',
         5: '#1d4ed8',
     }
-    fig, axes = plt.subplots(1, 2, figsize=(15, 8), sharey=True)
+
+    # Work out y-positions with gaps between groups
+    gap = 0.6
+    y_positions: list[float] = []
+    current_y = 0.0
+    for g_start, g_end, _g_label in POST_TRIAL_LIKERT_GROUPS:
+        for i in range(g_start, g_end):
+            y_positions.append(current_y)
+            current_y += 1.0
+        current_y += gap  # add gap after each group
+
+    fig, axes = plt.subplots(2, 1, figsize=(10, 13), sharex=True, sharey=True)
     has_any_data = False
+    mean_label_x = 0.075
+    group_label_x = 1.01
 
     for ax, (group_name, group_rows) in zip(axes, grouped_rows.items()):
         item_labels: list[str] = []
         distributions: list[dict[int, float]] = []
-        for key, label in POST_TRIAL_LIKERT_ITEMS:
+        means: list[float] = []
+        for key, label, reverse in POST_TRIAL_LIKERT_ITEMS:
             numeric = [int(to_number(row.get(key))) for row in group_rows if to_number(row.get(key)) in {1, 2, 3, 4, 5}]
             if not numeric:
                 continue
+            if reverse:
+                numeric = [6 - v for v in numeric]
             has_any_data = True
             total = len(numeric)
             percentages = {score: (numeric.count(score) / total) * 100 for score in range(1, 6)}
             item_labels.append(label)
             distributions.append(percentages)
+            means.append(sum(numeric) / total)
 
         if not distributions:
-            ax.set_title(f'{group_name.title()} (no post-trial data)')
+            ax.set_title(f'{display_group_label(group_name)} (no post-trial data)')
             ax.axis('off')
             continue
 
-        y_positions = list(range(len(item_labels)))
+        ax.text(mean_label_x, 0.985, 'Mean', fontsize=8, fontweight='bold',
+          ha='left', va='top', color='#374151',
+          transform=ax.transAxes, clip_on=False)
+
         for idx, percentages in enumerate(distributions):
+            y = y_positions[idx]
             negative_left = -(percentages[1] + percentages[2] + (percentages[3] / 2))
-            ax.barh(idx, percentages[1], left=negative_left, color=colors[1], edgecolor='white', height=0.75)
-            ax.barh(idx, percentages[2], left=negative_left + percentages[1], color=colors[2], edgecolor='white', height=0.75)
-            ax.barh(idx, percentages[3] / 2, left=-(percentages[3] / 2), color=colors[3], edgecolor='white', height=0.75)
-            ax.barh(idx, percentages[3] / 2, left=0, color=colors[3], edgecolor='white', height=0.75)
-            ax.barh(idx, percentages[4], left=percentages[3] / 2, color=colors[4], edgecolor='white', height=0.75)
-            ax.barh(idx, percentages[5], left=(percentages[3] / 2) + percentages[4], color=colors[5], edgecolor='white', height=0.75)
+            ax.barh(y, percentages[1], left=negative_left, color=colors[1], edgecolor='white', height=0.75)
+            ax.barh(y, percentages[2], left=negative_left + percentages[1], color=colors[2], edgecolor='white', height=0.75)
+            ax.barh(y, percentages[3] / 2, left=-(percentages[3] / 2), color=colors[3], edgecolor='white', height=0.75)
+            ax.barh(y, percentages[3] / 2, left=0, color=colors[3], edgecolor='white', height=0.75)
+            ax.barh(y, percentages[4], left=percentages[3] / 2, color=colors[4], edgecolor='white', height=0.75)
+            ax.barh(y, percentages[5], left=(percentages[3] / 2) + percentages[4], color=colors[5], edgecolor='white', height=0.75)
+
+        # Place mean values in reserved margin space to avoid overlapping the bars.
+        for idx, mean_val in enumerate(means):
+            y = y_positions[idx]
+            ax.text(mean_label_x, y, f'{mean_val:.1f}', fontsize=7, fontweight='bold',
+                    ha='left', va='center', color='#374151',
+                    transform=ax.get_yaxis_transform(), clip_on=False)
+
+        # Group labels on the right margin
+        for g_start, g_end, g_label in POST_TRIAL_LIKERT_GROUPS:
+            mid_y = (y_positions[g_start] + y_positions[g_end - 1]) / 2
+            ax.text(group_label_x, mid_y, g_label, fontsize=7, color='#6b7280',
+                    ha='left', va='center', style='italic',
+                    transform=ax.get_yaxis_transform(), clip_on=False)
 
         ax.axvline(0, color='#111827', linewidth=0.8)
         ax.set_yticks(y_positions)
         ax.set_yticklabels(item_labels)
         ax.invert_yaxis()
-        ax.set_title(f'{group_name.title()} post-trial responses')
-        ax.set_xlabel('Response distribution (%)')
+        ax.set_title(f'{display_group_label(group_name)} post-trial responses')
+        ax.set_xlabel('\u2190 Unfavourable          Response distribution (%)          Favourable \u2192')
         ax.set_xlim(-100, 100)
         ax.grid(axis='x', linestyle=':', alpha=0.35)
 
@@ -3548,9 +4015,107 @@ def create_post_trial_likert_figure(rows: list[dict[str, Any]]) -> Any | None:
         return None
 
     handles = [plt.Rectangle((0, 0), 1, 1, color=colors[score]) for score in range(1, 6)]
-    fig.legend(handles, ['1', '2', '3', '4', '5'], loc='lower center', ncol=5, frameon=False, title='Likert response')
+    fig.legend(handles, ['1', '2', '3', '4', '5'], loc='lower center', ncol=5,
+               frameon=False, bbox_to_anchor=(0.5, 0.03))
+    fig.text(0.5, 0.01, '(R) = reverse-coded so that higher values are favourable for all items',
+             ha='center', fontsize=8, color='#6b7280')
     fig.suptitle('Post-trial questionnaire response distributions', fontsize=14)
-    fig.tight_layout(rect=(0, 0.05, 1, 0.96))
+    fig.tight_layout(rect=(0, 0.07, 1, 0.97), h_pad=2.0)
+    return fig
+
+
+def create_prepost_confidence_figure(rows: list[dict[str, Any]]) -> Any | None:
+    """Paired diverging-bar chart showing within-group pre→post changes on directly comparable confidence measures."""
+    digital_rows = [row for row in rows if row.get('allocation_group') == 'digital']
+    physical_rows = [row for row in rows if row.get('allocation_group') == 'physical']
+    if not digital_rows and not physical_rows:
+        return None
+
+    colors = {1: '#b91c1c', 2: '#ef4444', 3: '#d1d5db', 4: '#60a5fa', 5: '#1d4ed8'}
+
+    # Each pair: (label, pre_key_digital, pre_key_physical, post_key)
+    pairs = [
+        ('Setup confidence', 'q7_digital_guidance', 'q8_physical_guidance', 'q5_confidence_setup'),
+        ('Troubleshooting confidence', 'q9_problem_solving', 'q9_problem_solving', 'q6_confidence_troubleshooting'),
+    ]
+
+    fig, axes = plt.subplots(2, 1, figsize=(10, 8), sharex=True, sharey=True)
+    has_any_data = False
+    bar_height = 0.65
+    mean_label_x = 0.075
+
+    for ax, (group_name, group_rows) in zip(axes, [('Digital', digital_rows), ('Paper', physical_rows)]):
+        y_positions: list[float] = []
+        item_labels: list[str] = []
+        distributions: list[dict[int, float]] = []
+        means: list[float] = []
+
+        current_y = 0.0
+        for pair_label, pre_key_d, pre_key_p, post_key in pairs:
+            pre_key = pre_key_d if group_name == 'Digital' else pre_key_p
+
+            pre_vals = [int(to_number(r.get(pre_key))) for r in group_rows if to_number(r.get(pre_key)) in {1, 2, 3, 4, 5}]
+            post_vals = [int(to_number(r.get(post_key))) for r in group_rows if to_number(r.get(post_key)) in {1, 2, 3, 4, 5}]
+
+            for phase_label, vals in [('Pre', pre_vals), ('Post', post_vals)]:
+                if not vals:
+                    continue
+                has_any_data = True
+                total = len(vals)
+                pcts = {s: (vals.count(s) / total) * 100 for s in range(1, 6)}
+                y_positions.append(current_y)
+                item_labels.append(f'{pair_label} ({phase_label})')
+                distributions.append(pcts)
+                means.append(sum(vals) / total)
+                current_y += 1.0
+
+            current_y += 0.5  # gap between pairs
+
+        if not distributions:
+            ax.set_title(f'{group_name} (no data)')
+            ax.axis('off')
+            continue
+
+        ax.text(mean_label_x, 0.985, 'Mean', fontsize=8, fontweight='bold',
+          ha='left', va='top', color='#374151',
+          transform=ax.transAxes, clip_on=False)
+
+        for idx, pcts in enumerate(distributions):
+            y = y_positions[idx]
+            is_post = '(Post)' in item_labels[idx]
+            alpha = 1.0 if is_post else 0.55
+            neg_left = -(pcts[1] + pcts[2] + (pcts[3] / 2))
+            ax.barh(y, pcts[1], left=neg_left, color=colors[1], edgecolor='white', height=bar_height, alpha=alpha)
+            ax.barh(y, pcts[2], left=neg_left + pcts[1], color=colors[2], edgecolor='white', height=bar_height, alpha=alpha)
+            ax.barh(y, pcts[3] / 2, left=-(pcts[3] / 2), color=colors[3], edgecolor='white', height=bar_height, alpha=alpha)
+            ax.barh(y, pcts[3] / 2, left=0, color=colors[3], edgecolor='white', height=bar_height, alpha=alpha)
+            ax.barh(y, pcts[4], left=pcts[3] / 2, color=colors[4], edgecolor='white', height=bar_height, alpha=alpha)
+            ax.barh(y, pcts[5], left=(pcts[3] / 2) + pcts[4], color=colors[5], edgecolor='white', height=bar_height, alpha=alpha)
+            ax.text(mean_label_x, y, f'{means[idx]:.1f}', fontsize=7, fontweight='bold',
+                  ha='left', va='center', color='#374151',
+                  transform=ax.get_yaxis_transform(), clip_on=False)
+
+        ax.axvline(0, color='#111827', linewidth=0.8)
+        ax.set_yticks(y_positions)
+        ax.set_yticklabels(item_labels, fontsize=9)
+        ax.invert_yaxis()
+        ax.set_title(f'{group_name} group')
+        ax.set_xlabel('\u2190 Unfavourable          Response distribution (%)          Favourable \u2192')
+        ax.set_xlim(-100, 100)
+        ax.grid(axis='x', linestyle=':', alpha=0.35)
+
+    if not has_any_data:
+        plt.close(fig)
+        return None
+
+    handles = [plt.Rectangle((0, 0), 1, 1, color=colors[s]) for s in range(1, 6)]
+    pre_patch = plt.Rectangle((0, 0), 1, 1, facecolor='#60a5fa', alpha=0.55)
+    post_patch = plt.Rectangle((0, 0), 1, 1, facecolor='#60a5fa', alpha=1.0)
+    fig.legend(handles + [pre_patch, post_patch],
+               ['1', '2', '3', '4', '5', 'Pre-trial', 'Post-trial'],
+               loc='lower center', ncol=7, frameon=False, title='Likert response')
+    fig.suptitle('Within-group confidence change (pre \u2192 post)', fontsize=14)
+    fig.tight_layout(rect=(0, 0.06, 1, 0.95), h_pad=2.0)
     return fig
 
 
@@ -3612,9 +4177,17 @@ def create_ranked_page_use_figure(page_usage_rows: list[dict[str, Any]], digital
 def generate_figures(participant_rows: list[dict[str, Any]], page_usage_rows: list[dict[str, Any]], task_rows: list[dict[str, Any]], scenario_transition_rows: list[dict[str, Any]]) -> list[dict[str, str]]:
   figure_outputs: list[dict[str, str]] = []
   participant_trial_span_seconds = compute_task_span_seconds_by_participant(task_rows, 'scenario_card_1', 'short_form_q4')
+  participant_trial_span_rows = build_participant_metric_rows(
+    participant_rows,
+    participant_trial_span_seconds,
+    'scenario_1_to_q4_total_time_seconds',
+  )
   clean_scenario_task_rows = [row for row in task_rows if is_clean_scenario_task(row)]
   clean_short_form_task_rows = [row for row in task_rows if is_clean_short_form_task(row)]
   clean_scenario_total_rows = build_clean_scenario_total_rows(task_rows)
+  chat_subgroup_map = build_chat_subgroup_map(task_rows, participant_rows)
+  chat_subgroup_participant_rows = filter_rows_to_group_map(participant_rows, chat_subgroup_map)
+  chat_subgroup_task_rows = filter_rows_to_group_map(task_rows, chat_subgroup_map)
 
   for config in STARTER_FIGURES:
     fig = create_group_distribution_figure(participant_rows, config['key'], config['title'], config['ylabel'])
@@ -3623,6 +4196,30 @@ def generate_figures(participant_rows: list[dict[str, Any]], page_usage_rows: li
     latest = save_figure(fig, config['filename'])
     figure_outputs.append({
       'label': config['title'],
+      'path': str(latest),
+    })
+
+  scenario_completion_fig = create_scenario_completion_rate_figure(task_rows)
+  if scenario_completion_fig is not None:
+    latest = save_figure(scenario_completion_fig, 'starter-scenario-completion-rates')
+    figure_outputs.append({
+      'label': 'Scenario full-completion rates by group',
+      'path': str(latest),
+    })
+
+  information_retrieval_accuracy_fig = create_information_retrieval_accuracy_by_question_figure(task_rows)
+  if information_retrieval_accuracy_fig is not None:
+    latest = save_figure(information_retrieval_accuracy_fig, 'starter-information-retrieval-accuracy-by-question')
+    figure_outputs.append({
+      'label': 'Information retrieval question accuracy by question and group',
+      'path': str(latest),
+    })
+
+  average_scenario_score_fig = create_average_scenario_score_figure(participant_rows)
+  if average_scenario_score_fig is not None:
+    latest = save_figure(average_scenario_score_fig, 'starter-average-scenario-score-distribution')
+    figure_outputs.append({
+      'label': 'Distribution of average scenario scores by group',
       'path': str(latest),
     })
 
@@ -3639,11 +4236,90 @@ def generate_figures(participant_rows: list[dict[str, Any]], page_usage_rows: li
       'path': str(latest),
     })
 
+  full_trial_span_fig = create_group_distribution_figure(
+    participant_trial_span_rows,
+    'scenario_1_to_q4_total_time_seconds',
+    'Scenario 1 start to Question 4 end time by group',
+    'Total time (s)',
+  )
+  if full_trial_span_fig is not None:
+    latest = save_figure(full_trial_span_fig, 'starter-scenario-1-to-q4-total-time')
+    figure_outputs.append({
+      'label': 'Scenario 1 start to Question 4 end time by group',
+      'path': str(latest),
+    })
+
   likert_fig = create_post_trial_likert_figure(participant_rows)
   if likert_fig is not None:
     latest = save_figure(likert_fig, 'starter-post-trial-likert')
     figure_outputs.append({
       'label': 'Post-trial questionnaire response distributions',
+      'path': str(latest),
+    })
+
+  prepost_conf_fig = create_prepost_confidence_figure(participant_rows)
+  if prepost_conf_fig is not None:
+    latest = save_figure(prepost_conf_fig, 'starter-prepost-confidence')
+    figure_outputs.append({
+      'label': 'Within-group confidence change (pre vs post)',
+      'path': str(latest),
+    })
+
+  for config in CHAT_SUBGROUP_FIGURES:
+    fig = create_group_distribution_figure(
+      chat_subgroup_participant_rows,
+      config['key'],
+      config['title'],
+      config['ylabel'],
+      group_configs=CHAT_SUBGROUP_CONFIGS,
+      group_field='analysis_group',
+    )
+    if fig is None:
+      continue
+    latest = save_figure(fig, config['filename'])
+    figure_outputs.append({
+      'label': config['title'],
+      'path': str(latest),
+    })
+
+  chat_average_scenario_score_fig = create_group_distribution_figure(
+    chat_subgroup_participant_rows,
+    'scenario_avg_score',
+    'Distribution of average scenario scores by chat-primary subgroup',
+    'Average scenario score',
+    group_configs=CHAT_SUBGROUP_CONFIGS,
+    group_field='analysis_group',
+  )
+  if chat_average_scenario_score_fig is not None:
+    latest = save_figure(chat_average_scenario_score_fig, 'starter-chat-subgroup-average-scenario-score-distribution')
+    figure_outputs.append({
+      'label': 'Distribution of average scenario scores by chat-primary subgroup',
+      'path': str(latest),
+    })
+
+  chat_scenario_completion_fig = create_scenario_completion_rate_figure(
+    chat_subgroup_task_rows,
+    group_configs=CHAT_SUBGROUP_CONFIGS,
+    group_field='analysis_group',
+    title='Scenario full-completion rates by chat-primary subgroup',
+  )
+  if chat_scenario_completion_fig is not None:
+    latest = save_figure(chat_scenario_completion_fig, 'starter-chat-subgroup-scenario-completion-rates')
+    figure_outputs.append({
+      'label': 'Scenario full-completion rates by chat-primary subgroup',
+      'path': str(latest),
+    })
+
+  chat_information_retrieval_accuracy_fig = create_information_retrieval_accuracy_by_question_figure(
+    chat_subgroup_task_rows,
+    group_configs=CHAT_SUBGROUP_CONFIGS,
+    group_field='analysis_group',
+    title='Information retrieval question accuracy by question and chat-primary subgroup',
+  )
+  if chat_information_retrieval_accuracy_fig is not None:
+    latest = save_figure(chat_information_retrieval_accuracy_fig, 'starter-chat-subgroup-information-retrieval-accuracy-by-question')
+    figure_outputs.append({
+      'label': 'Information retrieval question accuracy by question and chat-primary subgroup',
       'path': str(latest),
     })
 
@@ -3674,6 +4350,23 @@ def generate_figures(participant_rows: list[dict[str, Any]], page_usage_rows: li
       'path': str(latest),
     })
 
+  chat_scenario_duration_fig = create_task_duration_by_group_figure(
+    chat_subgroup_task_rows,
+    'scenario_card_',
+    'task_total_duration_seconds',
+    'Scenario duration by scenario and chat-primary subgroup',
+    'Duration (s)',
+    group_configs=CHAT_SUBGROUP_CONFIGS,
+    group_field='analysis_group',
+    show_chat_markers=False,
+  )
+  if chat_scenario_duration_fig is not None:
+    latest = save_figure(chat_scenario_duration_fig, 'starter-chat-subgroup-scenario-duration-by-scenario')
+    figure_outputs.append({
+      'label': 'Scenario duration by scenario and chat-primary subgroup',
+      'path': str(latest),
+    })
+
   clean_scenario_duration_fig = create_task_duration_by_group_figure(
     clean_scenario_task_rows,
     'scenario_card_',
@@ -3692,13 +4385,30 @@ def generate_figures(participant_rows: list[dict[str, Any]], page_usage_rows: li
     task_rows,
     'short_form_q',
     'short_form_duration_seconds',
-    'Short-form question duration by question and group',
+    'Information retrieval question duration by question and group',
     'Duration (s)',
   )
   if question_duration_fig is not None:
     latest = save_figure(question_duration_fig, 'starter-short-form-duration-by-question')
     figure_outputs.append({
-      'label': 'Short-form question duration by question and group',
+      'label': 'Information retrieval question duration by question and group',
+      'path': str(latest),
+    })
+
+  chat_question_duration_fig = create_task_duration_by_group_figure(
+    chat_subgroup_task_rows,
+    'short_form_q',
+    'short_form_duration_seconds',
+    'Information retrieval question duration by question and chat-primary subgroup',
+    'Duration (s)',
+    group_configs=CHAT_SUBGROUP_CONFIGS,
+    group_field='analysis_group',
+    show_chat_markers=False,
+  )
+  if chat_question_duration_fig is not None:
+    latest = save_figure(chat_question_duration_fig, 'starter-chat-subgroup-short-form-duration-by-question')
+    figure_outputs.append({
+      'label': 'Information retrieval question duration by question and chat-primary subgroup',
       'path': str(latest),
     })
 
@@ -3706,13 +4416,13 @@ def generate_figures(participant_rows: list[dict[str, Any]], page_usage_rows: li
     clean_short_form_task_rows,
     'short_form_q',
     'short_form_duration_seconds',
-    'Short-form question duration by question and group (fully correct, no errors)',
+    'Information retrieval question duration by question and group (fully correct, no errors)',
     'Duration (s)',
   )
   if clean_question_duration_fig is not None:
     latest = save_figure(clean_question_duration_fig, 'starter-short-form-duration-by-question-clean-only')
     figure_outputs.append({
-      'label': 'Short-form question duration by question and group (fully correct, no errors)',
+      'label': 'Information retrieval question duration by question and group (fully correct, no errors)',
       'path': str(latest),
     })
 
@@ -3776,6 +4486,7 @@ def build_report(
     participant_characteristics_rows: list[dict[str, Any]],
     baseline_equivalence_rows: list[dict[str, str]] | None = None,
     fdr_corrected_rows: list[dict[str, str]] | None = None,
+    domain_fdr_corrected_rows: list[dict[str, str]] | None = None,
     effect_size_ci_rows: list[dict[str, str]] | None = None,
     learning_effects_rows: list[dict[str, str]] | None = None,
     completion_rate_rows: list[dict[str, str]] | None = None,
@@ -3836,9 +4547,9 @@ def build_report(
             )
 
     lines.extend(['', '## Digital pathway metrics by task', ''])
-    lines.append('- Based on deduplicated page-view sequences within each digital task instance.')
+    lines.append('- Based on deduplicated in-task page-view sequences, with task-level fallbacks used when no in-task page-view event was recorded.')
     lines.append('- Backtracking % is the share of task instances containing an A -> B -> A return pattern after consecutive duplicate page views are removed.')
-    lines.append('- Chat used % and Chat primary % come from the task-level telemetry classification in the task export.')
+    lines.append('- Chat primary % is the share of task instances where chat dwell share was at least 50% of task page dwell and a chat submit event occurred.')
     lines.append('')
     if not pathway_summary_rows:
       lines.append('No digital task pathway rows were available for summary.')
@@ -3856,6 +4567,12 @@ def build_report(
       lines.append('FDR-adjusted p-values for all primary between-group outcome tests.')
       lines.append('')
       lines.extend(to_markdown_table(fdr_corrected_rows).strip().splitlines())
+
+    if domain_fdr_corrected_rows:
+      lines.extend(['', '## Domain-wise BH correction (sensitivity analysis)', ''])
+      lines.append('BH FDR correction applied within each outcome domain.')
+      lines.append('')
+      lines.extend(to_markdown_table(domain_fdr_corrected_rows).strip().splitlines())
 
     if effect_size_ci_rows:
       lines.extend(['', "## Effect size confidence intervals (Cliff's delta)", ''])
@@ -3883,7 +4600,7 @@ def build_report(
 
     if chat_impact_rows:
       lines.extend(['', '## Chat impact within digital group', ''])
-      lines.append('Exploratory comparison of digital participants who used chat vs those who did not.')
+      lines.append('Exploratory comparison of digital participants for whom chat was primary in at least one task versus other digital participants.')
       lines.append('Caution: small subgroup sizes limit statistical power.')
       lines.append('')
       lines.extend(to_markdown_table(chat_impact_rows).strip().splitlines())
@@ -3983,6 +4700,63 @@ def normalize_task_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return normalized_rows
 
 
+def apply_task_duration_overrides(task_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+  overrides = {
+    ('P05', 'scenario_card_1'),
+    ('P05', 'scenario_card_3'),
+  }
+
+  overridden_rows: list[dict[str, Any]] = []
+  for row in task_rows:
+    normalized = dict(row)
+    participant_id = str(normalized.get('participant_id') or '').strip().upper()
+    task_id = str(normalized.get('task_id') or '').strip()
+    observer_duration = to_number(normalized.get('observer_task_length_seconds'))
+    if (participant_id, task_id) in overrides and observer_duration is not None:
+      normalized['task_total_duration_seconds'] = float(observer_duration)
+    overridden_rows.append(normalized)
+
+  return overridden_rows
+
+
+def align_participant_scenario_timing_with_task_rows(
+  participant_rows: list[dict[str, Any]],
+  task_rows: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+  scenario_totals: dict[str, dict[str, float]] = {}
+
+  for row in task_rows:
+    task_id = str(row.get('task_id') or '').strip()
+    if not task_id.startswith('scenario_card_'):
+      continue
+    participant_id = str(row.get('participant_id') or '').strip()
+    duration = to_number(row.get('task_total_duration_seconds'))
+    if not participant_id or duration is None:
+      continue
+
+    participant_metrics = scenario_totals.setdefault(participant_id, {
+      'scenario_task_count': 0.0,
+      'scenario_total_time_seconds': 0.0,
+    })
+    participant_metrics['scenario_task_count'] += 1.0
+    participant_metrics['scenario_total_time_seconds'] += float(duration)
+
+  aligned_rows: list[dict[str, Any]] = []
+  for row in participant_rows:
+    normalized = dict(row)
+    participant_id = str(normalized.get('participant_id') or '').strip()
+    metrics = scenario_totals.get(participant_id)
+    if metrics is not None:
+      task_count = int(metrics['scenario_task_count'])
+      total_seconds = float(metrics['scenario_total_time_seconds'])
+      normalized['scenario_task_count'] = task_count
+      normalized['scenario_total_time_seconds'] = total_seconds
+      normalized['scenario_avg_time_seconds'] = (total_seconds / task_count) if task_count else None
+    aligned_rows.append(normalized)
+
+  return aligned_rows
+
+
 def main() -> int:
     load_dotenv(DOTENV_PATH)
     database_url = os.environ.get('DATABASE_URL')
@@ -3990,23 +4764,33 @@ def main() -> int:
         print('DATABASE_URL is required. Set it in the environment or add it to a .env file in the workspace root.', file=sys.stderr)
         return 1
 
-    participant_rows = normalize_participant_rows(fetch_rows(database_url))
-    page_usage_rows = fetch_page_usage_rows(database_url)
-    raw_task_rows = fetch_task_rows(database_url)
-    scenario_transition_rows = fetch_scenario_transition_rows(database_url)
-    pathway_instance_rows = fetch_pathway_instance_rows(database_url)
-    questionnaire_comment_rows = fetch_questionnaire_comment_rows(database_url)
-    allocation_group_by_participant = {
-      str(row.get('participant_id') or '').strip(): str(row.get('allocation_group') or '').strip()
-      for row in participant_rows
-    }
+    canonical_allocations = load_canonical_participant_allocations()
+    if not canonical_allocations:
+        print('Canonical participant allocation list is empty or unavailable.', file=sys.stderr)
+        return 1
+    canonical_ids = set(canonical_allocations)
+
+    participant_rows = [
+      {
+        **row,
+        'allocation_group': canonical_allocations[str(row.get('participant_id') or '').strip()],
+      }
+      for row in filter_rows_to_canonical_participants(normalize_participant_rows(fetch_rows(database_url)), canonical_ids)
+    ]
+    page_usage_rows = filter_rows_to_canonical_participants(fetch_page_usage_rows(database_url), canonical_ids)
+    raw_task_rows = filter_rows_to_canonical_participants(fetch_task_rows(database_url), canonical_ids)
+    scenario_transition_rows = filter_rows_to_canonical_participants(fetch_scenario_transition_rows(database_url), canonical_ids)
+    pathway_instance_rows = filter_rows_to_canonical_participants(fetch_pathway_instance_rows(database_url), canonical_ids)
+    questionnaire_comment_rows = filter_rows_to_canonical_participants(fetch_questionnaire_comment_rows(database_url), canonical_ids)
     task_rows = normalize_task_rows([
       {
         **row,
-        'allocation_group': allocation_group_by_participant.get(str(row.get('participant_id') or '').strip(), str(row.get('trial_mode') or '').strip()),
+        'allocation_group': canonical_allocations.get(str(row.get('participant_id') or '').strip(), str(row.get('trial_mode') or '').strip()),
       }
       for row in raw_task_rows
     ])
+    task_rows = apply_task_duration_overrides(task_rows)
+    participant_rows = align_participant_scenario_timing_with_task_rows(participant_rows, task_rows)
     digital_rows = [row for row in participant_rows if row.get('allocation_group') == 'digital']
     physical_rows = [row for row in participant_rows if row.get('allocation_group') == 'physical']
 
@@ -4086,6 +4870,7 @@ def main() -> int:
     pathway_summary_rows = build_pathway_summary_rows(pathway_instance_rows, task_rows)
     baseline_equivalence_rows = build_baseline_equivalence_rows(participant_rows)
     fdr_corrected_rows = build_fdr_corrected_rows(test_rows)
+    domain_fdr_corrected_rows = build_domain_fdr_corrected_rows(test_rows)
     effect_size_ci_rows = build_effect_size_ci_rows(test_rows, digital_rows, physical_rows, OUTCOMES)
     learning_effects_rows = build_learning_effects_rows(task_rows)
     completion_rate_rows = build_completion_rate_rows(task_rows)
@@ -4103,6 +4888,7 @@ def main() -> int:
         figure_outputs, pathway_summary_rows, participant_characteristics_rows,
         baseline_equivalence_rows=baseline_equivalence_rows,
         fdr_corrected_rows=fdr_corrected_rows,
+        domain_fdr_corrected_rows=domain_fdr_corrected_rows,
         effect_size_ci_rows=effect_size_ci_rows,
         learning_effects_rows=learning_effects_rows,
         completion_rate_rows=completion_rate_rows,
@@ -4149,6 +4935,7 @@ def main() -> int:
     new_tables: list[tuple[str, list[dict[str, str]]]] = [
         ('baseline-equivalence', baseline_equivalence_rows),
         ('fdr-corrected-p-values', fdr_corrected_rows),
+        ('fdr-domain-corrected-p-values', domain_fdr_corrected_rows),
         ('effect-size-ci', effect_size_ci_rows),
         ('learning-effects', learning_effects_rows),
         ('completion-rates', completion_rate_rows),
